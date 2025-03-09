@@ -1,24 +1,17 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import Header from '@/components/Header';
-import Footer from '@/components/Footer';
 
 export const metadata: Metadata = {
-  title: 'STARA | Silver Collections',
-  description: 'Explore our collection of Silver',
+  title: 'PALMONAS | Demifine Jewellery',
+  description: 'Explore our collection of Demifine Jewellery',
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body>
-        <Header />
-        <main>{children}</main>
-        <Footer />
+        {/* Render children directly without wrapping in ShopLayout or AdminLayout */}
+        {children}
       </body>
     </html>
   );
