@@ -1,17 +1,17 @@
 export const menuItems = [
     { 
       name: 'New Arrivals', 
-      link: '/new-arrivals',
+      link: '/collections/new-arrivals',
       hasDropdown: false 
     },
     { 
       name: 'Best Seller', 
-      link: '/best-seller',
+      link: '/collections/best-seller',
       hasDropdown: false 
     },
     { 
-      name: 'Lab Grown Diamond', 
-      link: '/lab-grown-diamond',
+      name: 'Lab Grown Silver', 
+      link: '/collections/lab-grown-silver',
       hasDropdown: false,
       badge: { text: 'New', color: 'bg-yellow-400' } 
     },
@@ -64,35 +64,35 @@ export const menuItems = [
     },
     { 
       name: 'Shop By', 
-      link: '/shop-by',
+      link: '-by',
       hasDropdown: true,
       dropdownContent: [
         {
           title: 'Metal Type',
           items: [
-            { name: 'Gold', link: '/shop-by/gold' },
-            { name: 'Silver', link: '/shop-by/silver' },
-            { name: 'Rose Gold', link: '/shop-by/rose-gold' },
-            { name: 'Platinum', link: '/shop-by/platinum' }
+            { name: 'Gold', link: '-by/gold' },
+            { name: 'Silver', link: '-by/silver' },
+            { name: 'Rose Gold', link: '-by/rose-gold' },
+            { name: 'Platinum', link: '-by/platinum' }
           ]
         },
         {
           title: 'Gemstone',
           items: [
-            { name: 'Diamond', link: '/shop-by/diamond' },
-            { name: 'Pearl', link: '/shop-by/pearl' },
-            { name: 'Ruby', link: '/shop-by/ruby' },
-            { name: 'Emerald', link: '/shop-by/emerald' },
-            { name: 'Sapphire', link: '/shop-by/sapphire' }
+            { name: 'Diamond', link: '-by/diamond' },
+            { name: 'Pearl', link: '-by/pearl' },
+            { name: 'Ruby', link: '-by/ruby' },
+            { name: 'Emerald', link: '-by/emerald' },
+            { name: 'Sapphire', link: '-by/sapphire' }
           ]
         },
         {
           title: 'Occasion',
           items: [
-            { name: 'Wedding', link: '/shop-by/wedding' },
-            { name: 'Party', link: '/shop-by/party' },
-            { name: 'Casual', link: '/shop-by/casual' },
-            { name: 'Office', link: '/shop-by/office' }
+            { name: 'Wedding', link: '-by/wedding' },
+            { name: 'Party', link: '-by/party' },
+            { name: 'Casual', link: '-by/casual' },
+            { name: 'Office', link: '-by/office' }
           ]
         }
       ]
