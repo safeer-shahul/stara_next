@@ -12,3 +12,27 @@ body {
   background: var(--background);
   font-family: 'Plus Jakarta Sans', sans-serif;
 }
+
+/* .swiper-button-prev,
+.swiper-button-next {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: black;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+.swiper-button-prev:hover,
+.swiper-button-next:hover {
+  background-color: white;
+  color: black;
+}
+
+.swiper-button-prev::after,
+.swiper-button-next::after {
+  display: none;
+} */
