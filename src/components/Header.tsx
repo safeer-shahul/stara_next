@@ -7,6 +7,7 @@ import { Search, User, Heart, ShoppingBag, Menu, X, ChevronDown } from 'lucide-r
 import MegaDropdown from './MegaDropdown';
 import MobileDropdown from './MobileDropdown';
 import { menuItems } from './menuData';
+import CartDrawer from './CartDrawer';
 
 type MenuItem = {
   name: string;
@@ -34,6 +35,14 @@ export default function Header() {
   const toggleDropdown = (index: number) => {
     setActiveDropdown(activeDropdown === index ? null : index);
   };
+
+  const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
+
+  const handleCartClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    setIsCartOpen(true);
+  };
+
 
   return (
     <>
@@ -76,10 +85,12 @@ export default function Header() {
               <Heart size={22} />
               <span className="absolute -top-2 -right-2 bg-[#175e7a] text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">0</span>
             </Link>
-            <Link href="/cart" className="relative">
+            <a href="#" className="relative" onClick={handleCartClick}>
               <ShoppingBag size={22} />
-              <span className="absolute -top-2 -right-2 bg-[#175e7a] text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">0</span>
-            </Link>
+              <span className="absolute -top-2 -right-2 bg-[#175e7a] text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                0
+              </span>
+            </a>
           </div>
         </div>
 
@@ -156,6 +167,7 @@ export default function Header() {
           </div>
         )}
       </header>
+      <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
     </>
   );
 }
