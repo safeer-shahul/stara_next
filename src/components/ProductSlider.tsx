@@ -10,6 +10,7 @@ import 'swiper/css';
 import 'swiper/css/navigation';
 import 'swiper/css/autoplay';
 import { isMobile } from 'react-device-detect';
+import { productData } from './productSliderData';
 
 interface ProductItem {
   id: string;
@@ -23,7 +24,12 @@ interface ProductItem {
   promo?: string;
 }
 
-export default function ProductSlider() {
+interface ProductSliderProps {
+  title: string;
+  type: 'dateNight' | 'bestsellers' | 'newArrivals';
+}
+
+export default function ProductSlider({ title, type = 'dateNight' }: ProductSliderProps) {
   const router = useRouter();
   const [swiperInstance, setSwiperInstance] = useState<any>(null);
   const [windowWidth, setWindowWidth] = useState<number>(0);
@@ -53,76 +59,8 @@ export default function ProductSlider() {
     }
   }, [windowWidth, swiperInstance]);
   
-  // Sample product data based on the images, now with hover images
-  const products: ProductItem[] = [
-    {
-      id: 'p1',
-      image: '/images/productslider/PM-EARRINGS-037_1_0040.webp',
-      hoverImage: '/images/productslider/PM-EARRINGS-037_3.webp',
-      title: 'Small Heart Hoop Earrings',
-      price: 2580,
-      originalPrice: 3686,
-      discount: '30%',
-      link: '/products/small-heart-hoop-earrings',
-      promo: 'BUY 1 GET 1'
-    },
-    {
-      id: 'p2',
-      image: '/images/productslider/PM-EARRINGS-037_1_0040.webp',
-      hoverImage: '/images/productslider/PM-EARRINGS-037_3.webp',
-      title: 'Green Baguette Tennis Bracelet',
-      price: 3010,
-      originalPrice: 4300,
-      discount: '30%',
-      link: '/products/green-baguette-tennis-bracelet',
-      promo: 'BUY 1 GET 1'
-    },
-    {
-      id: 'p3',
-      image: '/images/productslider/PM-EARRINGS-037_1_0040.webp',
-      hoverImage: '/images/productslider/PM-EARRINGS-037_3.webp',
-      title: 'Black Onyx Ring',
-      price: 2687,
-      originalPrice: 3839,
-      discount: '30%',
-      link: '/products/black-onyx-ring',
-      promo: 'BUY 1 GET 1'
-    },
-    {
-      id: 'p5',
-      image: '/images/productslider/PM-EARRINGS-037_1_0040.webp',
-      hoverImage: '/images/productslider/PM-EARRINGS-037_3.webp',
-      title: 'Peripheral Heart Earrings',
-      price: 2164,
-      originalPrice: 3091,
-      discount: '29%',
-      link: '/products/peripheral-heart-earrings',
-      promo: 'BUY 1 GET 1'
-    },
-    // Adding more products to ensure we have enough for large screens
-    {
-      id: 'p6',
-      image: '/images/productslider/PM-EARRINGS-037_1_0040.webp',
-      hoverImage: '/images/productslider/PM-EARRINGS-037_3.webp',
-      title: 'Silver Chain Necklace',
-      price: 3500,
-      originalPrice: 5000,
-      discount: '30%',
-      link: '/products/silver-chain-necklace',
-      promo: 'BUY 1 GET 1'
-    },
-    {
-      id: 'p7',
-      image: '/images/productslider/PM-EARRINGS-037_1_0040.webp',
-      hoverImage: '/images/productslider/PM-EARRINGS-037_3.webp',
-      title: 'Gold Plated Bangle',
-      price: 4200,
-      originalPrice: 6000,
-      discount: '30%',
-      link: '/products/gold-plated-bangle',
-      promo: 'BUY 1 GET 1'
-    },
-  ];
+  // Get products based on the type
+  const products: ProductItem[] = productData[type] || [];
 
   const [hoveredProduct, setHoveredProduct] = useState<string | null>(null);
 
@@ -158,7 +96,7 @@ export default function ProductSlider() {
   return (
     <div className="w-full mx-auto py-8 relative px-2 lg:px-8 xl:px-14">
       <h2 className="text-2xl md:text-3xl font-medium text-center mb-8">
-        Date Night
+        {title}
       </h2>
       
       <div className="relative">
@@ -173,8 +111,8 @@ export default function ProductSlider() {
           }}
           modules={[Autoplay, Navigation]}
           navigation={{
-            prevEl: '.product-swiper-prev',
-            nextEl: '.product-swiper-next',
+            prevEl: `.product-swiper-prev-${type}`,
+            nextEl: `.product-swiper-next-${type}`,
             enabled: true,
           }}
           watchOverflow={true}
@@ -182,7 +120,7 @@ export default function ProductSlider() {
           observeParents={true}
           updateOnWindowResize={true}
           onSwiper={(swiper) => setSwiperInstance(swiper)}
-          className="product-swiper"
+          className={`product-swiper-${type}`}
           breakpoints={{
             0: {
               slidesPerView: 2,
@@ -293,16 +231,16 @@ export default function ProductSlider() {
           ))}
         </Swiper>
         
-        {/* Lucide Navigation Buttons - Direct onClick handlers for better reliability */}
+        {/* Lucide Navigation Buttons - Each slider gets unique class names based on type */}
         <button 
           onClick={goPrev}
-          className="product-swiper-prev absolute left-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 lg:w-10 lg:h-10 flex items-center justify-center rounded-full bg-black text-white hover:bg-white hover:text-black transition-colors"
+          className={`product-swiper-prev-${type} absolute left-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 lg:w-10 lg:h-10 flex items-center justify-center rounded-full bg-black text-white hover:bg-white hover:text-black transition-colors`}
         >
           <ChevronLeft size={isMobile ? 20 : 24} />
         </button>
         <button 
           onClick={goNext}
-          className="product-swiper-next absolute right-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 lg:w-10 lg:h-10 flex items-center justify-center rounded-full bg-black text-white hover:bg-white hover:text-black transition-colors"
+          className={`product-swiper-next-${type} absolute right-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 lg:w-10 lg:h-10 flex items-center justify-center rounded-full bg-black text-white hover:bg-white hover:text-black transition-colors`}
         >
           <ChevronRight size={isMobile ? 20 : 24} />
         </button>
