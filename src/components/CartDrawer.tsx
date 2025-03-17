@@ -1,62 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, ShoppingBag, Plus, Minus, Trash2, ChevronRight } from 'lucide-react';
-import Image from 'next/image';
-
-// Define types
-type Product = {
-  id: string;
-  name: string;
-  price: number;
-  originalPrice: number;
-  discount: string;
-  image: string;
-};
-
-type CartItem = {
-  id: string;
-  quantity: number;
-};
-
-type CouponType = {
-  code: string;
-  description: string;
-  discount: number;
-};
-
-type CartDrawerProps = {
-  isOpen: boolean;
-  onClose: () => void;
-};
-
-// Sample product data for testing
-const SAMPLE_PRODUCTS: Record<string, Product> = {
-  '1': {
-    id: '1',
-    name: 'Golden Crossover Kada Bracelet',
-    price: 2250,
-    originalPrice: 3214,
-    discount: '30%',
-    image: '/starablack.webp', // placeholder - replace with actual image
-  },
-  '2': {
-    id: '2',
-    name: 'Chic Layered Necklace',
-    price: 899,
-    originalPrice: 3299,
-    discount: '73%',
-    image: '/starablack.webp', // placeholder - replace with actual image
-  },
-  '3': {
-    id: '3',
-    name: 'Gilded Oval Bangle',
-    price: 999,
-    originalPrice: 2999,
-    discount: '66%',
-    image: '/starablack.webp', // placeholder - replace with actual image
-  }
-};
+import { X, ShoppingBag } from 'lucide-react';
+import { Product, CartDrawerProps, SAMPLE_PRODUCTS, CouponType } from './type';
+import CartItem from './CartItem';
+import FrequentlyBoughtTogether from './FrequentlyBoughtTogether';
+import CouponSection from './CouponSection';
+import CouponsList from './CouponsList';
 
 const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
   const [cartProducts, setCartProducts] = useState<Product[]>([]);
@@ -115,6 +65,24 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
     setShowCoupons(true);
   };
 
+  const handleApplyCouponFromList = (code: string): void => {
+    setCouponCode(code);
+    if (code === 'B1G1') {
+      setAppliedCoupon({
+        code: 'B1G1',
+        description: 'Buy 1 Get 1 Free',
+        discount: calculateSubtotal() * 0.5 // 50% discount as an example
+      });
+    } else if (code === 'TANK') {
+      setAppliedCoupon({
+        code: 'TANK',
+        description: '10% off on all jewelry',
+        discount: calculateSubtotal() * 0.1 // 10% discount
+      });
+    }
+    setShowCoupons(false);
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -133,111 +101,33 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
               <X size={22} />
             </button>
           </div>
+          <>
+          {!showCoupons && (
+            <div className="bg-[#175e7a] py-1 text-center">
+            <p className="text-white text-[14px]">BUY 1 GET 1 FREE | USE CODE : B1G1</p>
+          </div>
+          )}
+          </>
           <div className="flex-1 overflow-y-auto">
             {showCoupons ? (
-              <div className="p-4">
-                <button 
-                  onClick={() => setShowCoupons(false)}
-                  className="flex items-center text-gray-600 mb-4"
-                >
-                  <X size={16} className="mr-2" /> Back to Cart
-                </button>
-                
-                <h3 className="text-lg font-medium mb-4">Available Coupons</h3>
-                
-                <div className="border rounded-md p-4 mb-4">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="font-bold">B1G1</p>
-                      <p className="text-sm text-gray-600">Buy 1 Get 1 Free</p>
-                    </div>
-                    <button 
-                      onClick={() => {
-                        setCouponCode('B1G1');
-                        handleApplyCoupon();
-                      }}
-                      className="px-3 py-1 bg-[#175e7a] text-white rounded-full text-sm"
-                    >
-                      Apply
-                    </button>
-                  </div>
-                </div>
-
-                <div className="border rounded-md p-4 mb-4">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="font-bold">TANK</p>
-                      <p className="text-sm text-gray-600">10% off on all jewelry</p>
-                    </div>
-                    <button 
-                      className="px-3 py-1 bg-[#175e7a] text-white rounded-full text-sm"
-                      onClick={() => {
-                        setCouponCode('TANK');
-                        handleApplyCoupon();
-                      }}
-                    >
-                      Apply
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <CouponsList 
+                onBack={() => setShowCoupons(false)}
+                onApplyCoupon={handleApplyCouponFromList}
+              />
             ) : (
               <>
-                <div className="bg-[#175e7a] py-1 text-center">
-                  <p className="text-white text-[14px]">BUY 1 GET 1 FREE | USE CODE : B1G1</p>
-                </div>
-                
+                   
                 {/* Items */}
                 <div className="p-2 space-y-2">
                   {cartProducts.length > 0 ? (
                     cartProducts.map(item => (
-                      <div key={item.id} className="flex rounded-md border border-gray-200 p-2 bg-white">
-                        <div className="w-20 h-20 relative mr-3 bg-gray-100 rounded">
-                          <Image 
-                            src={item.image} 
-                            alt={item.name}
-                            fill
-                            className="object-contain p-2"
-                          />
-                        </div>
-                        
-                        <div className="flex-1">
-                          <div className="flex justify-between">
-                            <h3 className="text-sm font-medium">{item.name}</h3>
-                          </div>
-                          
-                          <div className="flex items-center mt-1">
-                            <p className="text-sm font-bold">₹{item.price.toLocaleString()}</p>
-                            <p className="text-xs text-gray-500 line-through ml-2">
-                              ₹{item.originalPrice.toLocaleString()}
-                            </p>
-                            <span className="ml-2 bg-black text-white text-xs px-1.5 py-0.5 rounded">
-                              {item.discount}
-                            </span>
-                          </div>
-                          
-                          <div className="flex items-center mt-2">
-                            <button 
-                              className="w-5 h-5 rounded-full border flex items-center justify-center"
-                              onClick={() => handleQuantityChange(item.id, -1)}
-                            >
-                              <Minus size={10} />
-                            </button>
-                            <span className="mx-2 text-sm">1</span>
-                            <button 
-                              className="w-5 h-5 rounded-full border flex items-center justify-center"
-                              onClick={() => handleQuantityChange(item.id, 1)}
-                            >
-                              <Plus size={10} />
-                            </button>
-                            <button onClick={() => handleRemoveItem(item.id)} className='ml-2'>
-                              <Trash2 size={16} className="text-gray-500" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
+                      <CartItem 
+                        key={item.id}
+                        product={item}
+                        onRemove={handleRemoveItem}
+                        onQuantityChange={handleQuantityChange}
+                      />
                     ))
-                    
                   ) : (
                     <div className="text-center py-8">
                       <ShoppingBag size={40} className="mx-auto text-gray-300 mb-3" />
@@ -245,62 +135,44 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                     </div>
                   )}
                 </div>
+
+               
               </>
             )}
           </div>
+       
+          <>
+             {/* Frequently Bought Together Section */}
+             {!showCoupons && cartProducts.length > 0 && <FrequentlyBoughtTogether />}
+          </>
 
           {/* Footer */}
           {!showCoupons && cartProducts.length > 0 && (
-            <div className="border-t px-4 py-4">
-              <div className="bg-gray-50 p-4 rounded-lg mb-4">
-                <div className="flex items-center border-b pb-2">
-                  <input 
-                    type="text" 
-                    placeholder="Enter Coupon Code"
-                    className="flex-1 text-sm border-none bg-transparent focus:outline-none"
-                    value={couponCode}
-                    onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                  />
-                  <button 
-                    className="text-[#175e7a] font-medium text-sm"
-                    onClick={handleApplyCoupon}
-                  >
-                    Apply
-                  </button>
-                </div>
-                
-                <div className="flex justify-between mt-2">
-                  <button 
-                    className="text-[#175e7a] font-medium text-sm flex items-center"
-                    onClick={handleViewCoupons}
-                  >
-                    View Coupons <ChevronRight size={16} />
-                  </button>
-                  
-                  {appliedCoupon && (
-                    <div className="text-green-600 text-sm">
-                      {appliedCoupon.code} Applied
-                    </div>
-                  )}
-                </div>
-              </div>
+            <div className="px-4 pb-6">
+              <CouponSection 
+                couponCode={couponCode}
+                setCouponCode={setCouponCode}
+                appliedCoupon={appliedCoupon}
+                onApply={handleApplyCoupon}
+                onViewCoupons={handleViewCoupons}
+              />
               
-              <div className="space-y-2 mb-4">
+              <div className="mb-4">
                 {appliedCoupon && (
                   <div className="flex justify-between text-green-600">
-                    <span>Discount ({appliedCoupon.description})</span>
-                    <span>-₹{appliedCoupon.discount.toLocaleString()}</span>
+                    <span className='text-[13px]'>Discount ({appliedCoupon.description})</span>
+                    <span className='font-bold'>-₹{appliedCoupon.discount.toLocaleString()}</span>
                   </div>
                 )}
                 
-                <div className="flex justify-between font-bold">
-                  <span>Estimated Total</span>
-                  <span>₹{total.toLocaleString()}</span>
+                <div className="flex items-center justify-between text-[#7F7F7F]">
+                  <span className='text-[13px]'>Estimated Total</span>
+                  <span className='font-bold'>₹{total.toLocaleString()}</span>
                 </div>
               </div>
               
               <button 
-                className="w-full bg-pink-200 text-black font-medium py-3 rounded flex items-center justify-center"
+                className="w-full bg-[#175e7a] text-white font-medium py-3 rounded flex items-center justify-center"
               >
                 Proceed To Checkout
               </button>
