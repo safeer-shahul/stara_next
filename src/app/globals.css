@@ -13,26 +13,15 @@ body {
   font-family: 'Plus Jakarta Sans', sans-serif;
 }
 
-/* .swiper-button-prev,
-.swiper-button-next {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background-color: black;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background-color 0.3s, color 0.3s;
+@keyframes shake {
+  0% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(8px); }
+  60% { transform: translateX(-5px); }
+  80% { transform: translateX(5px); }
+  100% { transform: translateX(0); }
 }
 
-.swiper-button-prev:hover,
-.swiper-button-next:hover {
-  background-color: white;
-  color: black;
+.shake-animation {
+  animation: shake 0.8s ease-in-out;
 }
-
-.swiper-button-prev::after,
-.swiper-button-next::after {
-  display: none;
-} */
