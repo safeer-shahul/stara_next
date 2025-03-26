@@ -25,7 +25,7 @@ export default function CategoryGrid() {
     const fetchCategories = async () => {
       try {
         setLoading(true);
-        const categoryData = await apiService.getAllCategories();
+        const categoryData = await apiService.getAllCategoriesPublic();
         
         // Map API data to the format expected by the component
         const formattedCategories = categoryData.map(category => ({
