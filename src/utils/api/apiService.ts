@@ -1,4 +1,3 @@
-// src/utils/api/apiService.ts
 import axios, { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 
 // Configuration
@@ -20,9 +19,15 @@ interface UserProfile {
 class ApiService {
   private static instance: ApiService;
   private apiClient: AxiosInstance;
+  private publicApiClient: AxiosInstance;
 
   private constructor() {
     this.apiClient = axios.create({
+      baseURL: API_CONFIG.BASE_URL,
+      timeout: API_CONFIG.TIMEOUT,
+    });
+
+    this.publicApiClient = axios.create({
       baseURL: API_CONFIG.BASE_URL,
       timeout: API_CONFIG.TIMEOUT,
     });
@@ -47,7 +52,7 @@ class ApiService {
   }
 
   private setupInterceptors(): void {
-    // Request interceptor
+    // Request interceptor for authenticated requests
     this.apiClient.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
         const accessToken = this.getAccessToken();
@@ -62,7 +67,6 @@ class ApiService {
   
         if (config.headers) {
           config.headers['X-Requested-With'] = 'XMLHttpRequest';
-          // config.headers['Access-Control-Allow-Origin'] = '*';
           
           // Don't set content-type for FormData
           if (!config.headers['Content-Type'] && !(config.data instanceof FormData)) {
@@ -75,7 +79,6 @@ class ApiService {
       (error) => Promise.reject(error)
     );
   
-    // Response interceptor
     this.apiClient.interceptors.response.use(
       (response: AxiosResponse) => response,
       async (error) => {
@@ -99,13 +102,25 @@ class ApiService {
         return Promise.reject(error);
       }
     );
+
+    this.publicApiClient.interceptors.request.use(
+      (config: InternalAxiosRequestConfig) => {
+        if (config.headers) {
+          config.headers['X-Requested-With'] = 'XMLHttpRequest';
+          
+          if (!config.headers['Content-Type'] && !(config.data instanceof FormData)) {
+            config.headers['Content-Type'] = 'application/json';
+          }
+        }
+        return config;
+      },
+      (error) => Promise.reject(error)
+    );
   }
 
-  // Helper to dynamically set headers
   private getHeaders(isFormData: boolean = false, propagation: number = 0): Record<string, string> {
     const headers: Record<string, string> = {
       'X-Requested-With': 'XMLHttpRequest',
-      // 'Access-Control-Allow-Origin': '*',
     };
 
     if (propagation > 0) {
@@ -120,14 +135,28 @@ class ApiService {
     if (accessToken) {
       headers['Authorization'] = `Bearer ${accessToken}`;
     }
-
+    
     return headers;
   }
 
-  // Authentication methods
+  private getPublicHeaders(isFormData: boolean = false, propagation: number = 0): Record<string, string> {
+    const headers: Record<string, string> = {
+      'X-Requested-With': 'XMLHttpRequest',
+    };
+
+    if (propagation > 0) {
+      headers['propagation'] = propagation.toString();
+    }
+
+    if (!isFormData) {
+      headers['Content-Type'] = 'application/json';
+    }
+    
+    return headers;
+  }
+
   public async getAuthorizationToken(username: string, password: string): Promise<{ refresh: string, access: string }> {
     try {
-      // Create payload with username and password
       const payload = {
         username: username,
         password: password
@@ -135,17 +164,9 @@ class ApiService {
       
       console.log('Requesting token with payload:', { username });
       
-      // Make the API call with the payload - NOT using the interceptor that adds Authorization header
-      // Using a direct axios call instead of this.apiClient to avoid the interceptor
-      const response = await axios.post<{ refresh: string, access: string }>(
-        `${API_CONFIG.BASE_URL}/api/token/`, 
-        payload,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest'
-          }
-        }
+      const response = await this.publicApiClient.post<{ refresh: string, access: string }>(
+        '/api/token/', 
+        payload
       );
       
       console.log('Token response received:', response.data);
@@ -156,7 +177,6 @@ class ApiService {
     }
   }
 
-  // Get user profile (with admin check)
   public async getUserProfile(): Promise<UserProfile> {
     try {
       const token = this.getAccessToken();
@@ -175,7 +195,6 @@ class ApiService {
     }
   }
 
-  // Logout method
   public logout(): void {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('accessToken');
@@ -184,7 +203,6 @@ class ApiService {
     }
   }
 
-  // Generic API methods - following your pattern
   public async get<T>(url: string, propagation: number = 0): Promise<T> {
     try {
       console.log(`Making GET request to ${url}`);
@@ -198,6 +216,19 @@ class ApiService {
     }
   }
 
+  public async getPublic<T>(url: string, propagation: number = 0): Promise<T> {
+    try {
+      console.log(`Making public GET request to ${url}`);
+      const response = await this.publicApiClient.get<T>(url, {
+        headers: this.getPublicHeaders(false, propagation),
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Error in public GET request to ${url}:`, error);
+      throw error;
+    }
+  }
+
   public async post<T>(url: string, data: any, propagation: number = 0, isFormData: boolean = false): Promise<T> {
     try {
       const response = await this.apiClient.post<T>(url, data, {
@@ -206,6 +237,18 @@ class ApiService {
       return response.data;
     } catch (error) {
       console.error('Error in POST request:', error);
+      throw error;
+    }
+  }
+
+  public async postPublic<T>(url: string, data: any, propagation: number = 0, isFormData: boolean = false): Promise<T> {
+    try {
+      const response = await this.publicApiClient.post<T>(url, data, {
+        headers: this.getPublicHeaders(isFormData, propagation),
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error in public POST request:', error);
       throw error;
     }
   }
@@ -234,10 +277,8 @@ class ApiService {
     }
   }
 
-
   public async createCategory(categoryName: string, categoryImage: File): Promise<any> {
     try {
-
       const formData = new FormData();
       formData.append('category_name', categoryName);
       formData.append('category_image', categoryImage);
@@ -255,6 +296,7 @@ class ApiService {
       id: string; 
       category_name: string;
       category_image: string | null; 
+      slug: string;
     }>;
     count: number;
     next: string | null;
@@ -276,8 +318,7 @@ class ApiService {
     slug: string;
   }>> {
     try {
-      // Set a large page_size to get all categories at once
-      const response = await this.get<any>(`/category/get_paginated_category?page=1&page_size=1000`);
+      const response = await this.get<any>(`/category/get_paginated_category?page=1&page_size=1000&get_sub_category=true`);
       return response.results;
     } catch (error) {
       console.error('Error fetching all categories:', error);
@@ -285,8 +326,31 @@ class ApiService {
     }
   }
 
+  public async getAllCategoriesPublic(): Promise<Array<{
+    id: string;
+    category_name: string;
+    category_image: string | null;
+    slug: string;
+  }>> {
+    try {
+      const response = await this.getPublic<any>(`/category/get_paginated_category?page=1&page_size=1000`);
+      return response.results;
+    } catch (error) {
+      console.error('Error fetching all categories (public):', error);
+      throw error;
+    }
+  }
+
+  public async getPaginatedProducts(page: number = 1, pageSize: number = 10): Promise<any> {
+    try {
+      const response = await this.get<any>(`/products/get_all_products?page=${page}&page_size=${pageSize}`);
+      return response;
+    } catch (error) {
+      console.error('Error fetching paginated categories:', error);
+      throw error;
+    }
+  }
 }
 
-// Export as singleton
 const apiService = ApiService.getInstance();
 export default apiService;

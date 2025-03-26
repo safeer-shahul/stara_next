@@ -1,29 +1,68 @@
 // app/admin/products/list/page.tsx
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Package, Plus, Edit, Trash2, Eye } from 'lucide-react';
+import Image from 'next/image';
+import { Package, Plus, Edit, Trash2, Eye, ChevronLeft, ChevronRight, ImageIcon } from 'lucide-react';
+import apiService from '@/utils/api/apiService';
 
 export default function ProductsListPage() {
+  const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [pageSize] = useState(10);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
 
-  // Sample products data
-  const products = [
-    { id: 1, name: "Premium Smartphone", category: "Electronics", price: 899.99, stock: 42, status: "Active" },
-    { id: 2, name: "Wireless Earbuds", category: "Electronics", price: 129.99, stock: 78, status: "Active" },
-    { id: 3, name: "Men's Casual Shirt", category: "Clothing", price: 39.99, stock: 64, status: "Active" },
-    { id: 4, name: "Women's Running Shoes", category: "Footwear", price: 89.99, stock: 36, status: "Active" },
-    { id: 5, name: "Kitchen Blender", category: "Home & Kitchen", price: 79.99, stock: 23, status: "Active" },
-    { id: 6, name: "Smart Watch", category: "Electronics", price: 249.99, stock: 15, status: "Low Stock" },
-    { id: 7, name: "Coffee Maker", category: "Home & Kitchen", price: 69.99, stock: 0, status: "Out of Stock" }
-  ];
+  useEffect(() => {
+    fetchProducts();
+  }, [currentPage, categoryFilter]);
 
-  const filteredProducts = products.filter(product => 
-    product.name.toLowerCase().includes(searchQuery.toLowerCase()) && 
-    (categoryFilter === '' || product.category === categoryFilter)
-  );
+  const fetchProducts = async () => {
+    setLoading(true);
+    try {
+      // const response = await apiService.getPaginatedProducts(currentPage, pageSize, categoryFilter);
+      const response = await apiService.getPaginatedProducts(currentPage, pageSize);
+      console.log(response)
+      // setProducts(response.results);
+      setProducts(response);
+      setTotalItems(response.count);
+      setTotalPages(Math.ceil(response.count / pageSize));
+      setError(null);
+    } catch (err) {
+      console.error('Failed to fetch products:', err);
+      setError('Failed to load products. Please try again.');
+      setProducts([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+    // You would need to implement search in your API and call it here
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setCategoryFilter(e.target.value);
+    setCurrentPage(1); // Reset to first page when changing category
+  };
 
   return (
     <div>
@@ -49,104 +88,144 @@ export default function ProductsListPage() {
               placeholder="Search products..." 
               className="border rounded px-3 py-1 text-sm"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={handleSearch}
             />
             <select 
               className="border rounded px-3 py-1 text-sm"
               value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
+              onChange={handleCategoryChange}
             >
               <option value="">All Categories</option>
-              <option value="Electronics">Electronics</option>
-              <option value="Clothing">Clothing</option>
-              <option value="Footwear">Footwear</option>
-              <option value="Home & Kitchen">Home & Kitchen</option>
+              {/* You'll need to fetch and map categories here */}
             </select>
           </div>
         </div>
 
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Product
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Category
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Price
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Stock
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Status
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {filteredProducts.map((product) => (
-              <tr key={product.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center">
-                    <div className="h-10 w-10 flex-shrink-0 bg-gray-100 rounded-md flex items-center justify-center">
-                      <Package className="h-5 w-5 text-gray-400" />
-                    </div>
-                    <div className="ml-4">
-                      <div className="text-sm font-medium text-gray-900">{product.name}</div>
-                      <div className="text-sm text-gray-500">ID: {product.id}</div>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                    {product.category}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  ${product.price.toFixed(2)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {product.stock}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                    ${product.status === 'Active' ? 'bg-green-100 text-green-800' : 
-                      product.status === 'Low Stock' ? 'bg-yellow-100 text-yellow-800' : 
-                      'bg-red-100 text-red-800'}`}>
-                    {product.status}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  <div className="flex space-x-2">
-                    <button className="text-gray-600 hover:text-gray-800">
-                      <Eye className="w-4 h-4" />
-                    </button>
-                    <button className="text-blue-600 hover:text-blue-800">
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button className="text-red-600 hover:text-red-800">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        <div className="px-6 py-4 border-t flex justify-between items-center">
-          <p className="text-sm text-gray-500">Showing {filteredProducts.length} of {products.length} products</p>
-          <div className="flex space-x-1">
-            <button className="px-3 py-1 border rounded text-sm">Previous</button>
-            <button className="px-3 py-1 bg-blue-600 text-white rounded text-sm">1</button>
-            <button className="px-3 py-1 border rounded text-sm">Next</button>
+        {error && (
+          <div className="p-4 text-red-700 bg-red-100">
+            {error}
           </div>
-        </div>
+        )}
+
+        {loading ? (
+          <div className="p-8 text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+            <p className="mt-2 text-gray-600">Loading products...</p>
+          </div>
+        ) : (
+          <>
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Product
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Price
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Stock
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {products?.length > 0 ? (
+                  products.map((product) => (
+                    <tr key={product.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="h-12 w-12 flex-shrink-0 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center">
+                            {product.images && product.images.length > 0 ? (
+                              <Image 
+                                src={`${process.env.NEXT_PUBLIC_API_BASE_URL}${product.images[0].product_image}`}
+                                alt={product.product_name}
+                                width={48}
+                                height={48}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <ImageIcon className="h-6 w-6 text-gray-400" />
+                            )}
+                          </div>
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-gray-900">{product.product_name}</div>
+                            <div className="text-sm text-gray-500">ID: {product.id}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        ${parseFloat(product.product_price.toString()).toFixed(2)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {product.quantity}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                          ${product.product_status ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                          {product.product_status ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <div className="flex space-x-2">
+                          <Link href={`/admin/products/view/${product.id}`}>
+                            <button className="text-gray-600 hover:text-gray-800">
+                              <Eye className="w-4 h-4" />
+                            </button>
+                          </Link>
+                          <Link href={`/admin/products/edit/${product.id}`}>
+                            <button className="text-blue-600 hover:text-blue-800">
+                              <Edit className="w-4 h-4" />
+                            </button>
+                          </Link>
+                          <button className="text-red-600 hover:text-red-800">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                      No products found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+
+            <div className="px-6 py-4 border-t flex justify-between items-center">
+              <p className="text-sm text-gray-500">
+                Showing {products?.length} of {totalItems} products
+              </p>
+              <div className="flex space-x-2">
+                <button 
+                  onClick={handlePrevPage}
+                  disabled={currentPage === 1}
+                  className={`px-3 py-1 rounded border ${currentPage === 1 ? 'text-gray-400 border-gray-200' : 'text-blue-600 border-blue-600'}`}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="px-3 py-1 text-sm">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button 
+                  onClick={handleNextPage}
+                  disabled={currentPage === totalPages}
+                  className={`px-3 py-1 rounded border ${currentPage === totalPages ? 'text-gray-400 border-gray-200' : 'text-blue-600 border-blue-600'}`}
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
