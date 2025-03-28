@@ -19,7 +19,8 @@ export default function AddProductPage() {
   const [productDescription, setProductDescription] = useState('');
   const [productStatus, setProductStatus] = useState(true);
   const [subCategory, setSubCategory] = useState('');
-  
+  const [strikePrice, setStrikePrice] = useState('');
+
   // Multiple images
   const [productImages, setProductImages] = useState<File[]>([]);
   const [imageErrors, setImageErrors] = useState<string | null>(null);
@@ -144,7 +145,8 @@ export default function AddProductPage() {
       formData.append('product_description', productDescription);
       formData.append('sub_category', subCategory);
       formData.append('product_status', productStatus.toString());
-      
+      formData.append('strike_price', strikePrice);
+
       // Append all product images with the same key
       productImages.forEach(image => {
         formData.append('product_images', image);
@@ -238,7 +240,7 @@ export default function AddProductPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="mb-4">
                   <label htmlFor="productPrice" className="block text-sm font-medium text-gray-700 mb-1">
-                    Price ($) *
+                    Price (₹) *
                   </label>
                   <input
                     type="number"
@@ -254,20 +256,36 @@ export default function AddProductPage() {
                 </div>
 
                 <div className="mb-4">
-                  <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 mb-1">
-                    Quantity *
+                  <label htmlFor="strikePrice" className="block text-sm font-medium text-gray-700 mb-1">
+                    Strike Price (₹)
                   </label>
                   <input
                     type="number"
-                    id="quantity"
+                    id="strikePrice"
                     min="0"
+                    step="0.01"
                     className="w-full p-2 border border-gray-300 rounded"
-                    value={quantity}
-                    onChange={(e) => setQuantity(e.target.value)}
-                    required
+                    value={strikePrice}
+                    onChange={(e) => setStrikePrice(e.target.value)}
                     disabled={isLoading}
                   />
                 </div>
+              </div>
+
+              <div className="mb-4">
+                <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 mb-1">
+                  Quantity *
+                </label>
+                <input
+                  type="number"
+                  id="quantity"
+                  min="0"
+                  className="w-full p-2 border border-gray-300 rounded"
+                  value={quantity}
+                  onChange={(e) => setQuantity(e.target.value)}
+                  required
+                  disabled={isLoading}
+                />
               </div>
               
               <div className="mb-4">

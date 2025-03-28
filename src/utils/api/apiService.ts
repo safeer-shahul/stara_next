@@ -350,6 +350,32 @@ class ApiService {
       throw error;
     }
   }
+
+  public async createHomeCategory(categoryName: string, products: any[]): Promise<any> {
+    try {
+      const data = {
+        name:categoryName,
+        product_ids:products
+      }
+      
+      const response = await this.post<any>('/home_category/create', data);
+      return response;
+    } catch (error) {
+      console.error('Error creating category:', error);
+      throw error;
+    }
+  }
+
+  public async getHomeCategories(): Promise<any> {
+    try {
+      const response = await this.get<any>(`/home_category/get_all_product`);
+      return response;
+    } catch (error) {
+      console.error('Error fetching paginated home categories:', error);
+      throw error;
+    }
+  }
+
 }
 
 const apiService = ApiService.getInstance();

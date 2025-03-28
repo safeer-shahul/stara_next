@@ -32,6 +32,16 @@ export default function ProductsPage() {
             <p className="text-gray-500 text-center mt-2">Manage product inventory</p>
           </div>
         </Link>
+
+        <Link href="/admin/products/home-category">
+          <div className="bg-white rounded-lg shadow-md p-6 flex flex-col items-center justify-center h-48 cursor-pointer hover:shadow-lg transition-shadow">
+            <div className="bg-blue-50 p-4 rounded-lg mb-4">
+              <Package className="w-12 h-12 text-blue-600" />
+            </div>
+            <h3 className="text-lg font-medium text-blue-600">Home Categories</h3>
+            <p className="text-gray-500 text-center mt-2">Manage product inventory</p>
+          </div>
+        </Link>
       </div>
 
       {/* Dashboard Summary */}
