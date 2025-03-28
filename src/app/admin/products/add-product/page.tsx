@@ -20,6 +20,7 @@ export default function AddProductPage() {
   const [productStatus, setProductStatus] = useState(true);
   const [subCategory, setSubCategory] = useState('');
   const [strikePrice, setStrikePrice] = useState('');
+  const [productCode, setProductCode] = useState('');
 
   // Multiple images
   const [productImages, setProductImages] = useState<File[]>([]);
@@ -146,6 +147,7 @@ export default function AddProductPage() {
       formData.append('sub_category', subCategory);
       formData.append('product_status', productStatus.toString());
       formData.append('strike_price', strikePrice);
+      formData.append('product_code', productCode);
 
       // Append all product images with the same key
       productImages.forEach(image => {
@@ -194,6 +196,21 @@ export default function AddProductPage() {
         <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
+
+            <div className="mb-4">
+                <label htmlFor="productCode" className="block text-sm font-medium text-gray-700 mb-1">
+                  Product Code *
+                </label>
+                <input
+                  type="text"
+                  id="productCode"
+                  className="w-full p-2 border border-gray-300 rounded"
+                  value={productCode}
+                  onChange={(e) => setProductCode(e.target.value)}
+                  required
+                  disabled={isLoading}
+                />
+              </div>
               <div className="mb-4">
                 <label htmlFor="productName" className="block text-sm font-medium text-gray-700 mb-1">
                   Product Name *
