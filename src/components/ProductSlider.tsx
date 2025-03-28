@@ -10,26 +10,35 @@ import 'swiper/css';
 import 'swiper/css/navigation';
 import 'swiper/css/autoplay';
 import { isMobile } from 'react-device-detect';
-import { productData } from './productSliderData';
 
-interface ProductItem {
+interface ProductImage {
   id: string;
-  image: string;
-  hoverImage: string;
-  title: string;
-  price: number;
-  originalPrice: number;
-  discount: string;
-  link: string;
-  promo?: string;
+  product_image: string;
+  product: string;
+}
+
+interface Product {
+  id: string;
+  images: ProductImage[];
+  product_code: string;
+  product_name: string;
+  product_description: string;
+  product_price: string;
+  strike_price: string;
+  quantity: number;
+  product_status: boolean;
+  created_at: string;
+  updated_at: string;
+  sub_category: string;
 }
 
 interface ProductSliderProps {
   title: string;
-  type: 'dateNight' | 'bestsellers' | 'newArrivals';
+  categoryId: string;
+  products: Product[];
 }
 
-export default function ProductSlider({ title, type = 'dateNight' }: ProductSliderProps) {
+export default function ProductSlider({ title, categoryId, products }: ProductSliderProps) {
   const router = useRouter();
   const [swiperInstance, setSwiperInstance] = useState<any>(null);
   const [windowWidth, setWindowWidth] = useState<number>(0);
@@ -58,14 +67,11 @@ export default function ProductSlider({ title, type = 'dateNight' }: ProductSlid
       swiperInstance.update();
     }
   }, [windowWidth, swiperInstance]);
-  
-  // Get products based on the type
-  const products: ProductItem[] = productData[type] || [];
 
   const [hoveredProduct, setHoveredProduct] = useState<string | null>(null);
 
-  const handleProductClick = (link: string): void => {
-    router.push(link);
+  const handleProductClick = (productId: string): void => {
+    router.push(`/product/${productId}`);
   };
 
   const handleAddToWishlist = (e: React.MouseEvent, productId: string): void => {
@@ -93,6 +99,24 @@ export default function ProductSlider({ title, type = 'dateNight' }: ProductSlid
     }
   };
 
+  // Calculate discount percentage
+  const calculateDiscount = (price: string, strikePrice: string): string => {
+    if (!strikePrice || parseFloat(strikePrice) <= 0) return '';
+    
+    const currentPrice = parseFloat(price);
+    const originalPrice = parseFloat(strikePrice);
+    
+    if (currentPrice >= originalPrice) return '';
+    
+    const discount = ((originalPrice - currentPrice) / originalPrice) * 100;
+    return `${Math.round(discount)}% OFF`;
+  };
+
+  // Check if products exist and have length
+  if (!products || products.length === 0) {
+    return null;
+  }
+
   return (
     <div className="w-full mx-auto py-8 relative px-2 lg:px-8 xl:px-14">
       <h2 className="text-2xl md:text-3xl font-medium text-center mb-8">
@@ -104,15 +128,15 @@ export default function ProductSlider({ title, type = 'dateNight' }: ProductSlid
           spaceBetween={20}
           slidesPerView={2}
           slidesPerGroup={1}
-          loop={true}
+          loop={products.length > 4}
           autoplay={{ 
             delay: 3500, 
             disableOnInteraction: false 
           }}
           modules={[Autoplay, Navigation]}
           navigation={{
-            prevEl: `.product-swiper-prev-${type}`,
-            nextEl: `.product-swiper-next-${type}`,
+            prevEl: `.product-swiper-prev-${categoryId}`,
+            nextEl: `.product-swiper-next-${categoryId}`,
             enabled: true,
           }}
           watchOverflow={true}
@@ -120,7 +144,7 @@ export default function ProductSlider({ title, type = 'dateNight' }: ProductSlid
           observeParents={true}
           updateOnWindowResize={true}
           onSwiper={(swiper) => setSwiperInstance(swiper)}
-          className={`product-swiper-${type}`}
+          className={`product-swiper-${categoryId}`}
           breakpoints={{
             0: {
               slidesPerView: 2,
@@ -148,99 +172,117 @@ export default function ProductSlider({ title, type = 'dateNight' }: ProductSlid
             }
           }}
         >
-          {products.map((product) => (
-            <SwiperSlide key={product.id}>
-              <div 
-                className="relative group"
-                onMouseEnter={() => setHoveredProduct(product.id)}
-                onMouseLeave={() => setHoveredProduct(null)}
-              >
-                {/* Promo Tag */}
-                {product.promo && (
-                  <div className="absolute top-2 left-2 bg-gray-100 text-gray-800 px-2 py-1 text-xs font-medium z-10">
-                    {product.promo}
-                  </div>
-                )}
-                
-                {/* Product Image Container */}
+          {products.map((product) => {
+            const discount = calculateDiscount(product.product_price, product.strike_price);
+            const mainImage = product.images[0]?.product_image || "";
+            const hoverImage = product.images[1]?.product_image || product.images[0]?.product_image || "";
+            
+            return (
+              <SwiperSlide key={product.id}>
                 <div 
-                  className="relative w-full aspect-square cursor-pointer overflow-hidden"
-                  onClick={() => handleProductClick(product.link)}
+                  className="relative group"
+                  onMouseEnter={() => setHoveredProduct(product.id)}
+                  onMouseLeave={() => setHoveredProduct(null)}
                 >
-                  {/* Main image */}
-                  <Image
-                    src={product.image}
-                    alt={product.title}
-                    fill
-                    sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 25vw"
-                    className={`object-cover object-center transition-all duration-500 ease-in-out transform ${
-                      hoveredProduct === product.id ? 'scale-110 opacity-0' : 'scale-100 opacity-100'
-                    }`}
-                  />
-                  
-                  {/* Hover image */}
-                  <Image
-                    src={product.hoverImage}
-                    alt={`${product.title} - model view`}
-                    fill
-                    sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 25vw"
-                    className={`object-cover object-center transition-all duration-500 ease-in-out transform ${
-                      hoveredProduct === product.id ? 'scale-100 opacity-100' : 'scale-110 opacity-0'
-                    }`}
-                  />
-                  
-                  {/* Wishlist button */}
-                  <button
-                    className={`absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-white/90 shadow-sm transition-opacity ${
-                      hoveredProduct === product.id ? 'opacity-100' : 'opacity-0'
-                    }`}
-                    onClick={(e) => handleAddToWishlist(e, product.id)}
-                    aria-label="Add to wishlist"
+                  {/* Product Image Container */}
+                  <div 
+                    className="relative w-full aspect-square cursor-pointer overflow-hidden"
+                    onClick={() => handleProductClick(product.id)}
                   >
-                    <Heart size={16} className="text-gray-700 hover:text-red-500 transition-colors" />
-                  </button>
+                    {/* Main image */}
+                    <Image
+                      src={`${process.env.NEXT_PUBLIC_API_BASE_URL}${mainImage}`}
+                      alt={product.product_name}
+                      fill
+                      sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 25vw"
+                      className={`object-cover object-center transition-all duration-500 ease-in-out transform ${
+                        hoveredProduct === product.id ? 'scale-110 opacity-0' : 'scale-100 opacity-100'
+                      }`}
+                    />
+                    
+                    {/* Hover image */}
+                    <Image
+                      src={`${process.env.NEXT_PUBLIC_API_BASE_URL}${hoverImage}`}
+                      alt={`${product.product_name} - model view`}
+                      fill
+                      sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 25vw"
+                      className={`object-cover object-center transition-all duration-500 ease-in-out transform ${
+                        hoveredProduct === product.id ? 'scale-100 opacity-100' : 'scale-110 opacity-0'
+                      }`}
+                    />
+                    
+                    {/* Stock badge */}
+                    {product.quantity <= 0 && (
+                      <div className="absolute top-2 left-2 bg-red-100 text-red-800 px-2 py-1 text-xs font-medium z-10">
+                        Out of Stock
+                      </div>
+                    )}
+                    
+                    {/* Discount badge */}
+                    {discount && (
+                      <div className="absolute top-2 left-2 bg-green-100 text-green-800 px-2 py-1 text-xs font-medium z-10">
+                        {discount}
+                      </div>
+                    )}
+                    
+                    {/* Wishlist button */}
+                    <button
+                      className={`absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-white/90 shadow-sm transition-opacity ${
+                        hoveredProduct === product.id ? 'opacity-100' : 'opacity-0'
+                      }`}
+                      onClick={(e) => handleAddToWishlist(e, product.id)}
+                      aria-label="Add to wishlist"
+                    >
+                      <Heart size={16} className="text-gray-700 hover:text-red-500 transition-colors" />
+                    </button>
+                    
+                    {/* Add to Bag button */}
+                    <button
+                      className={`absolute bottom-3 right-3 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 text-white shadow-sm transition-opacity ${
+                        hoveredProduct === product.id ? 'opacity-100' : 'opacity-0'
+                      }`}
+                      onClick={(e) => handleAddToBag(e, product.id)}
+                      aria-label="Add to bag"
+                      disabled={product.quantity <= 0}
+                    >
+                      <ShoppingBag size={18} />
+                    </button>
+                  </div>
                   
-                  {/* Add to Bag button */}
-                  <button
-                    className={`absolute bottom-3 right-3 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 text-white shadow-sm transition-opacity ${
-                      hoveredProduct === product.id ? 'opacity-100' : 'opacity-0'
-                    }`}
-                    onClick={(e) => handleAddToBag(e, product.id)}
-                    aria-label="Add to bag"
-                  >
-                    <ShoppingBag size={18} />
-                  </button>
-                </div>
-                
-                {/* Product Info */}
-                <div className="mt-4">
-                  <h3 
-                    className="text-sm md:text-base font-medium cursor-pointer hover:text-blue-500 transition-colors"
-                    onClick={() => handleProductClick(product.link)}
-                  >
-                    {product.title}
-                  </h3>
-                  <div className="flex items-center mt-1 gap-2">
-                    <span className="text-sm font-semibold">₹ {product.price.toLocaleString()}</span>
-                    <span className="text-xs text-gray-500 line-through">₹ {product.originalPrice.toLocaleString()}</span>
-                    <span className="text-xs text-green-600">({product.discount})</span>
+                  {/* Product Info */}
+                  <div className="mt-4">
+                    <h3 
+                      className="text-sm md:text-base font-medium cursor-pointer hover:text-blue-500 transition-colors"
+                      onClick={() => handleProductClick(product.id)}
+                    >
+                      {product.product_name}
+                    </h3>
+                    <div className="flex items-center mt-1 gap-2">
+                      <span className="text-sm font-semibold">₹ {parseFloat(product.product_price).toLocaleString()}</span>
+                      {parseFloat(product.strike_price) > 0 && (
+                        <>
+                          <span className="text-xs text-gray-500 line-through">₹ {parseFloat(product.strike_price).toLocaleString()}</span>
+                          {discount && <span className="text-xs text-green-600">({discount})</span>}
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </SwiperSlide>
-          ))}
+              </SwiperSlide>
+            );
+          })}
         </Swiper>
         
-        {/* Lucide Navigation Buttons - Each slider gets unique class names based on type */}
+        {/* Navigation Buttons - Each slider gets unique class names based on categoryId */}
         <button 
           onClick={goPrev}
-          className={`product-swiper-prev-${type} absolute left-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 lg:w-10 lg:h-10 flex items-center justify-center rounded-full bg-black text-white hover:bg-white hover:text-black transition-colors`}
+          className={`product-swiper-prev-${categoryId} absolute left-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 lg:w-10 lg:h-10 flex items-center justify-center rounded-full bg-black text-white hover:bg-white hover:text-black transition-colors`}
         >
           <ChevronLeft size={isMobile ? 20 : 24} />
         </button>
         <button 
           onClick={goNext}
-          className={`product-swiper-next-${type} absolute right-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 lg:w-10 lg:h-10 flex items-center justify-center rounded-full bg-black text-white hover:bg-white hover:text-black transition-colors`}
+          className={`product-swiper-next-${categoryId} absolute right-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 lg:w-10 lg:h-10 flex items-center justify-center rounded-full bg-black text-white hover:bg-white hover:text-black transition-colors`}
         >
           <ChevronRight size={isMobile ? 20 : 24} />
         </button>

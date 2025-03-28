@@ -160,7 +160,7 @@ export default function ProductsListPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        ${parseFloat(product.product_price.toString()).toFixed(2)}
+                      ₹{parseFloat(product.product_price.toString()).toFixed(2)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {product.quantity}
