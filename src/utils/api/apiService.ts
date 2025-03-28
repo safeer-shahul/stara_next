@@ -371,7 +371,15 @@ class ApiService {
       const response = await this.get<any>(`/home_category/get_all_product`);
       return response;
     } catch (error) {
-      console.error('Error fetching paginated home categories:', error);
+      throw error;
+    }
+  }
+
+  public async getProductByID(id:any): Promise<any> {
+    try {
+      const response = await this.get<any>(`/products/get_by_id/${id}`);
+      return response;
+    } catch (error) {
       throw error;
     }
   }

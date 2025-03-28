@@ -71,7 +71,7 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
   const [hoveredProduct, setHoveredProduct] = useState<string | null>(null);
 
   const handleProductClick = (productId: string): void => {
-    router.push(`/product/${productId}`);
+    router.push(`/shop/products/${productId}`);
   };
 
   const handleAddToWishlist = (e: React.MouseEvent, productId: string): void => {
@@ -111,6 +111,7 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
     const discount = ((originalPrice - currentPrice) / originalPrice) * 100;
     return `${Math.round(discount)}% OFF`;
   };
+  
 
   // Check if products exist and have length
   if (!products || products.length === 0) {

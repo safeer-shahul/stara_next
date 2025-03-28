@@ -1,27 +1,30 @@
+// Create this file structure:
+// app/
+//   shop/
+//     products/
+//       [id]/
+//         page.tsx
+
+// File: app/shop/products/[id]/page.tsx
 'use client';
 
 import { CheckCircle2, Star, Tag } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from "next/image";
+import { useParams } from 'next/navigation';
 import ProductImageSlider from '@/components/ProductImageSlider';
 import AddToCartButton from '@/components/AddToCartButton';
 import DeliveryPincodeChecker from '@/components/DeliveryPincodeChecker';
 import PolicyIcons from '@/components/PolicyIcons';
 import CartDrawer from '@/components/CartDrawer';
+import apiService from '@/utils/api/apiService';
 
-const product = {
-  id: '1',
-  name: 'Crystal Love Bangle Bracelet',
-  price: '₹2,346',
-  originalPrice: '₹3,799',
+// Keep static data for features that aren't in the API
+const staticProductData = {
   discount: '38%',
-  description: 'Inclusive of all taxes',
   offer: 'Buy 1 Get 1 Free Use Code: BIG1 at checkout',
-  inStock: true,
   isGift: false,
   giftSpecialPrice: '₹399.00',
-  details: 'Bracelets',
-  material: 'GOLD',
   delivery: 'Typically arrives in 3-4 Days',
   returnPolicy: '2 Days Return',
   exchangePolicy: '10 Days Exchange',
@@ -33,18 +36,39 @@ const product = {
     { name: 'Skin Safe Jewellery', icon: '/images/icons/skin-safe.svg' },
     { name: '18k Gold Tone Plated', icon: '/images/icons/gold-plated.svg' },
   ],
-  images: [
-    '/images/productslider/PM-EARRINGS-037_3.webp', 
-    '/images/productslider/PM-EARRINGS-037_1_0040.webp',
-    '/images/productslider/PM-EARRINGS-037_3.webp', 
-    '/images/productslider/PM-EARRINGS-037_1_0040.webp',
-  ],
 };
 
-export default function ProductPage() {
+export default function ProductDetailPage() {
+  const params = useParams();
+  const productId = params.id as string;
+  
   const [isGift, setIsGift] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
+  const [product, setProduct] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchProduct = async () => {
+      try {
+        if (productId) {
+          setIsLoading(true);
+          const fetchedProduct = await apiService.getProductByID(productId);
+          setProduct(fetchedProduct);
+        }
+      } catch (err) {
+        console.error('Error fetching product:', err);
+        setError('Failed to load product details');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (productId) {
+      fetchProduct();
+    }
+  }, [productId]);
 
   const openModal = () => {
     setIsModalOpen(true);
@@ -52,14 +76,15 @@ export default function ProductPage() {
   };
 
   const handleAddToBag = () => {
-
-    const storedCartIds = JSON.parse(localStorage.getItem('cartItems') || '[]');
-    if (!storedCartIds.includes(product.id)) {
-      const updatedCart = [...storedCartIds, product.id];
-      localStorage.setItem('cartItems', JSON.stringify(updatedCart));
+    if (product) {
+      const storedCartIds = JSON.parse(localStorage.getItem('cartItems') || '[]');
+      if (!storedCartIds.includes(product.id)) {
+        const updatedCart = [...storedCartIds, product.id];
+        localStorage.setItem('cartItems', JSON.stringify(updatedCart));
+      }
+      
+      setIsCartOpen(true);
     }
-    
-    setIsCartOpen(true);
   };
 
   const handleAddToWishlist = () => {
@@ -85,39 +110,78 @@ export default function ProductPage() {
     }
   };
 
+  if (isLoading) {
+    return <div className="container mx-auto p-12 text-center">Loading product details...</div>;
+  }
+
+  if (error || !product) {
+    return <div className="container mx-auto p-12 text-center text-red-500">{error || 'Product not found'}</div>;
+  }
+
+  // Prepare image data for the slider with full URLs
+  const productImages = product.images.map((img: any) => {
+    return `${process.env.NEXT_PUBLIC_API_BASE_URL}${img.product_image}`;
+  });
+
+  // Format price with currency symbol
+  const formattedPrice = `₹${parseFloat(product.product_price).toLocaleString('en-IN')}`;
+  const formattedStrikePrice = product.strike_price && parseFloat(product.strike_price) > 0 
+    ? `₹${parseFloat(product.strike_price).toLocaleString('en-IN')}` 
+    : null;
+
+  const calculateDiscount = (price: string, strikePrice: string): string => {
+    if (!strikePrice || parseFloat(strikePrice) <= 0) return '';
+    
+    const currentPrice = parseFloat(price);
+    const originalPrice = parseFloat(strikePrice);
+    
+    if (currentPrice >= originalPrice) return '';
+    
+    const discount = ((originalPrice - currentPrice) / originalPrice) * 100;
+    return `${Math.round(discount)}%`;
+  };
+
   return (
     <div className="container mx-auto p-2 md:p-12">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <ProductImageSlider 
-          images={product.images} 
-          productName={product.name}
+          images={productImages} 
+          productName={product.product_name}
           hasOffer={true}
           offerLabel="BUY 1 GET 1"
         />
 
         <div className="space-y-4 pl-0 md:pl-24">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-normal">{product.name}</h1>
+            <h1 className="text-2xl font-normal">{product.product_name}</h1>
 
             <div className="flex items-center space-x-1">
               <div className="flex text-[#36454F]">
-                {[...Array(5)].map((_, i) => (
+                {[...Array(staticProductData.rating)].map((_, i) => (
                   <Star key={i} className="w-3 h-3" fill="currentColor" />
                 ))}
               </div>
-              <span className="text-[12px] text-gray-500">({product.reviewCount})</span>
+              <span className="text-[12px] text-gray-500">({staticProductData.reviewCount})</span>
             </div>
           </div>
 
           <div className="flex items-center space-x-2">
-            <p className="text-[12px] line-through">MRP: {product.originalPrice}</p>
-            <p className="text-lg font-semibold text-[15px]">{product.price}</p>
-            <div className="bg-black text-white text-xs px-2 py-1 rounded-md flex items-center">
-              SAVE {product.discount}
-            </div>
+            {formattedStrikePrice && (
+              <p className="text-[12px] line-through">MRP: {formattedStrikePrice}</p>
+            )}
+            <p className="text-lg font-semibold text-[15px]">{formattedPrice}</p>
+            {formattedStrikePrice && (
+              <div className="bg-black text-white text-xs px-2 py-1 rounded-md flex items-center">
+                SAVE {calculateDiscount(product.product_price, product.strike_price)}
+              </div>
+            )}
           </div>
 
-          <p className="text-sm text-gray-500">{product.description}</p>
+          <p className="text-sm text-gray-500">Inclusive of all taxes</p>
+          
+          <div className="text-xs text-gray-500">
+            <span className="font-medium">Product Code:</span> {product.product_code}
+          </div>
 
           <div className="flex items-center text-sm border-t py-5 border-b border-gray-200 gap-2">
             <Tag size={16} className="text-green-700"/>
@@ -129,7 +193,7 @@ export default function ProductPage() {
             </div>
           </div>
 
-          {product.inStock && (
+          {product.product_status && product.quantity > 0 && (
             <div className="flex items-center text-sm space-x-2">
               <CheckCircle2 className='text-[#2e7e52]'/>
               <span className='text-[14px]'>In stock - ready to ship</span>
@@ -145,7 +209,7 @@ export default function ProductPage() {
               className="h-4 w-4 rounded border-gray-300"
             />
             <label htmlFor="giftOption" className="text-sm">
-              Is it a gift? Make it Special <span className="font-semibold">{product.giftSpecialPrice}</span>
+              Is it a gift? Make it Special <span className="font-semibold">{staticProductData.giftSpecialPrice}</span>
             </label>
           </div>
 
@@ -156,7 +220,7 @@ export default function ProductPage() {
           />
 
           <div className="flex items-center justify-between pt-4 cursor-pointer" onClick={openModal}>
-            <p className="text-sm">Details: {product.details}</p>
+            <p className="text-sm">Details: {product.product_description}</p>
             <span className="text-[#C69A7F] text-sm underline">View More</span>
           </div>
 
