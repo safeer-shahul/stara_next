@@ -341,12 +341,22 @@ class ApiService {
     }
   }
 
-  public async getPaginatedProducts(page: number = 1, pageSize: number = 10): Promise<any> {
+  public async getPaginatedProducts(
+    page: number = 1,
+    pageSize: number = 10,
+    productIds?: string[]
+  ): Promise<any> {
     try {
-      const response = await this.get<any>(`/products/get_all_products?page=${page}&page_size=${pageSize}`);
+      let url = `/products/get_all_products?page=${page}&page_size=${pageSize}`;
+      
+      if (productIds && productIds.length > 0) {
+        url += `&ids=${encodeURIComponent(JSON.stringify(productIds))}`;
+      }
+       
+      const response = await this.getPublic<any>(url);
       return response;
     } catch (error) {
-      console.error('Error fetching paginated categories:', error);
+      console.error('Error fetching paginated products:', error);
       throw error;
     }
   }
@@ -368,7 +378,7 @@ class ApiService {
 
   public async getHomeCategories(): Promise<any> {
     try {
-      const response = await this.get<any>(`/home_category/get_all_product`);
+      const response = await this.getPublic<any>(`/home_category/get_all_product`);
       return response;
     } catch (error) {
       throw error;
@@ -377,7 +387,7 @@ class ApiService {
 
   public async getProductByID(id:any): Promise<any> {
     try {
-      const response = await this.get<any>(`/products/get_by_id/${id}`);
+      const response = await this.getPublic<any>(`/products/get_by_id/${id}`);
       return response;
     } catch (error) {
       throw error;
