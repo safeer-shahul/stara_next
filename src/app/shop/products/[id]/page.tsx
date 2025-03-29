@@ -78,10 +78,10 @@ export default function ProductDetailPage() {
   const handleAddToBag = () => {
     if (product) {
       const storedCartIds = JSON.parse(localStorage.getItem('cartItems') || '[]');
-      if (!storedCartIds.includes(product.id)) {
+      // if (!storedCartIds.includes(product.id)) {
         const updatedCart = [...storedCartIds, product.id];
         localStorage.setItem('cartItems', JSON.stringify(updatedCart));
-      }
+      // }
       
       setIsCartOpen(true);
     }

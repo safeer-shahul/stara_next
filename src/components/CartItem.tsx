@@ -28,9 +28,9 @@ const CartItem = ({ product, onRemove, onQuantityChange }: CartItemProps) => {
         </div>
         
         <div className="flex items-center mt-1">
-          <p className="text-sm font-bold">₹{product.price.toLocaleString()}</p>
+          <p className="text-sm font-bold">₹{product.price}</p>
           <p className="text-xs text-gray-500 line-through ml-2">
-            ₹{product.originalPrice.toLocaleString()}
+            ₹{product.originalPrice}
           </p>
           <span className="ml-2 bg-black text-white text-xs px-1.5 py-0.5 rounded">
             {product.discount}

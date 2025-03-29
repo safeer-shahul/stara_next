@@ -2,28 +2,89 @@
 
 import { useState, useEffect } from 'react';
 import { X, ShoppingBag } from 'lucide-react';
-import { Product, CartDrawerProps, SAMPLE_PRODUCTS, CouponType } from './type';
+import { Product, CartDrawerProps, CouponType } from './type';
 import CartItem from './CartItem';
 import FrequentlyBoughtTogether from './FrequentlyBoughtTogether';
 import CouponSection from './CouponSection';
 import CouponsList from './CouponsList';
+import apiService from '@/utils/api/apiService';
+
+// Define a type for the API response based on the data structure you showed
+interface ApiProduct {
+  id: string;
+  product_name: string;
+  product_price: string;
+  strike_price: string;
+  images: {
+    id: string;
+    product_image: string;
+    product: string;
+  }[];
+  product_description: string;
+  quantity: number;
+  // Add other fields as needed
+}
 
 const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
   const [cartProducts, setCartProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
   const [showCoupons, setShowCoupons] = useState<boolean>(false);
   const [couponCode, setCouponCode] = useState<string>('');
   const [appliedCoupon, setAppliedCoupon] = useState<CouponType | null>(null);
 
-  // Load cart items from localStorage on mount
+  // Load cart items from localStorage and fetch from API on mount
   useEffect(() => {
     if (isOpen) {
       try {
-        const storedCartIds = JSON.parse(localStorage.getItem('cartItems') || '[]') as string[];
-        const items = storedCartIds.map(id => SAMPLE_PRODUCTS[id]).filter(Boolean);
-        setCartProducts(items);
+        const fetchCartProducts = async () => {
+          setLoading(true);
+          
+          // Get product IDs from localStorage
+          const storedCartIds = JSON.parse(localStorage.getItem('cartItems') || '[]') as string[];
+          
+          if (storedCartIds.length === 0) {
+            setCartProducts([]);
+            setLoading(false);
+            return;
+          }
+          
+          try {
+            
+            const response = await apiService.getPaginatedProducts(1, 30, storedCartIds);
+            
+            // Convert API response to your Product type
+            if (response && Array.isArray(response)) {
+              const formattedProducts: any[] = response.map((item: ApiProduct) => ({
+                id: item.id,
+                name: item.product_name,
+                price: parseFloat(item.product_price),
+                originalPrice: item.strike_price !== "0.00" ? parseFloat(item.strike_price) : undefined,
+                discount: item.strike_price !== "0.00" ? 
+                  Math.round(((parseFloat(item.strike_price) - parseFloat(item.product_price)) / parseFloat(item.strike_price)) * 100) + "%" : 
+                  undefined,
+                description: item.product_description,
+                image: item.images.length > 0 ? item.images[0].product_image : '/placeholder.jpg',
+                quantity: 1,
+
+              }));
+              
+              setCartProducts(formattedProducts);
+            } else {
+              setCartProducts([]);
+            }
+          } catch (apiError) {
+            console.error('Error fetching cart products from API:', apiError);
+            setCartProducts([]);
+          }
+          
+          setLoading(false);
+        };
+        
+        fetchCartProducts();
       } catch (error) {
         console.error('Error loading cart items:', error);
         setCartProducts([]);
+        setLoading(false);
       }
     }
   }, [isOpen]);
@@ -101,22 +162,25 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
               <X size={22} />
             </button>
           </div>
-          <>
+          
           {!showCoupons && (
             <div className="bg-[#175e7a] py-1 text-center">
-            <p className="text-white text-[14px]">BUY 1 GET 1 FREE | USE CODE : B1G1</p>
-          </div>
+              <p className="text-white text-[14px]">BUY 1 GET 1 FREE | USE CODE : B1G1</p>
+            </div>
           )}
-          </>
+          
           <div className="flex-1 overflow-y-auto">
-            {showCoupons ? (
+            {loading ? (
+              <div className="flex justify-center items-center h-40">
+                <p>Loading cart items...</p>
+              </div>
+            ) : showCoupons ? (
               <CouponsList 
                 onBack={() => setShowCoupons(false)}
                 onApplyCoupon={handleApplyCouponFromList}
               />
             ) : (
               <>
-                   
                 {/* Items */}
                 <div className="p-2 space-y-2">
                   {cartProducts.length > 0 ? (
@@ -135,16 +199,11 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                     </div>
                   )}
                 </div>
-
-               
               </>
             )}
           </div>
-       
-          <>
-             {/* Frequently Bought Together Section */}
-             {!showCoupons && cartProducts.length > 0 && <FrequentlyBoughtTogether />}
-          </>
+          
+          {!showCoupons && cartProducts.length > 0 && <FrequentlyBoughtTogether />}
 
           {/* Footer */}
           {!showCoupons && cartProducts.length > 0 && (
@@ -161,13 +220,13 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                 {appliedCoupon && (
                   <div className="flex justify-between text-green-600">
                     <span className='text-[13px]'>Discount ({appliedCoupon.description})</span>
-                    <span className='font-bold'>-₹{appliedCoupon.discount.toLocaleString()}</span>
+                    <span className='font-bold'>-₹{appliedCoupon.discount}</span>
                   </div>
                 )}
                 
                 <div className="flex items-center justify-between text-[#7F7F7F]">
                   <span className='text-[13px]'>Estimated Total</span>
-                  <span className='font-bold'>₹{total.toLocaleString()}</span>
+                  <span className='font-bold'>₹{total}</span>
                 </div>
               </div>
               
