@@ -11,6 +11,7 @@ import { menuItems } from './menuData';
 import CartDrawer from './CartDrawer';
 import UserDropdown from './auth/UserDropdown';
 import AuthModal from './auth/AuthModal';
+import apiService from '@/utils/api/apiService';
 
 type MenuItem = {
   name: string;
@@ -32,16 +33,16 @@ export default function Header() {
   // Check authentication status on mount and when local storage changes
   useEffect(() => {
     const checkAuthStatus = () => {
-      const token = localStorage.getItem('accessTokenUser');
+      const token = localStorage.getItem('accessToken');
       
       if (token) {
         console.log('testtttt token')
         setIsLoggedIn(true);
-        // fetchUserProfile(token);
+        fetchUserProfile();
       } else {
         console.log('testtttt noooo token')
         setIsLoggedIn(false);
-        // setUserProfile(null);
+        setUserProfile(null);
       }
     };
 
@@ -50,7 +51,7 @@ export default function Header() {
 
     // Setup listener for storage events (for multi-tab support)
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'accessTokenUser') {
+      if (e.key === 'accessToken') {
         checkAuthStatus();
       }
     };
@@ -58,9 +59,9 @@ export default function Header() {
     // Add listener for login events from AuthModal
     const handleUserLogin = () => {
       setIsLoggedIn(true);
-      const token = localStorage.getItem('accessTokenUser');
+      const token = localStorage.getItem('accessToken');
       if (token) {
-        fetchUserProfile(token);
+        fetchUserProfile();
       }
     };
     
@@ -73,24 +74,13 @@ export default function Header() {
     };
   }, []);
 
-  // Fetch user profile from the API
-  const fetchUserProfile = async (token: string) => {
+  const fetchUserProfile = async () => {
     try {
-      const response = await fetch('/api/auth/me', {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
+      const response = await apiService.getUserProfile();
       
-      if (response.ok) {
-        const data = await response.json();
-        setUserProfile(data);
-      } else {
-        // Token invalid
-        localStorage.removeItem('accessTokenUser');
-        setIsLoggedIn(false);
-        setUserProfile(null);
-      }
+      console.log(response,'getmecustomer')
+        setUserProfile(response);
+    
     } catch (error) {
       console.error('Failed to fetch user profile:', error);
     }
@@ -123,7 +113,7 @@ export default function Header() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('accessTokenUser');
+    localStorage.removeItem('accessToken');
     setIsLoggedIn(false);
     setUserProfile(null);
     setIsMenuOpen(false);
@@ -240,10 +230,10 @@ export default function Header() {
               {isLoggedIn ? (
                 <div className="flex items-center py-2 border-b border-gray-100 mb-2">
                   <div className="w-8 h-8 rounded-full bg-[#175e7a] text-white flex items-center justify-center mr-2">
-                    {userProfile?.name?.charAt(0) || 'U'}
+                    {userProfile?.first_name?.charAt(0) || 'U'}
                   </div>
                   <div>
-                    <p className="text-sm font-medium">{userProfile?.name || 'User'}</p>
+                    <p className="text-sm font-medium">{userProfile?.first_name || 'User'}</p>
                     <Link href="/account" className="text-xs text-[#175e7a]">View Profile</Link>
                   </div>
                 </div>
