@@ -61,8 +61,8 @@ const Register = ({ onClose, switchToLogin }: RegisterProps) => {
       }
 
       // Store the token if auto-login is enabled
-      if (data.accessTokenUser) {
-        localStorage.setItem('accessTokenUserUser', data.accessTokenUser);
+      if (data.accessToken) {
+        localStorage.setItem('accessTokenUser', data.accessToken);
       }
       
       // Close the modal and redirect or refresh

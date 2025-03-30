@@ -8,7 +8,7 @@ import { User, LogOut, Settings } from 'lucide-react';
 
 interface UserDropdownProps {
   userProfile?: {
-    name: string;
+    first_name: string;
     email: string;
     avatar?: string;
   };
@@ -33,13 +33,13 @@ const UserDropdown = ({ userProfile }: UserDropdownProps) => {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem('accessTokenUser');
+    localStorage.removeItem('accessToken');
     setIsOpen(false);
     router.refresh();
   };
 
-  const defaultName = userProfile?.name || 'User';
-  const defaultEmail = userProfile?.email || 'user@example.com';
+  const defaultName = userProfile?.first_name || '';
+  const defaultEmail = userProfile?.email;
   const initials = defaultName
     .split(' ')
     .map((n) => n[0])
@@ -53,15 +53,7 @@ const UserDropdown = ({ userProfile }: UserDropdownProps) => {
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center justify-center w-8 h-8 rounded-full bg-[#175e7a] text-white hover:bg-opacity-90 focus:outline-none"
       >
-        {userProfile?.avatar ? (
-          <img
-            src={userProfile.avatar}
-            alt={defaultName}
-            className="w-8 h-8 rounded-full object-cover"
-          />
-        ) : (
           <span className="text-sm font-medium">{initials}</span>
-        )}
       </button>
 
       {isOpen && (

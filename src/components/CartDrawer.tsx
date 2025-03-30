@@ -9,7 +9,6 @@ import CouponSection from './CouponSection';
 import CouponsList from './CouponsList';
 import apiService from '@/utils/api/apiService';
 
-// Define a type for the API response based on the data structure you showed
 interface ApiProduct {
   id: string;
   product_name: string;
@@ -21,6 +20,12 @@ interface ApiProduct {
     product: string;
   }[];
   product_description: string;
+  product_code: string;
+  quantity: number;
+  product_status: boolean;
+  created_at: string;
+  updated_at: string;
+  sub_category: string;
 }
 
 
@@ -40,6 +45,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
         
         // Get cart items from localStorage
         const storedCartRaw = localStorage.getItem('cartItems') || '[]';
+        console.log(storedCartRaw,'storedCartRaw')
         let storedCartItems;
         
         try {
@@ -91,8 +97,8 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
           const response = await apiService.getPaginatedProducts(1, 30, uniqueProductIds);
           
           // Convert API response to your Product type with quantities
-          if (response && Array.isArray(response)) {
-            const formattedProducts: any[] = response.map((item: ApiProduct) => {
+          if (response && response.products && Array.isArray(response.products)) {
+            const formattedProducts: any[] = response.products.map((item: ApiProduct) => {
               // Find quantity from stored cart items - match IDs without hyphens
               const itemIdWithoutHyphens = item.id.replace(/-/g, '');
               const cartItem = storedCartItems.find((cartItem:any) => cartItem.id === itemIdWithoutHyphens);

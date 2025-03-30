@@ -37,7 +37,7 @@ const Login = ({ onClose, switchToRegister, onLoginSuccess }: LoginProps) => {
       if (!response.ok) throw new Error(data.message || 'Failed to login');
 
       // Store the token
-      localStorage.setItem('accessTokenUser', data.accessTokenUser);
+      localStorage.setItem('accessToken', data.accessToken);
 
       // Trigger the login success callback if provided
       if (onLoginSuccess) {
@@ -70,7 +70,7 @@ const Login = ({ onClose, switchToRegister, onLoginSuccess }: LoginProps) => {
 
       const response = await apiService.googleKeyVerify({idToken:idToken});
 
-      localStorage.setItem('accessTokenUser', response.access_token);
+      localStorage.setItem('accessToken', response.access_token);
       localStorage.setItem('refreshToken', response.refresh_token);
       
       // Trigger the login success callback if provided
