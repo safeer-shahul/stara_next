@@ -1,13 +1,16 @@
+// /src/components/header.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Search, User, Heart, ShoppingBag, Menu, X, ChevronDown } from 'lucide-react';
+import { Search, User, Heart, ShoppingBag, Menu, X, ChevronDown, LogOut } from 'lucide-react';
 import MegaDropdown from './MegaDropdown';
 import MobileDropdown from './MobileDropdown';
 import { menuItems } from './menuData';
 import CartDrawer from './CartDrawer';
+import UserDropdown from './auth/UserDropdown';
+import AuthModal from './auth/AuthModal';
 
 type MenuItem = {
   name: string;
@@ -21,6 +24,77 @@ export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeDropdown, setActiveDropdown] = useState<number | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
+
+  // Check authentication status on mount and when local storage changes
+  useEffect(() => {
+    const checkAuthStatus = () => {
+      const token = localStorage.getItem('accessTokenUser');
+      
+      if (token) {
+        console.log('testtttt token')
+        setIsLoggedIn(true);
+        // fetchUserProfile(token);
+      } else {
+        console.log('testtttt noooo token')
+        setIsLoggedIn(false);
+        // setUserProfile(null);
+      }
+    };
+
+    // Initial check
+    checkAuthStatus();
+
+    // Setup listener for storage events (for multi-tab support)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'accessTokenUser') {
+        checkAuthStatus();
+      }
+    };
+
+    // Add listener for login events from AuthModal
+    const handleUserLogin = () => {
+      setIsLoggedIn(true);
+      const token = localStorage.getItem('accessTokenUser');
+      if (token) {
+        fetchUserProfile(token);
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('userLoggedIn', handleUserLogin);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('userLoggedIn', handleUserLogin);
+    };
+  }, []);
+
+  // Fetch user profile from the API
+  const fetchUserProfile = async (token: string) => {
+    try {
+      const response = await fetch('/api/auth/me', {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setUserProfile(data);
+      } else {
+        // Token invalid
+        localStorage.removeItem('accessTokenUser');
+        setIsLoggedIn(false);
+        setUserProfile(null);
+      }
+    } catch (error) {
+      console.error('Failed to fetch user profile:', error);
+    }
+  };
 
   // Simplified hover handlers
   const handleMouseEnter = (index: number) => {
@@ -36,13 +110,24 @@ export default function Header() {
     setActiveDropdown(activeDropdown === index ? null : index);
   };
 
-  const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
-
   const handleCartClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
     setIsCartOpen(true);
   };
 
+  const handleUserClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    if (!isLoggedIn) {
+      setIsAuthModalOpen(true);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('accessTokenUser');
+    setIsLoggedIn(false);
+    setUserProfile(null);
+    setIsMenuOpen(false);
+  };
 
   return (
     <>
@@ -78,13 +163,23 @@ export default function Header() {
             <button className="md:hidden" onClick={() => setIsMenuOpen(!isMenuOpen)}>
               {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
-            <Link href="/account" className="hidden md:block">
-              <User size={22} />
-            </Link>
+            
+            {/* User account icon - conditionally render dropdown or open auth modal */}
+            <div className="hidden md:block">
+              {isLoggedIn ? (
+                <UserDropdown userProfile={userProfile} />
+              ) : (
+                <a href="#" onClick={handleUserClick}>
+                  <User size={22} />
+                </a>
+              )}
+            </div>
+            
             <Link href="/wishlist" className="hidden md:block relative">
               <Heart size={22} />
               <span className="absolute -top-2 -right-2 bg-[#175e7a] text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">0</span>
             </Link>
+            
             <a href="#" className="relative" onClick={handleCartClick}>
               <ShoppingBag size={22} />
               <span className="absolute -top-2 -right-2 bg-[#175e7a] text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
@@ -140,12 +235,34 @@ export default function Header() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
+              
+              {/* Mobile user account link */}
+              {isLoggedIn ? (
+                <div className="flex items-center py-2 border-b border-gray-100 mb-2">
+                  <div className="w-8 h-8 rounded-full bg-[#175e7a] text-white flex items-center justify-center mr-2">
+                    {userProfile?.name?.charAt(0) || 'U'}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">{userProfile?.name || 'User'}</p>
+                    <Link href="/account" className="text-xs text-[#175e7a]">View Profile</Link>
+                  </div>
+                </div>
+              ) : (
+                <button 
+                  className="w-full py-2 px-4 mb-4 rounded-md border border-[#175e7a] text-[#175e7a] flex items-center justify-center"
+                  onClick={() => setIsAuthModalOpen(true)}
+                >
+                  <User size={16} className="mr-2" />
+                  Login / Register
+                </button>
+              )}
+              
               <ul className="space-y-2">
                 {menuItems.map((item: MenuItem, index: number) => (
                   <li key={index}>
                     {item.hasDropdown ? (
                       <>
-                        <button className="flex items-center w-full py-2 hover:text-gray-600 text-[10px] justify-between" onClick={() => toggleDropdown(index)}>
+                        <button className="flex items-center w-full py-2 hover:text-gray-600 text-[14px] justify-between" onClick={() => toggleDropdown(index)}>
                           <span className="flex items-center">
                             {item.name}
                             {item.badge && <span className={`ml-1 ${item.badge.color} text-xs px-2 py-0.5 rounded-full`}>{item.badge.text}</span>}
@@ -163,11 +280,30 @@ export default function Header() {
                   </li>
                 ))}
               </ul>
+              
+              {/* Mobile logout button if logged in */}
+              {isLoggedIn && (
+                <button 
+                  className="w-full py-2 px-4 mt-4 rounded-md border border-red-500 text-red-500 flex items-center justify-center"
+                  onClick={handleLogout}
+                >
+                  <LogOut size={16} className="mr-2" />
+                  Sign Out
+                </button>
+              )}
             </div>
           </div>
         )}
       </header>
+      
+      {/* Cart Drawer */}
       <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
+      
+      {/* Auth Modal */}
+      <AuthModal 
+        isOpen={isAuthModalOpen} 
+        onClose={() => setIsAuthModalOpen(false)}
+      />
     </>
   );
 }
