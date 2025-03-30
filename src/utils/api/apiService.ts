@@ -350,7 +350,7 @@ class ApiService {
       let url = `/products/get_all_products?page=${page}&page_size=${pageSize}`;
       
       if (productIds && productIds.length > 0) {
-        url += `&ids=${encodeURIComponent(JSON.stringify(productIds))}`;
+        url += `&ids=${productIds}`;
       }
        
       const response = await this.getPublic<any>(url);
@@ -390,6 +390,16 @@ class ApiService {
       const response = await this.getPublic<any>(`/products/get_by_id/${id}`);
       return response;
     } catch (error) {
+      throw error;
+    }
+  }
+
+  public async googleKeyVerify(data:any): Promise<any> {
+    try {
+      const response = await this.post<any>('/user/firebase-login', data);
+      return response;
+    } catch (error) {
+      console.error('Error creating category:', error);
       throw error;
     }
   }

@@ -77,11 +77,59 @@ export default function ProductDetailPage() {
 
   const handleAddToBag = () => {
     if (product) {
-      const storedCartIds = JSON.parse(localStorage.getItem('cartItems') || '[]');
-      // if (!storedCartIds.includes(product.id)) {
-        const updatedCart = [...storedCartIds, product.id];
-        localStorage.setItem('cartItems', JSON.stringify(updatedCart));
-      // }
+      // Get current cart items
+      const storedCartItems = JSON.parse(localStorage.getItem('cartItems') || '[]');
+      
+      // Check if we're dealing with the old format (array of strings)
+      if (storedCartItems.length > 0 && typeof storedCartItems[0] === 'string') {
+        // Convert old format items, removing hyphens
+        const formattedCartIds = storedCartItems.map((id) => id.replace(/-/g, ''));
+        
+        // Add new product ID
+        const productIdWithoutHyphens = product.id.replace(/-/g, '');
+        const updatedCart = [...formattedCartIds, productIdWithoutHyphens];
+        
+        // Count occurrences and convert to new format
+        const productCounts = {};
+        updatedCart.forEach(id => {
+          productCounts[id] = (productCounts[id] || 0) + 1;
+        });
+        
+        // Convert to new format with quantities
+        const newFormatCart = Object.keys(productCounts).map(id => ({
+          id,
+          quantity: productCounts[id]
+        }));
+        
+        localStorage.setItem('cartItems', JSON.stringify(newFormatCart));
+      } else {
+        // Already using new format
+        const productIdWithoutHyphens = product.id.replace(/-/g, '');
+        
+        // Find if product already exists in cart
+        const existingItemIndex = storedCartItems.findIndex(
+          item => item.id === productIdWithoutHyphens
+        );
+        
+        let updatedCartItems;
+        
+        if (existingItemIndex >= 0) {
+          // Product already exists, increase quantity
+          updatedCartItems = [...storedCartItems];
+          updatedCartItems[existingItemIndex] = {
+            ...updatedCartItems[existingItemIndex],
+            quantity: updatedCartItems[existingItemIndex].quantity + 1
+          };
+        } else {
+          // Product doesn't exist in cart, add it with quantity 1
+          updatedCartItems = [
+            ...storedCartItems, 
+            { id: productIdWithoutHyphens, quantity: 1 }
+          ];
+        }
+        
+        localStorage.setItem('cartItems', JSON.stringify(updatedCartItems));
+      }
       
       setIsCartOpen(true);
     }

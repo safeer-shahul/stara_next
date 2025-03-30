@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, ShoppingBag } from 'lucide-react';
-import { Product, CartDrawerProps, CouponType } from './type';
+import { CartDrawerProps, CouponType } from './type';
 import CartItem from './CartItem';
 import FrequentlyBoughtTogether from './FrequentlyBoughtTogether';
 import CouponSection from './CouponSection';
@@ -21,12 +21,11 @@ interface ApiProduct {
     product: string;
   }[];
   product_description: string;
-  quantity: number;
-  // Add other fields as needed
 }
 
+
 const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
-  const [cartProducts, setCartProducts] = useState<Product[]>([]);
+  const [cartProducts, setCartProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [showCoupons, setShowCoupons] = useState<boolean>(false);
   const [couponCode, setCouponCode] = useState<string>('');
@@ -34,27 +33,72 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
 
   // Load cart items from localStorage and fetch from API on mount
   useEffect(() => {
-    if (isOpen) {
-      try {
-        const fetchCartProducts = async () => {
-          setLoading(true);
+  if (isOpen) {
+    try {
+      const fetchCartProducts = async () => {
+        setLoading(true);
+        
+        // Get cart items from localStorage
+        const storedCartRaw = localStorage.getItem('cartItems') || '[]';
+        let storedCartItems;
+        
+        try {
+          storedCartItems = JSON.parse(storedCartRaw);
           
-          // Get product IDs from localStorage
-          const storedCartIds = JSON.parse(localStorage.getItem('cartItems') || '[]') as string[];
-          
-          if (storedCartIds.length === 0) {
-            setCartProducts([]);
-            setLoading(false);
-            return;
+          // Check if we're using the old format (array of strings)
+          if (storedCartItems.length > 0 && typeof storedCartItems[0] === 'string') {
+            // Remove hyphens from each ID in old format
+            const formattedCartIds = storedCartItems.map((id:any) => id.replace(/-/g, ''));
+            
+            // Count occurrences and convert to new format
+            const productCounts:any = {};
+            formattedCartIds.forEach((id:any) => {
+              productCounts[id] = (productCounts[id] || 0) + 1;
+            });
+            
+            // Convert to new format with quantities
+            storedCartItems = Object.keys(productCounts).map(id => ({
+              id,
+              quantity: productCounts[id]
+            }));
+            
+            // Update localStorage with new format
+            localStorage.setItem('cartItems', JSON.stringify(storedCartItems));
+          } else {
+            // Already using new format, but still need to remove hyphens
+            storedCartItems = storedCartItems.map((item:any) => ({
+              ...item,
+              id: item.id.replace(/-/g, '')
+            }));
           }
+        } catch (error) {
+          console.error('Error parsing cart items:', error);
+          storedCartItems = [];
+        }
+        
+        if (storedCartItems.length === 0) {
+          setCartProducts([]);
+          setLoading(false);
+          return;
+        }
+        
+        // Get unique product IDs (already without hyphens)
+        const uniqueProductIds = storedCartItems.map((item:any) => item.id);
+        
+        console.log(uniqueProductIds, 'uniqueProductIds', storedCartItems, 'storedCartItems');
+        
+        try {
+          const response = await apiService.getPaginatedProducts(1, 30, uniqueProductIds);
           
-          try {
-            
-            const response = await apiService.getPaginatedProducts(1, 30, storedCartIds);
-            
-            // Convert API response to your Product type
-            if (response && Array.isArray(response)) {
-              const formattedProducts: any[] = response.map((item: ApiProduct) => ({
+          // Convert API response to your Product type with quantities
+          if (response && Array.isArray(response)) {
+            const formattedProducts: any[] = response.map((item: ApiProduct) => {
+              // Find quantity from stored cart items - match IDs without hyphens
+              const itemIdWithoutHyphens = item.id.replace(/-/g, '');
+              const cartItem = storedCartItems.find((cartItem:any) => cartItem.id === itemIdWithoutHyphens);
+              const quantity = cartItem ? cartItem.quantity : 1;
+              
+              return {
                 id: item.id,
                 name: item.product_name,
                 price: parseFloat(item.product_price),
@@ -64,51 +108,73 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                   undefined,
                 description: item.product_description,
                 image: item.images.length > 0 ? item.images[0].product_image : '/placeholder.jpg',
-                quantity: 1,
-
-              }));
-              
-              setCartProducts(formattedProducts);
-            } else {
-              setCartProducts([]);
-            }
-          } catch (apiError) {
-            console.error('Error fetching cart products from API:', apiError);
+                quantity: quantity,
+              };
+            });
+            
+            setCartProducts(formattedProducts);
+          } else {
             setCartProducts([]);
           }
-          
-          setLoading(false);
-        };
+        } catch (apiError) {
+          console.error('Error fetching cart products from API:', apiError);
+          setCartProducts([]);
+        }
         
-        fetchCartProducts();
-      } catch (error) {
-        console.error('Error loading cart items:', error);
-        setCartProducts([]);
         setLoading(false);
-      }
+      };
+      
+      fetchCartProducts();
+    } catch (error) {
+      console.error('Error loading cart items:', error);
+      setCartProducts([]);
+      setLoading(false);
     }
-  }, [isOpen]);
+  }
+}, [isOpen]);
 
   // Calculate cart totals
   const calculateSubtotal = (): number => {
-    return cartProducts.reduce((total, item) => total + item.price, 0);
+    return cartProducts.reduce((total, item) => total + (item.price * item.quantity), 0);
   };
 
   const subtotal = calculateSubtotal();
   const total = appliedCoupon ? subtotal - appliedCoupon.discount : subtotal;
 
   const handleRemoveItem = (id: string): void => {
+    // Remove item from cart
     const updatedCart = cartProducts.filter(item => item.id !== id);
     setCartProducts(updatedCart);
     
-    // Update localStorage
-    const cartIds = updatedCart.map(item => item.id);
-    localStorage.setItem('cartItems', JSON.stringify(cartIds));
+    // Update localStorage - now storing items with quantities
+    const cartItems = updatedCart.map(item => ({
+      id: item.id,
+      quantity: item.quantity
+    }));
+    
+    localStorage.setItem('cartItems', JSON.stringify(cartItems));
   };
 
   const handleQuantityChange = (id: string, change: number): void => {
-    // In a real app, you would update quantities here
-    console.log(`Change quantity of item ${id} by ${change}`);
+    // Update quantity in the cart state
+    const updatedCart = cartProducts.map(item => {
+      if (item.id === id) {
+        const newQuantity = Math.max(1, item.quantity + change); // Ensure minimum quantity is 1
+        return { ...item, quantity: newQuantity };
+      }
+      return item;
+    });
+    
+    setCartProducts(updatedCart);
+    
+    // Update localStorage with new quantities
+    // Important: Remove hyphens from IDs when storing in localStorage
+    const cartItems = updatedCart.map(item => ({
+      id: item.id.replace(/-/g, ''),
+      quantity: item.quantity
+    }));
+    
+    localStorage.setItem('cartItems', JSON.stringify(cartItems));
   };
 
   const handleApplyCoupon = (): void => {
@@ -156,7 +222,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
           <div className="flex items-center justify-between py-3 pl-6 pr-2 border-b">
             <div className="flex items-center">
               <ShoppingBag className="mr-2 text-[#7F7F7F]" size={18} />
-              <h3 className="text-[16px] font-medium text-[#7F7F7F]">Your Cart ({cartProducts.length} items)</h3>
+              <h3 className="text-[16px] font-medium text-[#7F7F7F]">Your Cart ({cartProducts.reduce((total, item) => total + item.quantity, 0)} items)</h3>
             </div>
             <button onClick={onClose} className="text-black hover:text-gray-700">
               <X size={22} />
@@ -203,7 +269,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
             )}
           </div>
           
-          {!showCoupons && cartProducts.length > 0 && <FrequentlyBoughtTogether />}
+          {/*{!showCoupons && cartProducts.length > 0 && <FrequentlyBoughtTogether />}*/}
 
           {/* Footer */}
           {!showCoupons && cartProducts.length > 0 && (
