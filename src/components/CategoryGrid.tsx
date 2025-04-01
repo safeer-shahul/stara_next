@@ -13,6 +13,7 @@ interface CategoryItem {
   image: string;
   title: string;
   link: string;
+  id: number; // Add the id field
 }
 
 export default function CategoryGrid() {
@@ -27,13 +28,13 @@ export default function CategoryGrid() {
         setLoading(true);
         const categoryData = await apiService.getAllCategoriesPublic();
         
-        // Map API data to the format expected by the component
-        const formattedCategories = categoryData.map(category => ({
+        const formattedCategories:any = categoryData.map(category => ({
           image: category.category_image 
             ? `${process.env.NEXT_PUBLIC_API_BASE_URL}${category.category_image}`
-            : '/images/placeholder.png', // fallback image
+            : '/images/placeholder.png', 
           title: category.category_name.toUpperCase(),
-          link: `/shop/categories/${category.slug}`
+          link: `/shop/collections/${category.slug}?id=${category.id}`,
+          id: category.id 
         }));
         
         setCategories(formattedCategories);
