@@ -341,10 +341,17 @@ class ApiService {
     }
   }
 
+
   public async getPaginatedProducts(
     page: number = 1,
     pageSize: number = 10,
-    productIds?: string[]
+    productIds?: string[],
+    filters?: {
+      subcategory_id?: string | number,
+      min_price?: number,
+      max_price?: number,
+      sort_by?: string
+    }
   ): Promise<any> {
     try {
       let url = `/products/get_all_products?page=${page}&page_size=${pageSize}`;
@@ -352,7 +359,25 @@ class ApiService {
       if (productIds && productIds.length > 0) {
         url += `&ids=${productIds}`;
       }
-       
+      
+      if (filters) {
+        if (filters.subcategory_id) {
+          url += `&sub_category=${filters.subcategory_id}`;
+        }
+        
+        if (filters.min_price) {
+          url += `&min_price=${filters.min_price}`;
+        }
+        
+        if (filters.max_price) {
+          url += `&max_price=${filters.max_price}`;
+        }
+        
+        if (filters.sort_by) {
+          url += `&sort_by=${filters.sort_by}`;
+        }
+      }
+      
       const response = await this.getPublic<any>(url);
       return response;
     } catch (error) {
