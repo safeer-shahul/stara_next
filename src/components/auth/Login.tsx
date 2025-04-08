@@ -57,29 +57,31 @@ const Login = ({ onClose, switchToRegister, onLoginSuccess }: LoginProps) => {
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     setError('');
-
+  
     try {
-      // Force new window for Google auth
       const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({
-        prompt: 'select_account'
-      });
-      
+      provider.setCustomParameters({ prompt: 'select_account' });
+  
       const result = await signInWithPopup(auth, provider);
       const idToken = await result.user.getIdToken();
-
-      const response = await apiService.googleKeyVerify({idToken:idToken});
-
+  
+      const response = await apiService.googleKeyVerify({ idToken });
+  
+      // Save tokens
       localStorage.setItem('accessToken', response.access_token);
       localStorage.setItem('refreshToken', response.refresh_token);
-      
-      // Trigger the login success callback if provided
+  
+      // Now fetch user profile using the stored access token
+      const userProfile = await apiService.getUserProfile();
+      localStorage.setItem('me', JSON.stringify(userProfile));
+
       if (onLoginSuccess) {
         onLoginSuccess();
       } else {
         onClose();
         router.refresh();
-      }
+      }      
+      
     } catch (err) {
       console.error('Google login error:', err);
       setError(err instanceof Error ? err.message : 'Failed to login with Google');
@@ -87,6 +89,7 @@ const Login = ({ onClose, switchToRegister, onLoginSuccess }: LoginProps) => {
       setIsLoading(false);
     }
   };
+  
 
   return (
     <div>

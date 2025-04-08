@@ -95,7 +95,11 @@ class ApiService {
                 window.location.pathname !== '/admin/login') {
               console.log('Unauthorized access, redirecting to login');
               localStorage.removeItem('accessToken');
+              localStorage.removeItem('refreshToken');
               window.location.href = '/admin/login';
+            } else {
+              localStorage.removeItem('accessToken');
+              localStorage.removeItem('refreshToken');
             }
           }
         }
@@ -331,9 +335,10 @@ class ApiService {
     category_name: string;
     category_image: string | null;
     slug: string;
+    sub_categories:any[]
   }>> {
     try {
-      const response = await this.getPublic<any>(`/category/get_paginated_category?page=1&page_size=1000`);
+      const response = await this.getPublic<any>(`/category/get_paginated_category?page=1&page_size=1000&get_sub_category=true`);
       return response.results;
     } catch (error) {
       console.error('Error fetching all categories (public):', error);
@@ -422,6 +427,45 @@ class ApiService {
   public async googleKeyVerify(data:any): Promise<any> {
     try {
       const response = await this.post<any>('/user/firebase-login', data);
+      return response;
+    } catch (error) {
+      console.error('Error creating category:', error);
+      throw error;
+    }
+  }
+
+
+  public async getAddresses(): Promise<any> {
+    try {
+      const response = await this.get<any>(`/address/get_address`);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  public async addAddress(data:any): Promise<any> {
+    try {
+      const response = await this.post<any>('/address/add_address', data);
+      return response;
+    } catch (error) {
+      console.error('Error creating category:', error);
+      throw error;
+    }
+  }
+
+  public async getUserCart(): Promise<any> {
+    try {
+      const response = await this.get<any>(`/cart/get_my_cart`);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  public async addToCart(data:any): Promise<any> {
+    try {
+      const response = await this.post<any>('/cart/add_to_cart', data);
       return response;
     } catch (error) {
       console.error('Error creating category:', error);

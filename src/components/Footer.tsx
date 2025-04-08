@@ -104,12 +104,12 @@ export default function Footer() {
           </div>
 
           {/* Payment options */}
-          <div className="flex justify-center space-x-4 mb-6">
+          {/* <div className="flex justify-center space-x-4 mb-6">
             <img src="https://cdn.stara.com/media/google-pay_1.svg" alt="Google Pay" className="h-8" />
             <img src="https://cdn.stara.com/media/mastercard.svg" alt="Mastercard" className="h-8" />
             <img src="https://cdn.stara.com/media/paypal.svg" alt="PayPal" className="h-8" />
             <img src="https://cdn.stara.com/media/visa.svg" alt="Visa" className="h-8" />
-          </div>
+          </div> */}
 
           {/* App download section
           <div className="text-center mb-6">
