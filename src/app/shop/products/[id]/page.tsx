@@ -1,11 +1,3 @@
-// Create this file structure:
-// app/
-//   shop/
-//     products/
-//       [id]/
-//         page.tsx
-
-// File: app/shop/products/[id]/page.tsx
 'use client';
 
 import { CheckCircle2, Star, Tag } from 'lucide-react';
@@ -48,6 +40,7 @@ export default function ProductDetailPage() {
   const [product, setProduct] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -77,20 +70,27 @@ export default function ProductDetailPage() {
 
   const handleAddToBag = () => {
     if (product) {
+      // Set the selected product ID to pass to CartDrawer
+      setSelectedProductId(product.id);
+      
+      // Open the cart drawer
+      setIsCartOpen(true);
+      
+      // For backward compatibility, also update localStorage
       // Get current cart items
       const storedCartItems = JSON.parse(localStorage.getItem('cartItems') || '[]');
       
       // Check if we're dealing with the old format (array of strings)
       if (storedCartItems.length > 0 && typeof storedCartItems[0] === 'string') {
         // Convert old format items, removing hyphens
-        const formattedCartIds = storedCartItems.map((id) => id.replace(/-/g, ''));
+        const formattedCartIds = storedCartItems.map((id:any) => id.replace(/-/g, ''));
         
         // Add new product ID
         const productIdWithoutHyphens = product.id.replace(/-/g, '');
         const updatedCart = [...formattedCartIds, productIdWithoutHyphens];
         
         // Count occurrences and convert to new format
-        const productCounts = {};
+        const productCounts:any = {};
         updatedCart.forEach(id => {
           productCounts[id] = (productCounts[id] || 0) + 1;
         });
@@ -108,7 +108,7 @@ export default function ProductDetailPage() {
         
         // Find if product already exists in cart
         const existingItemIndex = storedCartItems.findIndex(
-          item => item.id === productIdWithoutHyphens
+          (item:any) => item.id === productIdWithoutHyphens
         );
         
         let updatedCartItems;
@@ -130,8 +130,6 @@ export default function ProductDetailPage() {
         
         localStorage.setItem('cartItems', JSON.stringify(updatedCartItems));
       }
-      
-      setIsCartOpen(true);
     }
   };
 
@@ -156,6 +154,12 @@ export default function ProductDetailPage() {
         error: "Please enter a valid 6-digit pincode"
       };
     }
+  };
+
+  const handleCartClose = () => {
+    setIsCartOpen(false);
+    // Reset selected product ID when cart is closed
+    setSelectedProductId(null);
   };
 
   if (isLoading) {
@@ -306,7 +310,11 @@ export default function ProductDetailPage() {
           <PolicyIcons/>
         </div>
       </div>
-      <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
+      <CartDrawer 
+        isOpen={isCartOpen} 
+        onClose={handleCartClose} 
+        productId={selectedProductId} 
+      />
     </div>
   );
 }

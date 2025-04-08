@@ -27,13 +27,11 @@ export default function CategoryGrid() {
       try {
         setLoading(true);
         const categoryData = await apiService.getAllCategoriesPublic();
-        
+        console.log(categoryData,'categoryData')
         const formattedCategories:any = categoryData.map(category => ({
-          image: category.category_image 
-            ? `${process.env.NEXT_PUBLIC_API_BASE_URL}${category.category_image}`
-            : '/images/placeholder.png', 
+          image: `${process.env.NEXT_PUBLIC_API_BASE_URL}${category.category_image}`, 
           title: category.category_name.toUpperCase(),
-          link: `/shop/collections/${category.slug}?id=${category.id}`,
+          link: `/shop/collections/${category.slug}?id=${category.sub_categories[0].id}`,
           id: category.id 
         }));
         

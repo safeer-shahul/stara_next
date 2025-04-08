@@ -114,6 +114,7 @@ export default function Header() {
 
   const handleLogout = () => {
     localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
     setIsLoggedIn(false);
     setUserProfile(null);
     setIsMenuOpen(false);
