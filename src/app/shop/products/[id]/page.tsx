@@ -9,6 +9,7 @@ import AddToCartButton from '@/components/AddToCartButton';
 import DeliveryPincodeChecker from '@/components/DeliveryPincodeChecker';
 import PolicyIcons from '@/components/PolicyIcons';
 import CartDrawer from '@/components/CartDrawer';
+import CheckoutModal from '@/components/CheckoutModal';
 import apiService from '@/utils/api/apiService';
 
 // Keep static data for features that aren't in the API
@@ -37,10 +38,17 @@ export default function ProductDetailPage() {
   const [isGift, setIsGift] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState<boolean>(false);
   const [product, setProduct] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [checkoutData, setCheckoutData] = useState<{
+    items: Array<{
+      product_id: string;
+      quantity: number;
+    }>;
+  }>({ items: [] });
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -138,7 +146,30 @@ export default function ProductDetailPage() {
   };
 
   const handleBuyNow = () => {
-    console.log('Buy now clicked');
+    if (product) {
+      // Prepare checkout data with just this product
+      const productIdWithoutHyphens = product.id.replace(/-/g, '');
+      setCheckoutData({
+        items: [
+          {
+            product_id: productIdWithoutHyphens,
+            quantity: 1
+          }
+        ]
+      });
+      
+      // Open checkout modal directly
+      setIsCheckoutOpen(true);
+    }
+  };
+
+  const handleCheckoutClose = () => {
+    setIsCheckoutOpen(false);
+  };
+  
+  const handleAddressSelected = (addressId: string): void => {
+    console.log(`Proceeding with address ID: ${addressId}`);
+    setIsCheckoutOpen(false);
   };
 
   const checkPincode = async (pincode: string) => {
@@ -310,10 +341,20 @@ export default function ProductDetailPage() {
           <PolicyIcons/>
         </div>
       </div>
+      
+      {/* Cart Drawer */}
       <CartDrawer 
         isOpen={isCartOpen} 
         onClose={handleCartClose} 
         productId={selectedProductId} 
+      />
+
+      {/* Checkout Modal for Buy Now */}
+      <CheckoutModal 
+        isOpen={isCheckoutOpen} 
+        onClose={handleCheckoutClose} 
+        onProceed={handleAddressSelected}
+        orderItems={checkoutData.items}
       />
     </div>
   );

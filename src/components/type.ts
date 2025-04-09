@@ -22,6 +22,7 @@ export type Product = {
   export type CartDrawerProps = {
     isOpen: boolean;
     onClose: () => void;
+    productId:any;
   };
   
   // Sample product data for testing

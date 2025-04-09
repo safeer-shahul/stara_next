@@ -36,6 +36,13 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, productId }) =
   const [couponCode, setCouponCode] = useState<string>('');
   const [appliedCoupon, setAppliedCoupon] = useState<CouponType | null>(null);
   const [showCheckoutModal, setShowCheckoutModal] = useState<boolean>(false);
+  const [checkoutData, setCheckoutData] = useState<{
+    coupon_code_id?: string;
+    items: Array<{
+      product_id: string;
+      quantity: number;
+    }>;
+  }>({ items: [] });
 
   useEffect(() => {
     const handleProductIdAddToCart = async () => {
@@ -248,6 +255,14 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, productId }) =
         description: 'Buy 1 Get 1 Free',
         discount: calculateSubtotal() * 0.5 
       });
+    } else if (couponCode.toUpperCase() === 'TANK') {
+      setAppliedCoupon({
+        code: 'TANK',
+        description: '10% off on all jewelry',
+        discount: calculateSubtotal() * 0.1
+      });
+    } else {
+      setAppliedCoupon(null);
     }
     setShowCoupons(false);
   };
@@ -275,6 +290,17 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, productId }) =
   };
   
   const handleProceedToCheckout = (): void => {
+    // Prepare checkout data
+    const items = cartProducts.map(item => ({
+      product_id: item.id.replace(/-/g, ''),
+      quantity: item.quantity
+    }));
+    
+    setCheckoutData({
+      items,
+      coupon_code_id: appliedCoupon?.code
+    });
+    
     setShowCheckoutModal(true);
   };
   
@@ -392,6 +418,8 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, productId }) =
         isOpen={showCheckoutModal}
         onClose={handleCheckoutClose}
         onProceed={handleAddressSelected}
+        orderItems={checkoutData.items}
+        coupon_code_id={checkoutData.coupon_code_id}
       />
     </>
   );
