@@ -3,7 +3,7 @@ import axios, { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 
 // Configuration
 const API_CONFIG = {
   BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:8000',
-  TIMEOUT: 10000,
+  TIMEOUT: 30000,
 };
 
 // User profile interface
@@ -474,6 +474,26 @@ class ApiService {
   }
 
   public async getProductAmountDetailed(data:any): Promise<any> {
+    try {
+      const response = await this.post<any>('/products/get_product_amount', data);
+      return response;
+    } catch (error) {
+      console.error('Error creating category:', error);
+      throw error;
+    }
+  }
+
+  public async getRazorpayOrder(data:any): Promise<any> {
+    try {
+      const response = await this.post<any>('/products/get_product_amount', data);
+      return response;
+    } catch (error) {
+      console.error('Error creating category:', error);
+      throw error;
+    }
+  }
+
+  public async verifyPayment(data:any): Promise<any> {
     try {
       const response = await this.post<any>('/products/get_product_amount', data);
       return response;
