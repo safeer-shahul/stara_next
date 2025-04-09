@@ -473,6 +473,16 @@ class ApiService {
     }
   }
 
+  public async getProductAmountDetailed(data:any): Promise<any> {
+    try {
+      const response = await this.post<any>('/products/get_product_amount', data);
+      return response;
+    } catch (error) {
+      console.error('Error creating category:', error);
+      throw error;
+    }
+  }
+
 }
 
 const apiService = ApiService.getInstance();
