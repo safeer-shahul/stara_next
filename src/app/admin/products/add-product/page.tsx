@@ -151,6 +151,7 @@ export default function AddProductPage() {
       formData.append('strike_price', strikePrice);
       formData.append('product_code', productCode);
       formData.append('product_weight', product_weight);
+      formData.append('product_box_weight', product_box_weight);
 
       // Append all product images with the same key
       productImages.forEach(image => {
