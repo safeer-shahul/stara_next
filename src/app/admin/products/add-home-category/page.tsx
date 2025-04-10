@@ -64,7 +64,7 @@ function AddHomeCategoryPage() {
       const response = await apiService.getPaginatedProducts(page, 10);
       
       // Check if API returns data in expected format
-      const newProducts = response.results || response;
+      const newProducts = response.products || response;
       
       if (newProducts.length === 0) {
         setHasMore(false);
