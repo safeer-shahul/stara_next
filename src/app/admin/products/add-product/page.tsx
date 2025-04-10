@@ -16,6 +16,8 @@ export default function AddProductPage() {
   const [productName, setProductName] = useState('');
   const [productPrice, setProductPrice] = useState('');
   const [quantity, setQuantity] = useState('');
+  const [product_weight, setProductWeight] = useState('');
+  const [product_box_weight, setProductBoxWeight] = useState('');
   const [productDescription, setProductDescription] = useState('');
   const [productStatus, setProductStatus] = useState(true);
   const [subCategory, setSubCategory] = useState('');
@@ -148,6 +150,7 @@ export default function AddProductPage() {
       formData.append('product_status', productStatus.toString());
       formData.append('strike_price', strikePrice);
       formData.append('product_code', productCode);
+      formData.append('product_weight', product_weight);
 
       // Append all product images with the same key
       productImages.forEach(image => {
@@ -320,6 +323,39 @@ export default function AddProductPage() {
                   <option value="inactive">Inactive</option>
                 </select>
               </div>
+
+              <div className="mb-4">
+                <label htmlFor="product_weight" className="block text-sm font-medium text-gray-700 mb-1">
+                Product Weight *
+                </label>
+                <input
+                  type="number"
+                  id="product_weight"
+                  min="0"
+                  className="w-full p-2 border border-gray-300 rounded"
+                  value={product_weight}
+                  onChange={(e) => setProductWeight(e.target.value)}
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+
+              <div className="mb-4">
+                <label htmlFor="product_box_weight" className="block text-sm font-medium text-gray-700 mb-1">
+                Product Box Weight *
+                </label>
+                <input
+                  type="number"
+                  id="product_box_weight"
+                  min="0"
+                  className="w-full p-2 border border-gray-300 rounded"
+                  value={product_box_weight}
+                  onChange={(e) => setProductBoxWeight(e.target.value)}
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+
             </div>
 
             <div>
