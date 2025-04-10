@@ -495,7 +495,7 @@ class ApiService {
 
   public async verifyPayment(data:any): Promise<any> {
     try {
-      const response = await this.post<any>('/products/get_product_amount', data);
+      const response = await this.post<any>('/order/verify_payment', data);
       return response;
     } catch (error) {
       console.error('Error creating category:', error);

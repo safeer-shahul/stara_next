@@ -11,7 +11,6 @@ import BillSummary from './BillSummary';
 import RazorpayPayment from './RazorpayPayment';
 import OrderConfirmation from './OrderConfirmation';
 
-// Step enum to track checkout flow
 enum CheckoutStep {
   ADDRESS_SELECTION,
   BILL_SUMMARY,
@@ -142,7 +141,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
   };
   
-  const handlePaymentSuccess = (paymentId: string) => {
+  const handlePaymentSuccess = () => {
     setPaymentId(paymentId);
     setCurrentStep(CheckoutStep.ORDER_CONFIRMATION);
   };
