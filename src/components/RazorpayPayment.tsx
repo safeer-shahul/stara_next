@@ -6,7 +6,7 @@ import apiService from '@/utils/api/apiService';
 interface RazorpayPaymentProps {
   orderId: string; // This is now the razorpay_order_id
   customerPhone: string;
-  onSuccess: (paymentId: string) => void;
+  onSuccess: () => void;
   onError: (errorMessage: string) => void;
 }
 
@@ -60,9 +60,9 @@ const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
         const options = {
           key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
           currency: 'INR',
-          name: 'Your Company Name',
+          name: 'Stara Silver Jewels',
           description: 'Order Payment',
-          order_id: orderId, // Direct use of the razorpay_order_id passed from BillSummary
+          order_id: orderId, 
           handler: function (response: any) {
             handlePaymentSuccess(response);
           },
@@ -100,18 +100,12 @@ const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
 
   const handlePaymentSuccess = async (paymentResponse: any) => {
     try {
-      // Verify payment with your backend
-      const verificationData = {
-        order_id: orderId,
-        payment_id: paymentResponse.razorpay_payment_id,
-        razorpay_signature: paymentResponse.razorpay_signature
-      };
+      console.log(paymentResponse,'paymentResponse')
+      const response = await apiService.verifyPayment(paymentResponse);
       
-      const response = await apiService.verifyPayment(verificationData);
-      
-      if (response && response.success) {
+      if (response) {
         // Payment verified successfully
-        onSuccess(paymentResponse.razorpay_payment_id);
+        onSuccess();
       } else {
         setError('Payment verification failed. Please contact support.');
         onError('Payment verification failed');
