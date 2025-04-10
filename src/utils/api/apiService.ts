@@ -483,9 +483,9 @@ class ApiService {
     }
   }
 
-  public async getRazorpayOrder(data:any): Promise<any> {
+  public async createProductsOrder(data:any): Promise<any> {
     try {
-      const response = await this.post<any>('/products/get_product_amount', data);
+      const response = await this.post<any>('/order/place_order', data);
       return response;
     } catch (error) {
       console.error('Error creating category:', error);

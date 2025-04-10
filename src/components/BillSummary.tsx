@@ -35,7 +35,7 @@ const BillSummary: React.FC<any> = ({
   const [responseData, setResponseData] = useState<APIResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [processingOrder, setProcessingOrder] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'cod' | 'online'>('online');
+  const [paymentMethod, setPaymentMethod] = useState<'Cod' | 'Razorpay'>('Razorpay');
 
   useEffect(() => {
     fetchBillDetails();
@@ -75,8 +75,12 @@ const BillSummary: React.FC<any> = ({
     setError(null);
     
     try {
-      // Notify parent component to handle the order placement
-      onPlaceOrder(paymentMethod);
+      const response = await apiService.createProductsOrder({
+        items: orderItems,
+        payment_mode : paymentMethod
+      });
+      console.log(response,'order creations')
+      onPlaceOrder(paymentMethod,response.razorpay_order_id);
     } catch (error) {
       console.error('Error placing order:', error);
       setError('Failed to place your order. Please try again.');
@@ -185,14 +189,14 @@ const BillSummary: React.FC<any> = ({
             <div className="space-y-3">
               <div 
                 className={`flex items-center p-3 border rounded-md cursor-pointer ${
-                  paymentMethod === 'online' ? 'border-[#175e7a] bg-blue-50' : 'border-gray-200'
+                  paymentMethod === 'Razorpay' ? 'border-[#175e7a] bg-blue-50' : 'border-gray-200'
                 }`}
-                onClick={() => setPaymentMethod('online')}
+                onClick={() => setPaymentMethod('Razorpay')}
               >
                 <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                  paymentMethod === 'online' ? 'border-[#175e7a]' : 'border-gray-300'
+                  paymentMethod === 'Razorpay' ? 'border-[#175e7a]' : 'border-gray-300'
                 }`}>
-                  {paymentMethod === 'online' && (
+                  {paymentMethod === 'Razorpay' && (
                     <div className="w-3 h-3 rounded-full bg-[#175e7a]"></div>
                   )}
                 </div>
@@ -204,14 +208,14 @@ const BillSummary: React.FC<any> = ({
               
               <div 
                 className={`flex items-center p-3 border rounded-md cursor-pointer ${
-                  paymentMethod === 'cod' ? 'border-[#175e7a] bg-blue-50' : 'border-gray-200'
+                  paymentMethod === 'Cod' ? 'border-[#175e7a] bg-blue-50' : 'border-gray-200'
                 }`}
-                onClick={() => setPaymentMethod('cod')}
+                onClick={() => setPaymentMethod('Cod')}
               >
                 <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                  paymentMethod === 'cod' ? 'border-[#175e7a]' : 'border-gray-300'
+                  paymentMethod === 'Cod' ? 'border-[#175e7a]' : 'border-gray-300'
                 }`}>
-                  {paymentMethod === 'cod' && (
+                  {paymentMethod === 'Cod' && (
                     <div className="w-3 h-3 rounded-full bg-[#175e7a]"></div>
                   )}
                 </div>
@@ -229,7 +233,7 @@ const BillSummary: React.FC<any> = ({
               onClick={handlePlaceOrder}
               disabled={processingOrder}
             >
-              {processingOrder ? 'Processing...' : paymentMethod === 'cod' ? 'Place Order (COD)' : 'Proceed to Payment'}
+              {processingOrder ? 'Processing...' : paymentMethod === 'Cod' ? 'Place Order (COD)' : 'Proceed to Payment'}
             </button>
             <p className="text-center text-sm text-gray-500 mt-2">
               By placing your order, you agree to our terms and conditions.
