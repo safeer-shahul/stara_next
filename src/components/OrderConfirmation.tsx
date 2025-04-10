@@ -4,8 +4,8 @@ import { Check } from 'lucide-react';
 
 interface OrderConfirmationProps {
   orderId: string;
-  paymentId?: string;
-  paymentMethod: 'cod' | 'online';
+  paymentId?: string | null;
+  paymentMethod: 'Cod' | 'Razorpay';  
   onContinueShopping: () => void;
 }
 
@@ -21,7 +21,7 @@ const OrderConfirmation: React.FC<OrderConfirmationProps> = ({
         <Check size={32} className="text-green-600" />
       </div>
       
-      {paymentMethod === 'cod' ? (
+      {paymentMethod === 'Cod' ? (
         <>
           <h3 className="text-xl font-medium mb-2">Order Placed Successfully!</h3>
           <p className="text-gray-600 mb-6">
@@ -46,7 +46,7 @@ const OrderConfirmation: React.FC<OrderConfirmationProps> = ({
       
       <p className="text-sm text-gray-500 mb-6">
         A confirmation email has been sent to your registered email address 
-        {paymentMethod === 'online' ? ' with order details.' : '.'}
+        {paymentMethod === 'Razorpay' ? ' with order details.' : '.'}
       </p>
       
       <button

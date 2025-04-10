@@ -25,10 +25,8 @@ export default function ProductsListPage() {
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      // const response = await apiService.getPaginatedProducts(currentPage, pageSize, categoryFilter);
       const response = await apiService.getPaginatedProducts(currentPage, pageSize);
-      console.log(response)
-      // setProducts(response.results);
+      setProducts(response.products);
       setProducts(response);
       setTotalItems(response.count);
       setTotalPages(Math.ceil(response.count / pageSize));

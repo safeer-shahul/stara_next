@@ -63,9 +63,8 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   
   // Order state
   const [error, setError] = useState<string | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'cod' | 'online'>('online');
+  const [paymentMethod, setPaymentMethod] = useState<'Cod' | 'Razorpay'>('Razorpay');
   const [orderId, setOrderId] = useState<string | null>(null);
-  const [orderAmount, setOrderAmount] = useState<number>(0);
   const [paymentId, setPaymentId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -130,12 +129,11 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
   };
   
-  const handleOrderCreated = (createdOrderId: string, amount: number, method: 'cod' | 'online') => {
-    setOrderId(createdOrderId);
-    setOrderAmount(amount);
-    setPaymentMethod(method);
-    
-    if (method === 'online') {
+  const handleOrderCreated = (paymentMethod: 'Cod' | 'Razorpay', razorpayOrderId: string) => {
+    setOrderId(razorpayOrderId);
+    setPaymentMethod(paymentMethod);
+    console.log(paymentMethod,razorpayOrderId)
+    if (paymentMethod === 'Razorpay') {
       // Proceed to payment processing
       setCurrentStep(CheckoutStep.PAYMENT_PROCESSING);
     } else {
@@ -341,39 +339,34 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </>
             )}
 
-            {/* Bill Summary Step */}
-            {currentStep === CheckoutStep.BILL_SUMMARY && selectedAddress && (
-              <BillSummary
-                orderItems={orderItems}
-                couponCode={coupon_code_id}
-                destinationPincode={selectedAddress.pincode}
-                addressId={selectedAddressId || ''}
-                onPlaceOrder={handleOrderCreated} 
-                onError={handleBillSummaryError}
-                onBack={handleBackToAddresses}
-              />
-            )}
+              {currentStep === CheckoutStep.BILL_SUMMARY && selectedAddress && (
+                <BillSummary
+                  orderItems={orderItems}
+                  couponCode={coupon_code_id}
+                  destinationPincode={selectedAddress.pincode}
+                  onPlaceOrder={handleOrderCreated} 
+                  onError={handleBillSummaryError}
+                  onBack={handleBackToAddresses}
+                />
+              )}
 
-            {/* Payment Processing Step - Only shown for online payments */}
-            {currentStep === CheckoutStep.PAYMENT_PROCESSING && orderId && selectedAddress && (
-              <RazorpayPayment
-                orderId={orderId}
-                orderAmount={orderAmount}
-                customerPhone={selectedAddress.phone_number_1}
-                onSuccess={handlePaymentSuccess}
-                onError={handlePaymentError}
-              />
-            )}
+              {currentStep === CheckoutStep.PAYMENT_PROCESSING && orderId && selectedAddress && (
+                <RazorpayPayment
+                  orderId={orderId}
+                  customerPhone={selectedAddress.phone_number_1}
+                  onSuccess={handlePaymentSuccess}
+                  onError={handlePaymentError}
+                />
+              )}
 
-            {/* Order Confirmation Step */}
-            {currentStep === CheckoutStep.ORDER_CONFIRMATION && orderId && (
-              <OrderConfirmation
-                orderId={orderId}
-                paymentId={paymentId}
-                paymentMethod={paymentMethod}
-                onContinueShopping={handleContinueShopping}
-              />
-            )}
+              {currentStep === CheckoutStep.ORDER_CONFIRMATION && orderId && (
+                <OrderConfirmation
+                  orderId={orderId}
+                  paymentId={paymentId}
+                  paymentMethod={paymentMethod}
+                  onContinueShopping={handleContinueShopping}
+                />
+              )}
           </div>
         )}
       </div>

@@ -4,8 +4,7 @@ import { useState, useEffect } from 'react';
 import apiService from '@/utils/api/apiService';
 
 interface RazorpayPaymentProps {
-  orderId: string;
-  orderAmount: number;
+  orderId: string; // This is now the razorpay_order_id
   customerPhone: string;
   onSuccess: (paymentId: string) => void;
   onError: (errorMessage: string) => void;
@@ -19,7 +18,6 @@ declare global {
 
 const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
   orderId,
-  orderAmount,
   customerPhone,
   onSuccess,
   onError
@@ -57,21 +55,14 @@ const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
           await loadRazorpayScript();
         }
         
-        // Get Razorpay order details
-        const response = await apiService.getRazorpayOrder(orderId);
-        
-        if (!response || !response.razorpay_order_id) {
-          throw new Error('Failed to create payment order');
-        }
-        
-        // Initialize Razorpay checkout
+        // Since we already have the Razorpay order ID, no need to call getRazorpayOrder
+        // Initialize Razorpay checkout directly
         const options = {
           key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
-          amount: Math.round(orderAmount * 100), // in paise
           currency: 'INR',
           name: 'Your Company Name',
           description: 'Order Payment',
-          order_id: response.razorpay_order_id,
+          order_id: orderId, // Direct use of the razorpay_order_id passed from BillSummary
           handler: function (response: any) {
             handlePaymentSuccess(response);
           },
@@ -105,7 +96,7 @@ const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
     };
 
     initializePayment();
-  }, [orderId, orderAmount, customerPhone, onError]);
+  }, [orderId, customerPhone, onError]);
 
   const handlePaymentSuccess = async (paymentResponse: any) => {
     try {
