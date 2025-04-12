@@ -49,7 +49,6 @@ const BillSummary: React.FC<any> = ({
         coupon_code_id: couponCode,
         items: orderItems,
         destination_pincode: destinationPincode,
-        address_id: addressID
       });
       
       console.log(response, 'bill details');
@@ -77,7 +76,8 @@ const BillSummary: React.FC<any> = ({
     try {
       const response = await apiService.createProductsOrder({
         items: orderItems,
-        payment_mode : paymentMethod
+        payment_mode : paymentMethod,
+        address: addressID
       });
       console.log(response,'order creations')
       onPlaceOrder(paymentMethod,response.razorpay_order_id,response.order_details.order_id);

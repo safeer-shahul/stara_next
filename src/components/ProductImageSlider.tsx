@@ -1,7 +1,7 @@
 'use client';
 
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation, Pagination } from 'swiper/modules';
 import Image from "next/image";
@@ -20,17 +20,22 @@ interface ProductImageSliderProps {
 export default function ProductImageSlider({ 
   images, 
   productName, 
-  hasOffer = false, 
-  offerLabel = "BUY 1 GET 1" 
 }: ProductImageSliderProps) {
+  const router = useRouter();
+
+  const handleBack = () => {
+    router.back();
+  };
+
   return (
     <div className="relative">
       <div className="absolute top-4 left-4 z-10">
-        <Link href="/">
-          <button className="bg-white rounded-full p-2 shadow">
-            <ChevronLeft className="h-5 w-5 text-gray-700" />
-          </button>
-        </Link>
+        <button 
+          onClick={handleBack} 
+          className="bg-white rounded-full p-2 shadow"
+        >
+          <ChevronLeft className="h-5 w-5 text-gray-700" />
+        </button>
       </div>
 
       {/* {hasOffer && (

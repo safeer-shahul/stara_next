@@ -43,7 +43,6 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
   const [swiperInstance, setSwiperInstance] = useState<any>(null);
   const [windowWidth, setWindowWidth] = useState<number>(0);
   
-  // Effect to update window width state on mount and resize
   useEffect(() => {
     const handleResize = () => {
       setWindowWidth(window.innerWidth);
