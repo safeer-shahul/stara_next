@@ -248,6 +248,18 @@ const CartDrawer: React.FC<any> = ({ isOpen, onClose, productId }) => {
     }
   };
 
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'auto';
+    }
+    
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
+  }, [isOpen]);
+
   const handleApplyCoupon = (): void => {
     if (couponCode.toUpperCase() === 'B1G1') {
       setAppliedCoupon({

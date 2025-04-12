@@ -22,16 +22,17 @@ export default function Footer() {
 
             <div className="text-gray-400 space-y-3">
               <p className="flex items-center text-[14px]">
-                <MapPin className="w-5 h-5 mr-2 mr-2" />
-                <span>Address Line</span>
+                <MapPin className="w-5 h-5 mr-2" />
+                <span>Third Floor, Nalonkandy Arcade,<br/>
+                Pushpa Junction, Calicut, India 673002</span>
               </p>
               <p className="flex items-center text-[14px]">
                 <Phone className="w-5 h-5 mr-2" />
-                <span>+91 98765 4321</span>
+                <span>+91 80869 25925</span>
               </p>
               <p className="flex items-center text-[14px]">
                 <Mail className="w-5 h-5 mr-2" />
-                <span>care@stara.com</span>
+                <span>starajewels@gmail.com</span>
               </p>
             </div>
 
@@ -148,22 +149,6 @@ export default function Footer() {
               </p>
             </div>
 
-            <div className="mb-4">
-              <h4 className="font-medium mb-2">Mangalsutra</h4>
-              <p className="text-gray-400">
-                <a href="#" className="hover:text-black">Gold Mangalsutra</a> | 
-                <a href="#" className="hover:text-black"> Diamond Mangalsutra</a> | 
-                <a href="#" className="hover:text-black"> Modern Mangalsutra</a> | 
-                <a href="#" className="hover:text-black"> South Indian Mangalsutra</a> | 
-                <a href="#" className="hover:text-black"> Fancy Mangalsutra</a> | 
-                <a href="#" className="hover:text-black"> Black Beads Mangalsutra</a> | 
-                <a href="#" className="hover:text-black"> Gold Mangalsutra Under 10000</a> | 
-                <a href="#" className="hover:text-black"> Traditional Mangalsutra</a> | 
-                <a href="#" className="hover:text-black"> Light Weight Mangalsutra</a> | 
-                <a href="#" className="hover:text-black"> Daily Use Mangalsutra</a> | 
-                <a href="#" className="hover:text-black"> Infinity Mangalsutra</a>
-              </p>
-            </div>
           </div>
 
           {/* Copyright */}
