@@ -124,8 +124,8 @@ const AddressForm: React.FC<AddressFormProps> = ({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <h3 className="text-lg font-medium mb-4">Add New Address</h3>
+    <form onSubmit={handleSubmit} className="space-y-4 bg-white p-4 rounded-[12px]">
+      <h3 className="text-[15px] text-[#494949] font-medium mb-4">Add New Address</h3>
       
       {apiError && (
         <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
@@ -134,25 +134,25 @@ const AddressForm: React.FC<AddressFormProps> = ({
       )}
       
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-[13px] font-medium text-gray-700 mb-1">
           Address *
         </label>
         <textarea
           name="address"
           value={formData.address}
           onChange={handleChange}
-          className={`w-full px-3 py-2 border rounded-md ${errors.address ? 'border-red-500' : 'border-gray-300'}`}
+          className={`w-full px-3 py-2 text-[13px] border rounded-md ${errors.address ? 'border-red-500' : 'border-gray-300'}`}
           rows={2}
           placeholder="House No, Building, Street, Area"
         />
         {errors.address && (
-          <p className="mt-1 text-sm text-red-600">{errors.address}</p>
+          <p className="mt-1 text-[13px] text-red-600">{errors.address}</p>
         )}
       </div>
       
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-[13px] font-medium text-gray-700 mb-1">
             Town/City *
           </label>
           <input
@@ -160,23 +160,23 @@ const AddressForm: React.FC<AddressFormProps> = ({
             name="town"
             value={formData.town}
             onChange={handleChange}
-            className={`w-full px-3 py-2 border rounded-md ${errors.town ? 'border-red-500' : 'border-gray-300'}`}
+            className={`w-full px-3 py-2 text-[13px] border rounded-md ${errors.town ? 'border-red-500' : 'border-gray-300'}`}
             placeholder="Town or City"
           />
           {errors.town && (
-            <p className="mt-1 text-sm text-red-600">{errors.town}</p>
+            <p className="mt-1 text-[13px] text-red-600">{errors.town}</p>
           )}
         </div>
         
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-[13px] font-medium text-gray-700 mb-1">
             State *
           </label>
           <select
             name="state"
             value={formData.state}
             onChange={handleChange}
-            className={`w-full px-3 py-2 border rounded-md ${errors.state ? 'border-red-500' : 'border-gray-300'}`}
+            className={`w-full px-3 py-2 text-[13px] border rounded-md ${errors.state ? 'border-red-500' : 'border-gray-300'}`}
           >
             <option value="">Select State</option>
             {Object.entries(INDIAN_STATES).map(([code, name]) => (
@@ -186,14 +186,14 @@ const AddressForm: React.FC<AddressFormProps> = ({
             ))}
           </select>
           {errors.state && (
-            <p className="mt-1 text-sm text-red-600">{errors.state}</p>
+            <p className="mt-1 text-[13px] text-red-600">{errors.state}</p>
           )}
         </div>
       </div>
       
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-[13px] font-medium text-gray-700 mb-1">
             Pincode *
           </label>
           <input
@@ -203,15 +203,15 @@ const AddressForm: React.FC<AddressFormProps> = ({
             onChange={handleChange}
             maxLength={6}
             placeholder="6-digit pincode"
-            className={`w-full px-3 py-2 border rounded-md ${errors.pincode ? 'border-red-500' : 'border-gray-300'}`}
+            className={`w-full px-3 py-2 text-[13px] border rounded-md ${errors.pincode ? 'border-red-500' : 'border-gray-300'}`}
           />
           {errors.pincode && (
-            <p className="mt-1 text-sm text-red-600">{errors.pincode}</p>
+            <p className="mt-1 text-[13px] text-red-600">{errors.pincode}</p>
           )}
         </div>
         
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-[13px] font-medium text-gray-700 mb-1">
             Primary Phone Number *
           </label>
           <input
@@ -221,16 +221,16 @@ const AddressForm: React.FC<AddressFormProps> = ({
             onChange={handleChange}
             maxLength={10}
             placeholder="10-digit mobile number"
-            className={`w-full px-3 py-2 border rounded-md ${errors.phone_number_1 ? 'border-red-500' : 'border-gray-300'}`}
+            className={`w-full px-3 py-2 text-[13px] border rounded-md ${errors.phone_number_1 ? 'border-red-500' : 'border-gray-300'}`}
           />
           {errors.phone_number_1 && (
-            <p className="mt-1 text-sm text-red-600">{errors.phone_number_1}</p>
+            <p className="mt-1 text-[13px] text-red-600">{errors.phone_number_1}</p>
           )}
         </div>
       </div>
       
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-[13px] font-medium text-gray-700 mb-1">
           Alternate Phone Number (Optional)
         </label>
         <input
@@ -240,10 +240,10 @@ const AddressForm: React.FC<AddressFormProps> = ({
           onChange={handleChange}
           maxLength={10}
           placeholder="Alternate 10-digit mobile number"
-          className={`w-full px-3 py-2 border rounded-md ${errors.phone_number_2 ? 'border-red-500' : 'border-gray-300'}`}
+          className={`w-full px-3 py-2 text-[13px] border rounded-md ${errors.phone_number_2 ? 'border-red-500' : 'border-gray-300'}`}
         />
         {errors.phone_number_2 && (
-          <p className="mt-1 text-sm text-red-600">{errors.phone_number_2}</p>
+          <p className="mt-1 text-[13px] text-red-600">{errors.phone_number_2}</p>
         )}
       </div>
       
@@ -251,13 +251,13 @@ const AddressForm: React.FC<AddressFormProps> = ({
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+          className="px-4 py-2 border border-gray-300 rounded-md font-medium text-[14px] text-gray-700 hover:bg-black hover:text-white cursor-pointer"
         >
           Cancel
         </button>
         <button
           type="submit"
-          className={`px-4 py-2 bg-[#175e7a] border border-transparent rounded-md text-sm font-medium text-white hover:bg-[#124b62] ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
+          className={`px-4 py-2 bg-[#175e7a] border border-transparent rounded-md text-[14px] font-medium text-white hover:bg-[#124b62] cursor-pointer ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
           disabled={loading}
         >
           {loading ? 'Saving...' : 'Save Address'}
