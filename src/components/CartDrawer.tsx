@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { X, ShoppingBag } from 'lucide-react';
-import { CartDrawerProps, CouponType } from './type';
+import { CouponType } from './type';
 import CartItem from './CartItem';
-import FrequentlyBoughtTogether from './FrequentlyBoughtTogether';
+// import FrequentlyBoughtTogether from './FrequentlyBoughtTogether';
 import CouponSection from './CouponSection';
 import CouponsList from './CouponsList';
 import CheckoutModal from './CheckoutModal';
@@ -29,7 +29,7 @@ interface ApiProduct {
   sub_category: string;
 }
 
-const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, productId }) => {
+const CartDrawer: React.FC<any> = ({ isOpen, onClose, productId }) => {
   const [cartProducts, setCartProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [showCoupons, setShowCoupons] = useState<boolean>(false);
@@ -402,7 +402,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, productId }) =
                 </div>
                 
                 <button 
-                  className="w-full bg-[#175e7a] text-white font-medium py-3 rounded flex items-center justify-center"
+                  className="w-full bg-[#175e7a] text-[14px] text-white font-medium py-3 hover:bg-[#0f4c67] cursor-pointer transition-colors shadow-sm rounded flex items-center justify-center"
                   onClick={handleProceedToCheckout}
                 >
                   Proceed To Checkout

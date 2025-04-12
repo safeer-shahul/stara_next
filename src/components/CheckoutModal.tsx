@@ -47,7 +47,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   orderItems = [], 
   coupon_code_id 
 }) => {
-  // Common state
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
@@ -56,18 +55,22 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authModalClosed, setAuthModalClosed] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
-  
-  // Current step tracking
   const [currentStep, setCurrentStep] = useState<CheckoutStep>(CheckoutStep.ADDRESS_SELECTION);
-  
-  // Order state
   const [error, setError] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'Cod' | 'Razorpay'>('Razorpay');
   const [orderId, setOrderId] = useState<string | null>(null);
+  const [staraOrderId, setStaraOrderId] = useState<string | null>(null);
   const [paymentId, setPaymentId] = useState<string | null>(null);
 
+  const resetCheckoutState = () => {
+    setCurrentStep(CheckoutStep.ADDRESS_SELECTION);
+    setError(null);
+    setPaymentMethod('Razorpay');
+    setOrderId(null);
+    setPaymentId(null);
+  };
+
   useEffect(() => {
-    // Check if user is authenticated
     const checkAuthentication = () => {
       const accessToken = localStorage.getItem('accessToken');
       if (accessToken) {
@@ -81,13 +84,10 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
     if (isOpen) {
       checkAuthentication();
-      // Reset to address selection when modal is reopened
-      setCurrentStep(CheckoutStep.ADDRESS_SELECTION);
-      setError(null);
+      resetCheckoutState();
     }
   }, [isOpen]);
 
-  // Check if we should close the checkout modal completely
   useEffect(() => {
     if (authModalClosed && !isAuthenticated) {
       onClose();
@@ -101,7 +101,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       if (response && Array.isArray(response)) {
         setAddresses(response);
         
-        // Select default address if available
         const defaultAddress = response.find(addr => addr.is_default);
         if (defaultAddress) {
           setSelectedAddressId(defaultAddress.id);
@@ -123,32 +122,29 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const handleProceedToPayment = () => {
     if (selectedAddressId && selectedAddress) {
-      // Proceed to bill summary view
       setCurrentStep(CheckoutStep.BILL_SUMMARY);
     }
   };
   
-  const handleOrderCreated = (paymentMethod: 'Cod' | 'Razorpay', razorpayOrderId: string) => {
+  const handleOrderCreated = (paymentMethod: 'Cod' | 'Razorpay', razorpayOrderId: string, staraOrderID:any) => {
     setOrderId(razorpayOrderId);
+    setStaraOrderId(staraOrderID);
     setPaymentMethod(paymentMethod);
-    console.log(paymentMethod,razorpayOrderId)
+    console.log(paymentMethod,razorpayOrderId);
     if (paymentMethod === 'Razorpay') {
-      // Proceed to payment processing
       setCurrentStep(CheckoutStep.PAYMENT_PROCESSING);
     } else {
-      // For COD, just show confirmation
       setCurrentStep(CheckoutStep.ORDER_CONFIRMATION);
     }
   };
   
   const handlePaymentSuccess = () => {
-    setPaymentId(paymentId);
+    console.log('here')
     setCurrentStep(CheckoutStep.ORDER_CONFIRMATION);
   };
   
-  const handlePaymentError = (errorMessage: string) => {
-    setError(errorMessage);
-    // Stay on the payment processing step, but show error
+  const handlePaymentError = () => {
+    resetCheckoutState();
   };
 
   const handleBackToAddresses = () => {
@@ -176,7 +172,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     setShowAuthModal(false);
     setAuthModalClosed(true);
     
-    // Check if user got authenticated during login
     const accessToken = localStorage.getItem('accessToken');
     if (accessToken) {
       handleAuthSuccess();
@@ -195,28 +190,33 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     setError(errorMessage);
   };
 
+  const handleClose = () => {
+    onClose();
+    setTimeout(resetCheckoutState, 100);
+  };
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden">
-      <div className="absolute inset-0 bg-black/80" onClick={onClose}></div>
+    <div className="fixed inset-0 z-50 overflow-hidden flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/80" onClick={handleClose}></div>
       
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white rounded-lg shadow-xl max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center p-4 border-b sticky top-0 bg-white z-10">
+      <div className="relative w-full max-w-md bg-[#e1e1e1] rounded-lg shadow-xl flex flex-col max-h-[90vh]">
+        <div className="flex justify-between items-center p-4 bg-[#175E7A] rounded-t-lg z-10">
           <div className="flex items-center">
             {currentStep !== CheckoutStep.ADDRESS_SELECTION && (
               <button 
                 onClick={currentStep === CheckoutStep.BILL_SUMMARY ? handleBackToAddresses : 
                          currentStep === CheckoutStep.PAYMENT_PROCESSING ? handleBackToBillSummary : 
                          undefined}
-                className={`mr-3 text-gray-500 hover:text-gray-700 ${
-                  currentStep === CheckoutStep.ORDER_CONFIRMATION ? 'invisible' : ''
+                className={`mr-3 text-white hover:text-gray-200 transition-colors ${
+                  currentStep === CheckoutStep.ORDER_CONFIRMATION ? 'hidden' : ''
                 }`}
               >
                 <ArrowLeft size={20} />
               </button>
             )}
-            <h3 className="text-lg font-medium">
+            <h3 className="text-lg text-white font-medium">
               {currentStep === CheckoutStep.ADDRESS_SELECTION && 'Checkout'}
               {currentStep === CheckoutStep.BILL_SUMMARY && 'Order Summary'}
               {currentStep === CheckoutStep.PAYMENT_PROCESSING && 'Processing Payment'}
@@ -224,119 +224,104 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
             </h3>
           </div>
           <button 
-            onClick={onClose} 
-            className="text-gray-500 hover:text-gray-700"
+            onClick={handleClose} 
+            className="text-white hover:text-gray-200 transition-colors cursor-pointer"
             disabled={currentStep === CheckoutStep.PAYMENT_PROCESSING && !error}
           >
             <X size={20} />
           </button>
         </div>
 
-        {showAuthModal && !isAuthenticated ? (
-          <AuthModal 
-            isOpen={true} 
-            onClose={handleAuthModalClose} 
-          />
-        ) : (
-          <div className="p-4">
-            {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-md">
-                {error}
-              </div>
-            )}
+        <div className="overflow-y-auto flex-1">
+          {showAuthModal && !isAuthenticated ? (
+            <AuthModal 
+              isOpen={true} 
+              onClose={handleAuthModalClose} 
+            />
+          ) : (
+            <div className="p-5">
 
-            {/* Address Selection Step */}
-            {currentStep === CheckoutStep.ADDRESS_SELECTION && (
-              <>
-                {/* Product Summary Section - only shown if items exist */}
-                {orderItems.length > 0 && (
-                  <ProductSummary 
-                    items={orderItems}
-                    coupon_code_id={coupon_code_id}
-                  />
-                )}
-                
-                {loading ? (
-                  <div className="flex justify-center items-center h-40">
-                    <p>Loading addresses...</p>
-                  </div>
-                ) : showAddressForm ? (
-                  <AddressForm 
-                    onSuccess={(newAddressId) => {
-                      fetchAddresses().then(() => {
-                        setSelectedAddressId(newAddressId);
-                        setShowAddressForm(false);
-                      });
-                    }} 
-                    onCancel={() => setShowAddressForm(false)} 
-                  />
-                ) : (
-                  <>
-                    <div className="mb-4">
-                      <div className="flex justify-between items-center mb-2">
-                        <h4 className="font-medium">Select Delivery Address</h4>
-                        <button 
-                          onClick={() => setShowAddressForm(true)}
-                          className="text-sm text-blue-600 hover:text-blue-800"
-                        >
-                          Add New Address
-                        </button>
-                      </div>
-
-                      {addresses.length === 0 ? (
-                        <div className="text-center py-6 bg-gray-50 rounded">
-                          <p className="text-gray-500 mb-4">No addresses found</p>
+              {currentStep === CheckoutStep.ADDRESS_SELECTION && (
+                <>
+                  {orderItems.length > 0 && (
+                    <div className="mb-6">
+                      <ProductSummary 
+                        items={orderItems}
+                        coupon_code_id={coupon_code_id}
+                      />
+                    </div>
+                  )}
+                  
+                  {loading ? (
+                    <div className="flex justify-center items-center h-40">
+                      <p>Loading addresses...</p>
+                    </div>
+                  ) : showAddressForm ? (
+                    <AddressForm 
+                      onSuccess={(newAddressId) => {
+                        fetchAddresses().then(() => {
+                          setSelectedAddressId(newAddressId);
+                          setShowAddressForm(false);
+                        });
+                      }} 
+                      onCancel={() => setShowAddressForm(false)} 
+                    />
+                  ) : (
+                    <>
+                      <div className="mb-6 bg-white p-4 rounded-[12px]">
+                        <div className="flex justify-between items-center mb-4">
+                          <h4 className="font-medium text-[15px] text-[#494949]">Select Delivery Address</h4>
                           <button 
                             onClick={() => setShowAddressForm(true)}
-                            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                            className="text-[13px] text-[#175e7a] cursor-pointer hover:text-blue-800 font-medium transition-colors"
                           >
-                            Add an Address
+                            Add New Address
                           </button>
                         </div>
-                      ) : (
-                        <div className="space-y-3 max-h-60 overflow-y-auto">
-                          {addresses.map(address => (
-                            <div 
-                              key={address.id}
-                              className={`p-3 border rounded cursor-pointer ${selectedAddressId === address.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}
-                              onClick={() => handleAddressSelection(address.id)}
-                            >
-                              <div className="flex items-start">
-                                <input 
-                                  type="radio" 
-                                  checked={selectedAddressId === address.id}
-                                  onChange={() => handleAddressSelection(address.id)}
-                                  className="mt-1 mr-2"
-                                />
-                                <div>
-                                  <p>{address.address}</p>
-                                  <p>{address.town}, {INDIAN_STATES[address.state]} - {address.pincode}</p>
-                                  <p>Phone: {address.phone_number_1}</p>
-                                  {address.phone_number_2 && <p>Alt Phone: {address.phone_number_2}</p>}
-                                  {address.is_default && <span className="text-xs text-green-600">Default Address</span>}
+
+                        {addresses.length === 0 ? (
+                          <></>
+                        ) : (
+                          <div className="space-y-3 max-h-60 pr-1">
+                            {addresses.map(address => (
+                              <div 
+                                key={address.id}
+                                className={`p-4 border rounded-lg cursor-pointer transition-all ${
+                                  selectedAddressId === address.id 
+                                    ? 'border-[#175e7a] bg-blue-50' 
+                                    : 'border-gray-200 hover:border-gray-300'
+                                }`}
+                                onClick={() => handleAddressSelection(address.id)}
+                              >
+                                <div className="flex items-start">
+                                  <div className={`w-5 h-5 mt-1 mr-3 rounded-full border flex items-center justify-center ${
+                                    selectedAddressId === address.id ? 'border-[#175e7a]' : 'border-gray-300'
+                                  }`}>
+                                    {selectedAddressId === address.id && (
+                                      <div className="w-3 h-3 rounded-full bg-[#175e7a]"></div>
+                                    )}
+                                  </div>
+                                  <div className='mt-[-5px] text-[14px]'>
+                                    <p className="text-gray-800">{address.address}</p>
+                                    <p className="text-gray-600">{address.town}, {INDIAN_STATES[address.state]} - {address.pincode}</p>
+                                    <p className="text-gray-600">Phone: {address.phone_number_1}</p>
+                                    {address.phone_number_2 && <p className="text-gray-600">Alt Phone: {address.phone_number_2}</p>}
+                                    {address.is_default && (
+                                      <span className="inline-block mt-1 px-2 py-0.5 bg-green-100 text-green-800 text-xs rounded-full">
+                                        Default Address
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {addresses.length > 0 && (
-                      <div className="mt-6">
-                        <button 
-                          className="w-full bg-[#175e7a] text-white font-medium py-3 rounded"
-                          onClick={handleProceedToPayment}
-                          disabled={!selectedAddressId}
-                        >
-                          Proceed with Selected Address
-                        </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </>
-                )}
-              </>
-            )}
+                    </>
+                  )}
+                </>
+              )}
 
               {currentStep === CheckoutStep.BILL_SUMMARY && selectedAddress && (
                 <BillSummary
@@ -345,7 +330,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   destinationPincode={selectedAddress.pincode}
                   onPlaceOrder={handleOrderCreated} 
                   onError={handleBillSummaryError}
-                  onBack={handleBackToAddresses}
                 />
               )}
 
@@ -360,12 +344,25 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
               {currentStep === CheckoutStep.ORDER_CONFIRMATION && orderId && (
                 <OrderConfirmation
-                  orderId={orderId}
+                  orderId={staraOrderId}
                   paymentId={paymentId}
                   paymentMethod={paymentMethod}
                   onContinueShopping={handleContinueShopping}
                 />
               )}
+            </div>
+          )}
+        </div>
+
+        {currentStep === CheckoutStep.ADDRESS_SELECTION && addresses.length > 0 && !showAddressForm && (
+          <div className="p-4 border-t border-gray-200 bg-gray-50 rounded-b-lg">
+            <button 
+              className="w-full bg-[#175e7a] text-[14px] text-white font-medium py-3 rounded-md hover:bg-[#0f4c67] cursor-pointer transition-colors shadow-sm"
+              onClick={handleProceedToPayment}
+              disabled={!selectedAddressId}
+            >
+              Proceed with Selected Address
+            </button>
           </div>
         )}
       </div>
