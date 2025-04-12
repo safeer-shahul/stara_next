@@ -140,8 +140,8 @@ const ProductSummary: React.FC<ProductSummaryProps> = ({ items, coupon_code_id }
   }
 
   return (
-    <div className="mb-6">
-      <h4 className="font-medium mb-3">Order Summary</h4>
+    <div className="mb-6 bg-white p-4 rounded-[12px]">
+      <h4 className="font-medium text-[15px] text-[#494949] mb-2">Order Summary</h4>
       
       {showCoupons ? (
         <div className="border rounded-lg p-4 mb-4">
@@ -181,32 +181,36 @@ const ProductSummary: React.FC<ProductSummaryProps> = ({ items, coupon_code_id }
         </div>
       ) : (
         <>
-          <div className="border rounded-lg p-4 mb-4">
+          <div className="rounded-lg mb-4">
             {products.map((product) => (
-              <div key={product.id} className="flex items-center gap-3 py-2 border-b last:border-b-0">
-                <div className="relative w-16 h-16 bg-gray-100 rounded overflow-hidden">
+              <div key={product.id} className="flex items-center gap-3 py-1">
+                <div className="relative w-12 h-12 bg-gray-100 rounded-sm overflow-hidden">
                   <Image 
                     src={product.image} 
                     alt={product.name}
-                    width={64}
-                    height={64}
+                    width={54}
+                    height={54}
                     className="object-cover"
                   />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-medium">{product.name}</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-[13px] font-medium">{product.name}</p>
+                    <p className="text-[11px] text-gray-500">Quantity: {product.quantity}</p>
+                  </div>
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium">₹{product.price}</p>
+                    <p className="text-[11px] font-medium">₹{product.price}</p>
                     {product.originalPrice && (
-                      <p className="text-xs text-gray-500 line-through">₹{product.originalPrice}</p>
+                      <p className="text-[11px] text-gray-500 line-through">₹{product.originalPrice}</p>
                     )}
                     {product.discount && (
-                      <span className="bg-green-100 text-green-800 text-xs px-1.5 py-0.5 rounded">
+                      <span className="bg-green-100 text-green-800 text-[11px] px-1.5 py-0.5 rounded">
                         {product.discount} OFF
                       </span>
                     )}
+                     
                   </div>
-                  <p className="text-xs text-gray-500">Quantity: {product.quantity}</p>
+                 
                 </div>
               </div>
             ))}
@@ -254,23 +258,23 @@ const ProductSummary: React.FC<ProductSummaryProps> = ({ items, coupon_code_id }
             </div>
           </div>
           
-          <div className="border rounded-lg p-4">
+          <div className="py-4 px-2">
             <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Subtotal</span>
-                <span>₹{subtotal.toFixed(2)}</span>
+              <div className="flex justify-between text-[13px]">
+                <span className='text-gray-500'>Subtotal</span>
+                <span className='font-semibold'>₹{subtotal.toFixed(2)}</span>
               </div>
               
               {appliedCoupon && (
-                <div className="flex justify-between text-sm text-green-600">
+                <div className="flex justify-between text-[13px] text-green-600">
                   <span>Discount ({appliedCoupon.description})</span>
-                  <span>-₹{appliedCoupon.discount.toFixed(2)}</span>
+                  <span className='font-semibold'>-₹{appliedCoupon.discount.toFixed(2)}</span>
                 </div>
               )}
               
-              <div className="flex justify-between text-sm pt-2 border-t">
-                <span className="font-medium">Total</span>
-                <span className="font-medium">₹{total.toFixed(2)}</span>
+              <div className="flex justify-between text-[16px] pt-2 border-t border-gray-300">
+                <span className="text-gray-500">Total</span>
+                <span className="font-semibold">₹{total.toFixed(2)}</span>
               </div>
             </div>
           </div>

@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import apiService from '@/utils/api/apiService';
-import { ArrowLeft } from 'lucide-react';
 
 interface Product {
   id: string;
@@ -29,7 +28,6 @@ const BillSummary: React.FC<any> = ({
   destinationPincode,
   onPlaceOrder,
   onError,
-  onBack
 }) => {
   const [loading, setLoading] = useState(true);
   const [responseData, setResponseData] = useState<APIResponse | null>(null);
@@ -80,7 +78,7 @@ const BillSummary: React.FC<any> = ({
         payment_mode : paymentMethod
       });
       console.log(response,'order creations')
-      onPlaceOrder(paymentMethod,response.razorpay_order_id);
+      onPlaceOrder(paymentMethod,response.razorpay_order_id,response.order_details.order_id);
     } catch (error) {
       console.error('Error placing order:', error);
       setError('Failed to place your order. Please try again.');
@@ -125,66 +123,60 @@ const BillSummary: React.FC<any> = ({
         </div>
       ) : error ? (
         <div className="text-center py-6">
-          <p className="text-red-500 mb-4">{error}</p>
+          {/* <p className="text-red-500 mb-4">{error}</p> */}
           <button 
             onClick={fetchBillDetails}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 cursor-pointer"
           >
             Try Again
           </button>
         </div>
       ) : responseData && totals ? (
         <>
-          <div className="border rounded-lg p-4 mb-4">
-          <div className="flex items-center justify-between mb-3 pb-2 border-b">
-              <button 
-                onClick={onBack}
-                className="text-gray-500 hover:text-gray-700 mr-2"
-              >
-                <ArrowLeft size={20} />
-              </button>
-              <h4 className="font-medium">Price Details</h4>
+          <div className="bg-white rounded-lg p-4 mb-4">
+            <div className="flex items-center justify-between mb-3 pb-2">
+              <h4 className="font-medium text-[15px] text-[#494949]">Price Details</h4>
               <div></div> {/* Empty div for flex alignment */}
             </div>
             
             <div className="space-y-2">
-              <div className="flex justify-between">
-                <span>Subtotal</span>
-                <span>₹{totals.subtotal.toFixed(2)}</span>
+              <div className="flex justify-between text-[13px]">
+                <span className='text-gray-500'>Subtotal</span>
+                <span className='font-semibold'>₹{totals.subtotal.toFixed(2)}</span>
               </div>
               
               {totals.discount > 0 && (
-                <div className="flex justify-between text-green-600">
+                <div className="flex justify-between text-green-600 text-[13px]">
                   <span>Discount</span>
                   <span>-₹{totals.discount.toFixed(2)}</span>
                 </div>
               )}
               
-              <div className="flex justify-between">
-                <span>Shipping</span>
+              <div className="flex justify-between text-[13px]">
+                <span className='text-gray-500'>Shipping</span>
                 {totals.shippingCost > 0 ? (
-                  <span>₹{totals.shippingCost.toFixed(2)}</span>
+                  <span className='font-semibold'>₹{totals.shippingCost.toFixed(2)}</span>
                 ) : (
-                  <span className="text-green-600">Free</span>
+                  <span className="text-green-600 font-semibold">Free</span>
                 )}
               </div>
               
               {totals.tax > 0 && (
-                <div className="flex justify-between">
-                  <span>Estimated Tax</span>
-                  <span>₹{totals.tax.toFixed(2)}</span>
+                <div className="flex justify-between text-[13px]">
+                  <span className='text-gray-500'>Estimated Tax</span>
+                  <span className="text-green-600 font-semibold">₹{totals.tax.toFixed(2)}</span>
                 </div>
               )}
               
-              <div className="flex justify-between font-medium pt-2 mt-2 border-t">
-                <span>Order Total</span>
-                <span>₹{totals.total.toFixed(2)}</span>
+              <div className="flex justify-between font-medium pt-2 mt-2 border-t border-gray-300">
+                <span className="text-gray-500">Order Total</span>
+                <span className="font-semibold">₹{totals.total.toFixed(2)}</span>
               </div>
             </div>
           </div>
 
-          <div className="border rounded-lg p-4 mb-4">
-            <h4 className="font-medium mb-3 pb-2 border-b">Payment Method</h4>
+          <div className="bg-white rounded-lg p-4 mb-4">
+            <h4 className="font-medium mb-3 text-[15px] text-[#494949] pb-2">Payment Method</h4>
             
             <div className="space-y-3">
               <div 
@@ -201,8 +193,8 @@ const BillSummary: React.FC<any> = ({
                   )}
                 </div>
                 <div className="ml-3">
-                  <p className="font-medium">Pay Now</p>
-                  <p className="text-sm text-gray-500">Pay online with UPI, cards, or netbanking</p>
+                  <p className="font-medium text-[15px]">Pay Now</p>
+                  <p className="text-[11px] text-gray-500">Pay online with UPI, cards, or netbanking</p>
                 </div>
               </div>
               
@@ -220,8 +212,8 @@ const BillSummary: React.FC<any> = ({
                   )}
                 </div>
                 <div className="ml-3">
-                  <p className="font-medium">Cash on Delivery</p>
-                  <p className="text-sm text-gray-500">Pay with cash when your order arrives</p>
+                  <p className="font-medium text-[15px]">Cash on Delivery</p>
+                  <p className="text-[11px] text-gray-500">Pay with cash when your order arrives</p>
                 </div>
               </div>
             </div>
@@ -229,13 +221,13 @@ const BillSummary: React.FC<any> = ({
 
           <div className="mt-6">
             <button 
-              className="w-full bg-[#175e7a] text-white font-medium py-3 rounded flex items-center justify-center"
+              className="w-full bg-[#175e7a] text-[14px] text-white font-medium py-3 rounded-md hover:bg-[#0f4c67] cursor-pointer transition-colors shadow-sm"
               onClick={handlePlaceOrder}
               disabled={processingOrder}
             >
               {processingOrder ? 'Processing...' : paymentMethod === 'Cod' ? 'Place Order (COD)' : 'Proceed to Payment'}
             </button>
-            <p className="text-center text-sm text-gray-500 mt-2">
+            <p className="text-center text-[11px] text-gray-500 mt-2">
               By placing your order, you agree to our terms and conditions.
             </p>
           </div>

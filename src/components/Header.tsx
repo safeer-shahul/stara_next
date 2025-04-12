@@ -21,6 +21,14 @@ type MenuItem = {
   dropdownContent?: { title: string; items: { name: string; link: string; badge?: { text: string; color: string } }[] }[];
 };
 
+type Category = {
+  id: number;
+  category_name: string;
+  slug: string;
+  category_image: string;
+  sub_categories: { id: number; name: string; slug: string }[];
+};
+
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -29,6 +37,37 @@ export default function Header() {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch categories for header menu
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        setLoading(true);
+        const categoryData = await apiService.getAllCategoriesPublic();
+        console.log(categoryData, 'categoryData');
+        
+        const formattedCategories: any = categoryData.map(category => ({
+          image: `${process.env.NEXT_PUBLIC_API_BASE_URL}${category.category_image}`,
+          title: category.category_name.toUpperCase(),
+          link: `/shop/collections/${category.slug}?id=${category.sub_categories[0]?.id}`,
+          id: category.id
+        }));
+        
+        setCategories(formattedCategories);
+        setError(null);
+      } catch (err) {
+        console.error('Failed to fetch categories:', err);
+        setError('Failed to load categories');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchCategories();
+  }, []);
 
   // Check authentication status on mount and when local storage changes
   useEffect(() => {
@@ -118,6 +157,8 @@ export default function Header() {
     setIsLoggedIn(false);
     setUserProfile(null);
     setIsMenuOpen(false);
+    // Refresh the page after logout
+    window.location.reload();
   };
 
   return (
@@ -183,7 +224,20 @@ export default function Header() {
         <nav className="hidden md:block border-t border-gray-100 relative">
           <div className="container mx-auto px-4">
             <ul className="flex justify-center space-x-8 py-3">
-              {menuItems.map((item: MenuItem, index: number) => (
+              {/* Display dynamically loaded categories */}
+              {!loading && categories.map((category, index) => (
+                <li 
+                  key={index} 
+                  className="relative"
+                >
+                  <Link href={category.link || '#'} className="hover:text-gray-600 flex items-center text-[14px]">
+                    {category.title}
+                  </Link>
+                </li>
+              ))}
+              
+              {/* Keep the commented out original menu items code for reference */}
+              {/* {menuItems.map((item: MenuItem, index: number) => (
                 <li 
                   key={index} 
                   className="relative"
@@ -204,16 +258,16 @@ export default function Header() {
                     </Link>
                   )}
                 </li>
-              ))}
+              ))} */}
             </ul>
           </div>
 
-          {/* Move the dropdown outside of the list items to maintain the original structure */}
-          {activeDropdown !== null && menuItems[activeDropdown]?.hasDropdown && (
+          {/* MegaDropdown code kept but commented out */}
+          {/* {activeDropdown !== null && menuItems[activeDropdown]?.hasDropdown && (
             <div onMouseLeave={handleMouseLeave}>
               <MegaDropdown isOpen={true} categories={menuItems[activeDropdown].dropdownContent!} />
             </div>
-          )}
+          )} */}
         </nav>
 
         {isMenuOpen && (
@@ -249,7 +303,17 @@ export default function Header() {
               )}
               
               <ul className="space-y-2">
-                {menuItems.map((item: MenuItem, index: number) => (
+                {/* Display dynamically loaded categories for mobile */}
+                {!loading && categories.map((category, index) => (
+                  <li key={index}>
+                    <Link href={category.link || '#'} className="block py-2 hover:text-gray-600 flex items-center">
+                      {category.title}
+                    </Link>
+                  </li>
+                ))}
+                
+                {/* Keep the commented out original mobile menu items code for reference */}
+                {/* {menuItems.map((item: MenuItem, index: number) => (
                   <li key={index}>
                     {item.hasDropdown ? (
                       <>
@@ -269,7 +333,7 @@ export default function Header() {
                       </Link>
                     )}
                   </li>
-                ))}
+                ))} */}
               </ul>
               
               {/* Mobile logout button if logged in */}

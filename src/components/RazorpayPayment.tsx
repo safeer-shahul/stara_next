@@ -102,7 +102,7 @@ const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
     try {
       console.log(paymentResponse,'paymentResponse')
       const response = await apiService.verifyPayment(paymentResponse);
-      
+      console.log(response,'verify payment')
       if (response) {
         // Payment verified successfully
         onSuccess();
