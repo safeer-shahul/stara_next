@@ -56,6 +56,7 @@ export default function ProductDetailPage() {
         if (productId) {
           setIsLoading(true);
           const fetchedProduct = await apiService.getProductByID(productId);
+          console.log(fetchedProduct,'fetchedProduct')
           setProduct(fetchedProduct);
         }
       } catch (err) {
@@ -73,7 +74,7 @@ export default function ProductDetailPage() {
 
   const openModal = () => {
     setIsModalOpen(true);
-    console.log('clicked view more');
+    console.log('clicked view more',isModalOpen);
   };
 
   const handleAddToBag = () => {
