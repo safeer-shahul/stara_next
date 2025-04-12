@@ -151,7 +151,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   };
   
   const handlePaymentSuccess = () => {
-    console.log('here',razorpayOrderId)
+    console.log('here',orderId)
     setCurrentStep(CheckoutStep.ORDER_CONFIRMATION);
   };
   
