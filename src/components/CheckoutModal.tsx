@@ -330,6 +330,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   destinationPincode={selectedAddress.pincode}
                   onPlaceOrder={handleOrderCreated} 
                   onError={handleBillSummaryError}
+                  addressID={selectedAddressId}
                 />
               )}
 

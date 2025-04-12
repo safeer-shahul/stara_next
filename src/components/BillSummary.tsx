@@ -28,6 +28,7 @@ const BillSummary: React.FC<any> = ({
   destinationPincode,
   onPlaceOrder,
   onError,
+  addressID
 }) => {
   const [loading, setLoading] = useState(true);
   const [responseData, setResponseData] = useState<APIResponse | null>(null);
@@ -47,7 +48,8 @@ const BillSummary: React.FC<any> = ({
       const response = await apiService.getProductAmountDetailed({
         coupon_code_id: couponCode,
         items: orderItems,
-        destination_pincode: destinationPincode
+        destination_pincode: destinationPincode,
+        address_id: addressID
       });
       
       console.log(response, 'bill details');
