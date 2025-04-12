@@ -17,8 +17,8 @@ export default function CategoryPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const categorySlug = params?.category as string;
-  const categoryId = searchParams.get('id');
-console.log(categorySlug,categoryId)
+  const subCategoryId = searchParams.get('id');
+console.log(categorySlug,subCategoryId)
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [categoryName, setCategoryName] = useState('');
@@ -28,7 +28,7 @@ console.log(categorySlug,categoryId)
 
   useEffect(() => {
     const fetchCategoryProducts = async () => {
-      if (!categoryId) return;
+      if (!subCategoryId) return;
       
       try {
         setLoading(true);
@@ -38,7 +38,7 @@ console.log(categorySlug,categoryId)
           currentPage,
           pageSize,
           undefined, // No specific product IDs
-          { subcategory_id: categoryId.replace(/-/g, '') } // Pass category ID as subcategory_id
+          { subcategory_id: subCategoryId.replace(/-/g, '') } // Pass category ID as subcategory_id
         );
         
         setProducts(productsData.products || []);
@@ -59,7 +59,7 @@ console.log(categorySlug,categoryId)
     };
 
     fetchCategoryProducts();
-  }, [categoryId, categorySlug, currentPage]);
+  }, [subCategoryId, categorySlug, currentPage]);
 
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages) {
@@ -76,7 +76,7 @@ console.log(categorySlug,categoryId)
     );
   }
 
-  if (!categoryId) {
+  if (!subCategoryId) {
     return (
       <div className="container mx-auto p-6">
         <h1 className="text-3xl font-bold mb-4">Invalid Category</h1>
