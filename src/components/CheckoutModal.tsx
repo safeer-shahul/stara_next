@@ -89,6 +89,18 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   }, [isOpen]);
 
   useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'auto';
+    }
+    
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
     if (authModalClosed && !isAuthenticated) {
       onClose();
     }
