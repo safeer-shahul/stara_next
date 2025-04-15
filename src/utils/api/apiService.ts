@@ -45,7 +45,7 @@ class ApiService {
   private getAccessToken(): string | null {
     if (typeof window !== 'undefined') {
       const token = window.localStorage.getItem('accessToken');
-      console.log('Retrieved access token from localStorage:', token ? `${token.substring(0, 10)}...` : 'null');
+      // console.log('Retrieved access token from localStorage:', token ? `${token.substring(0, 10)}...` : 'null');
       return token;
     }
     return null;
@@ -59,7 +59,7 @@ class ApiService {
         
         // Only add authorization header if token exists
         if (accessToken && config.headers) {
-          console.log('Adding token to request:', config.url);
+          // console.log('Adding token to request:', config.url);
           config.headers['Authorization'] = `Bearer ${accessToken}`;
         } else {
           console.log('No token available for request:', config.url);
@@ -166,14 +166,14 @@ class ApiService {
         password: password
       };
       
-      console.log('Requesting token with payload:', { username });
+      // console.log('Requesting token with payload:', { username });
       
       const response = await this.publicApiClient.post<{ refresh: string, access: string }>(
         '/api/token/', 
         payload
       );
       
-      console.log('Token response received:', response.data);
+      // console.log('Token response received:', response.data);
       return response.data;
     } catch (error) {
       console.error('Error in getAuthorizationToken:', error);
@@ -184,14 +184,14 @@ class ApiService {
   public async getUserProfile(): Promise<UserProfile> {
     try {
       const token = this.getAccessToken();
-      console.log('Fetching user profile with token:', token ? 'Token exists' : 'No token');
+      // console.log('Fetching user profile with token:', token ? 'Token exists' : 'No token');
       
       if (!token) {
         throw new Error('No access token available');
       }
       
       const response = await this.get<UserProfile>('/user/me');
-      console.log('User profile response:', response);
+      // console.log('User profile response:', response);
       return response;
     } catch (error) {
       console.error('Error getting user profile:', error);
@@ -209,7 +209,7 @@ class ApiService {
 
   public async get<T>(url: string, propagation: number = 0): Promise<T> {
     try {
-      console.log(`Making GET request to ${url}`);
+      // console.log(`Making GET request to ${url}`);
       const response = await this.apiClient.get<T>(url, {
         headers: this.getHeaders(false, propagation),
       });
@@ -222,7 +222,7 @@ class ApiService {
 
   public async getPublic<T>(url: string, propagation: number = 0): Promise<T> {
     try {
-      console.log(`Making public GET request to ${url}`);
+      // console.log(`Making public GET request to ${url}`);
       const response = await this.publicApiClient.get<T>(url, {
         headers: this.getPublicHeaders(false, propagation),
       });
@@ -499,6 +499,15 @@ class ApiService {
       return response;
     } catch (error) {
       console.error('Error creating category:', error);
+      throw error;
+    }
+  }
+
+  public async getMyOrders(): Promise<any> {
+    try {
+      const response = await this.get<any>(`/order/get_my_orders`);
+      return response;
+    } catch (error) {
       throw error;
     }
   }

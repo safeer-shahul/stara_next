@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import apiService from '@/utils/api/apiService';
 
 interface Product {
@@ -22,7 +22,19 @@ interface APIResponse {
   shipping_cost: number;
 }
 
-const BillSummary: React.FC<any> = ({
+interface BillSummaryProps {
+  orderItems: Array<{
+    product_id: string;
+    quantity: number;
+  }>;
+  couponCode?: string;
+  destinationPincode: string;
+  onPlaceOrder: (paymentMethod: 'Cod' | 'Razorpay', razorpayOrderId: string, staraOrderID: any) => void;
+  onError: (errorMessage: string) => void;
+  addressID: string | null;
+}
+
+const BillSummary: React.FC<BillSummaryProps> = ({
   orderItems,
   couponCode,
   destinationPincode,
@@ -35,14 +47,29 @@ const BillSummary: React.FC<any> = ({
   const [error, setError] = useState<string | null>(null);
   const [processingOrder, setProcessingOrder] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'Cod' | 'Razorpay'>('Razorpay');
+  const isMounted = useRef(true);
+  const fetchInProgress = useRef(false);
+
+  // Helper to safely update state only if component is still mounted
+  const safeSetState = (setter: any, value: any) => {
+    if (isMounted.current) {
+      setter(value);
+    }
+  };
 
   useEffect(() => {
-    fetchBillDetails();
-  }, [orderItems, couponCode, destinationPincode]);
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   const fetchBillDetails = async () => {
-    setLoading(true);
-    setError(null);
+    if (fetchInProgress.current) return;
+    
+    fetchInProgress.current = true;
+    safeSetState(setLoading, true);
+    safeSetState(setError, null);
     
     try {
       const response = await apiService.getProductAmountDetailed({
@@ -51,42 +78,63 @@ const BillSummary: React.FC<any> = ({
         destination_pincode: destinationPincode,
       });
       
-      console.log(response, 'bill details');
+      if (!isMounted.current) return;
+      
+      console.log('Bill details:', response);
       if (response) {
-        setResponseData(response);
+        safeSetState(setResponseData, response);
       } else {
-        setError('Failed to retrieve billing details');
-        onError('Failed to retrieve billing details');
+        const errorMsg = 'Failed to retrieve billing details';
+        safeSetState(setError, errorMsg);
+        onError(errorMsg);
       }
     } catch (error) {
       console.error('Error fetching bill details:', error);
-      setError('An error occurred while calculating your order total');
-      onError('An error occurred while calculating your order total');
+      const errorMsg = 'An error occurred while calculating your order total';
+      if (isMounted.current) {
+        safeSetState(setError, errorMsg);
+        onError(errorMsg);
+      }
     } finally {
-      setLoading(false);
+      if (isMounted.current) {
+        safeSetState(setLoading, false);
+      }
+      fetchInProgress.current = false;
     }
   };
 
+  // Fetch bill details when component mounts or inputs change
+  useEffect(() => {
+    fetchBillDetails();
+  }, [orderItems, couponCode, destinationPincode]);
+
   const handlePlaceOrder = async () => {
-    if (!responseData) return;
+    if (!responseData || !addressID) return;
     
-    setProcessingOrder(true);
-    setError(null);
+    safeSetState(setProcessingOrder, true);
+    safeSetState(setError, null);
     
     try {
       const response = await apiService.createProductsOrder({
         items: orderItems,
-        payment_mode : paymentMethod,
+        payment_mode: paymentMethod,
         address: addressID
       });
-      console.log(response,'order creations')
-      onPlaceOrder(paymentMethod,response.razorpay_order_id,response.order_details.order_id);
+      
+      console.log('Order creation response:', response);
+      
+      if (response && response.razorpay_order_id) {
+        onPlaceOrder(paymentMethod, response.razorpay_order_id, response.order_details.order_id);
+      } else {
+        throw new Error('Invalid order response');
+      }
     } catch (error) {
       console.error('Error placing order:', error);
-      setError('Failed to place your order. Please try again.');
-      onError('Failed to place your order. Please try again.');
+      const errorMsg = 'Failed to place your order. Please try again.';
+      safeSetState(setError, errorMsg);
+      onError(errorMsg);
     } finally {
-      setProcessingOrder(false);
+      safeSetState(setProcessingOrder, false);
     }
   };
 
@@ -121,14 +169,15 @@ const BillSummary: React.FC<any> = ({
     <div>
       {loading ? (
         <div className="flex justify-center items-center h-40">
-          <p>Calculating order total...</p>
+          <div className="w-10 h-10 border-4 border-gray-200 border-t-[#175e7a] rounded-full animate-spin mb-4"></div>
+          <p className="ml-3">Calculating order total...</p>
         </div>
       ) : error ? (
         <div className="text-center py-6">
-          {/* <p className="text-red-500 mb-4">{error}</p> */}
+          <p className="text-red-500 mb-4">{error}</p>
           <button 
             onClick={fetchBillDetails}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 cursor-pointer"
+            className="px-4 py-2 bg-[#175e7a] text-white rounded hover:bg-[#0f4c67] cursor-pointer"
           >
             Try Again
           </button>
