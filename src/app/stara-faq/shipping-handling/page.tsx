@@ -3,18 +3,16 @@ import React from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { NextPage } from 'next';
+import type { Metadata } from 'next';
 
+export const metadata: Metadata = {
+  title: 'Shipping and handling | Stara Jewels',
+  description: 'Shipping and handling information for Stara Jewels',
+};
 const ShippingAndHandling: NextPage = () => {
   return (
     <>
-      <Head>
-        <title>Shipping & Handling | Stara Jewels</title>
-        <meta 
-          name="description" 
-          content="Shipping and handling information for Stara Jewels silver jewelry shop." 
-        />
-      </Head>
-
+ 
       <main className="max-w-4xl mx-auto px-4 py-8 md:py-12">
         <div className="mb-8 text-center">
           <h1 className="text-3xl md:text-4xl font-bold mb-2">Shipping & Handling</h1>
