@@ -64,12 +64,12 @@ export default function Footer() {
             <a href="#" className="text-gray-400 hover:text-black rounded-full border border-gray-300 p-2">
               <Instagram className="w-6 h-6" />
             </a>
-            <a href="#" className="text-gray-400 hover:text-black rounded-full border border-gray-300 p-2">
+            {/* <a href="#" className="text-gray-400 hover:text-black rounded-full border border-gray-300 p-2">
               <Twitter className="w-6 h-6" />
             </a>
             <a href="#" className="text-gray-400 hover:text-black rounded-full border border-gray-300 p-2">
               <Youtube className="w-6 h-6" />
-            </a>
+            </a> */}
             <a href="#" className="text-gray-400 hover:text-black rounded-full border border-gray-300 p-2">
               <Linkedin className="w-6 h-6" />
             </a>
