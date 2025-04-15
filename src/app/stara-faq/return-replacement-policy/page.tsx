@@ -1,20 +1,15 @@
-// pages/return-replacement-policy.tsx
 import React from 'react';
-import Head from 'next/head';
 import Link from 'next/link';
 import { NextPage } from 'next';
+import type { Metadata } from 'next';
 
+export const metadata: Metadata = {
+  title: 'Return and replacement Policy | Stara Jewels',
+  description: 'Return and replacement Policy for Stara Jewels',
+};
 const ReturnReplacementPolicy: NextPage = () => {
   return (
     <>
-      <Head>
-        <title>Return & Replacement Policy | Stara Jewels</title>
-        <meta 
-          name="description" 
-          content="Return and replacement policy for Stara Jewels silver jewelry shop." 
-        />
-      </Head>
-
       <main className="max-w-4xl mx-auto px-4 py-8 md:py-12">
         <div className="mb-8 text-center">
           <h1 className="text-3xl md:text-4xl font-bold mb-2">Return & Replacement Policy</h1>
