@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
-import { Loader2, Filter, Heart, ShoppingBag, Home } from 'lucide-react';
+import { Loader2, Filter, Heart, ShoppingBag, Home, X } from 'lucide-react';
 import apiService from '@/utils/api/apiService';
 import FilterDrawer from '@/components/FilterDrawer';
 import Link from 'next/link';
@@ -41,6 +41,9 @@ export default function CategoryPage() {
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 25000]);
   const [sortBy, setSortBy] = useState<string>('');
   const [hoveredProduct, setHoveredProduct] = useState<string | null>(null);
+  
+  // Check if filters are active
+  const isFilterActive = priceRange[0] > 0 || priceRange[1] < 25000 || sortBy !== '';
 
   useEffect(() => {
     const fetchCategoryProducts = async () => {
@@ -105,16 +108,21 @@ export default function CategoryPage() {
   };
 
   const applyFilters = () => {
-    setCurrentPage(1); // Reset to page 1 when filters change
-    setProducts([]); // Clear existing products
-    setShowFilter(false); // Close the filter drawer
+    setCurrentPage(1); 
+    setProducts([]); 
+    setShowFilter(false); 
   };
 
   const resetFilters = () => {
     setPriceRange([0, 25000]);
     setSortBy('');
     setCurrentPage(1);
-    setProducts([]); // Clear existing products
+    setProducts([]); 
+  };
+
+  // Format price as rupee
+  const formatRupee = (value: number) => {
+    return `₹ ${value.toLocaleString()}`;
   };
 
   const handleAddToWishlist = (e: React.MouseEvent, productId: string) => {
@@ -165,7 +173,7 @@ export default function CategoryPage() {
 
   return (
     <div className="container mx-auto p-6 relative">
-      {/* Page Header - Centered with breadcrumb */}
+
       <div className="text-center mb-8">
         <div className="flex items-center justify-center gap-2 text-sm mb-3">
           <Link href="/" className="text-gray-500 hover:text-gray-700 flex items-center">
@@ -179,18 +187,53 @@ export default function CategoryPage() {
         <p className="text-gray-500">Explore our {categoryName.toLowerCase()} collection</p>
       </div>
       
-      {/* Filter button */}
-      <div className="flex justify-end mb-6">
+      <div className="flex flex-col sm:flex-row items-center justify-between mb-6 gap-3">
+        {/* Active Filters Display */}
+        <div className="flex-grow flex flex-wrap items-center gap-2">
+          {isFilterActive && priceRange[0] !== 0 && priceRange[1] !== 25000 && (
+            <div className="inline-flex items-center px-3 py-1 text-sm bg-gray-100 border border-gray-300 rounded-md">
+              <span>{formatRupee(priceRange[0])} - {formatRupee(priceRange[1])}</span>
+              <button 
+                onClick={resetFilters}
+                className="ml-2 text-gray-500 hover:text-black"
+                aria-label="Clear price filter"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          )}
+          {sortBy && (
+            <div className="inline-flex items-center px-3 py-1 text-sm bg-gray-100 border border-gray-300 rounded-md">
+              <span>
+                {sortBy === 'price_asc' ? 'Price: Low to High' : 
+                 sortBy === 'price_desc' ? 'Price: High to Low' : 
+                 'Sorted'}
+              </span>
+              <button 
+                onClick={() => {
+                  setSortBy('');
+                  setCurrentPage(1);
+                  setProducts([]);
+                }}
+                className="ml-2 text-gray-500 hover:text-black"
+                aria-label="Clear sort filter"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          )}
+        </div>
+        
+        {/* Filter Button */}
         <button 
           onClick={toggleFilter}
-          className="flex items-center gap-2 px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800 transition-colors"
+          className="flex items-center gap-2 px-4 py-1 text-[15px] border border-black text-black rounded-md hover:bg-gray-50 cursor-pointer transition-colors"
         >
-          <Filter size={18} />
+          <Filter size={15} />
           <span>Filter</span>
         </button>
       </div>
       
-      {/* Filter Drawer Component */}
       <FilterDrawer 
         isOpen={showFilter}
         onClose={toggleFilter}
@@ -202,7 +245,6 @@ export default function CategoryPage() {
         resetFilters={resetFilters}
       />
       
-      {/* Products Grid */}
       {products.length > 0 ? (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
@@ -218,12 +260,10 @@ export default function CategoryPage() {
                   onMouseEnter={() => setHoveredProduct(product.id)}
                   onMouseLeave={() => setHoveredProduct(null)}
                 >
-                  {/* Product Image Container */}
                   <div 
                     className="relative w-full aspect-square cursor-pointer overflow-hidden"
                     onClick={() => handleProductClick(product.id)}
                   >
-                    {/* Main image */}
                     <Image
                       src={mainImage ? `${process.env.NEXT_PUBLIC_API_BASE_URL}${mainImage}` : '/images/placeholder.png'}
                       alt={product.product_name}
@@ -234,7 +274,6 @@ export default function CategoryPage() {
                       }`}
                     />
                     
-                    {/* Hover image */}
                     <Image
                       src={hoverImage ? `${process.env.NEXT_PUBLIC_API_BASE_URL}${hoverImage}` : '/images/placeholder.png'}
                       alt={`${product.product_name} - alternate view`}
@@ -245,22 +284,18 @@ export default function CategoryPage() {
                       }`}
                     />
                     
-                    {/* Stock badge */}
                     {!product.product_status && (
                       <div className="absolute top-2 left-2 bg-red-100 text-red-800 px-2 py-1 text-xs font-medium z-10">
                         Out of Stock
                       </div>
                     )}
                     
-                    {/* Discount badge */}
                     {discount && (
                       <div className="absolute top-2 left-2 bg-green-100 text-green-800 px-2 py-1 text-xs font-medium z-10">
                         {discount}
                       </div>
                     )}
                     
-                    
-                    {/* Wishlist button */}
                     <button
                       className={`absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-white/90 shadow-sm transition-opacity ${
                         hoveredProduct === product.id ? 'opacity-100' : 'opacity-0'
@@ -271,7 +306,6 @@ export default function CategoryPage() {
                       <Heart size={16} className="text-gray-700 hover:text-red-500 transition-colors" />
                     </button>
                     
-                    {/* Add to Bag button */}
                     <button
                       className={`absolute bottom-3 right-3 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 text-white shadow-sm transition-opacity ${
                         hoveredProduct === product.id ? 'opacity-100' : 'opacity-0'
@@ -284,7 +318,6 @@ export default function CategoryPage() {
                     </button>
                   </div>
                   
-                  {/* Product Info */}
                   <div className="mt-4">
                     <h3 
                       className="text-sm md:text-base font-medium cursor-pointer hover:text-blue-500 transition-colors"
@@ -307,7 +340,6 @@ export default function CategoryPage() {
             })}
           </div>
           
-          {/* Load More Button - Only shown if not all products loaded */}
           {!allProductsLoaded && (
             <div className="flex justify-center mt-10">
               <button

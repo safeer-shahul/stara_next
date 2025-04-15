@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { X, ShoppingBag } from 'lucide-react';
 import { CouponType } from './type';
 import CartItem from './CartItem';
@@ -44,6 +44,30 @@ const CartDrawer: React.FC<any> = ({ isOpen, onClose, productId }) => {
     }>;
   }>({ items: [] });
 
+  const fetchCartFromBackend = useCallback(async () => {
+    try {
+      setLoading(true);
+      const userCartResponse = await apiService.getUserCart();
+      console.log('userCartResponse', userCartResponse);
+      if (userCartResponse && userCartResponse.items && Array.isArray(userCartResponse.items)) {
+        const cartItems = userCartResponse.items.map((item: any) => ({
+          id: item.product.replace(/-/g, ''),
+          quantity: item.quantity
+        }));
+        console.log(cartItems, 'cartItems');
+        localStorage.setItem('cartItems', JSON.stringify(cartItems));
+        
+        await fetchCartProducts(cartItems);
+      } else {
+        setCartProducts([]);
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error('Error fetching cart from backend:', error);
+      await loadCartFromLocalStorage();
+    }
+  }, []);
+
   useEffect(() => {
     const handleProductIdAddToCart = async () => {
       if (isOpen && productId) {
@@ -64,31 +88,7 @@ const CartDrawer: React.FC<any> = ({ isOpen, onClose, productId }) => {
     };
     
     handleProductIdAddToCart();
-  }, [isOpen, productId]);
-
-  const fetchCartFromBackend = async () => {
-    try {
-      setLoading(true);
-      const userCartResponse = await apiService.getUserCart();
-      console.log('userCartResponse',userCartResponse)
-      if (userCartResponse && userCartResponse.items && Array.isArray(userCartResponse.items)) {
-        const cartItems = userCartResponse.items.map((item: any) => ({
-          id: item.product.replace(/-/g, ''),
-          quantity: item.quantity
-        }));
-        console.log(cartItems,'cartItems')
-        localStorage.setItem('cartItems', JSON.stringify(cartItems));
-        
-        await fetchCartProducts(cartItems);
-      } else {
-        setCartProducts([]);
-        setLoading(false);
-      }
-    } catch (error) {
-      console.error('Error fetching cart from backend:', error);
-      await loadCartFromLocalStorage();
-    }
-  };
+  }, [isOpen, productId, fetchCartFromBackend]);
 
   const loadCartFromLocalStorage = async () => {
     try {
@@ -178,11 +178,19 @@ const CartDrawer: React.FC<any> = ({ isOpen, onClose, productId }) => {
     setLoading(false);
   };
 
+  // Fetch cart when cart drawer is opened
   useEffect(() => {
     if (isOpen) {
       fetchCartFromBackend();
     }
-  }, [isOpen]);
+  }, [isOpen, fetchCartFromBackend]);
+
+  // Fetch cart again when checkout modal is closed (to update cart if it was cleared)
+  useEffect(() => {
+    if (!showCheckoutModal && isOpen) {
+      fetchCartFromBackend();
+    }
+  }, [showCheckoutModal, isOpen, fetchCartFromBackend]);
 
   const calculateSubtotal = (): number => {
     return cartProducts.reduce((total, item) => total + (item.price * item.quantity), 0);
@@ -196,7 +204,7 @@ const CartDrawer: React.FC<any> = ({ isOpen, onClose, productId }) => {
       const cleanProductId = id.replace(/-/g, '');
       await apiService.addToCart({
         product_id: cleanProductId,
-        mode: 'delete_all' 
+        mode: 'delete' 
       });
       
       await fetchCartFromBackend();
@@ -318,12 +326,30 @@ const CartDrawer: React.FC<any> = ({ isOpen, onClose, productId }) => {
   
   const handleCheckoutClose = (): void => {
     setShowCheckoutModal(false);
+    // Refresh cart data after checkout modal is closed
+    fetchCartFromBackend();
   };
   
   const handleAddressSelected = (addressId: string): void => {
     console.log(`Proceeding with address ID: ${addressId}`);
-    
     setShowCheckoutModal(false);
+    // Refresh cart data after checkout is completed
+    fetchCartFromBackend();
+  };
+
+  const clearCart = async (): Promise<void> => {
+    try {
+      await apiService.addToCart({
+        mode: 'delete_cart'
+      });
+      
+      // Clear local storage cart as well
+      localStorage.setItem('cartItems', JSON.stringify([]));
+      setCartProducts([]);
+      console.log('Cart cleared successfully');
+    } catch (error) {
+      console.error('Error clearing cart:', error);
+    }
   };
 
   if (!isOpen) return null;
@@ -348,13 +374,14 @@ const CartDrawer: React.FC<any> = ({ isOpen, onClose, productId }) => {
             
             {!showCoupons && (
               <div className="bg-[#175e7a] py-1 text-center">
-                <p className="text-white text-[14px]">BUY 1 GET 1 FREE | USE CODE : B1G1</p>
+                <p className="text-white text-[12px]">BUY 1 GET 1 FREE | USE CODE : B1G1</p>
               </div>
             )}
             
             <div className="flex-1 overflow-y-auto">
               {loading ? (
                 <div className="flex justify-center items-center h-40">
+                  <div className="w-8 h-8 border-4 border-gray-200 border-t-[#175e7a] rounded-full animate-spin mr-2"></div>
                   <p>Loading cart items...</p>
                 </div>
               ) : showCoupons ? (
@@ -412,13 +439,24 @@ const CartDrawer: React.FC<any> = ({ isOpen, onClose, productId }) => {
                     <span className='font-bold'>₹{total}</span>
                   </div>
                 </div>
-                
-                <button 
-                  className="w-full bg-[#175e7a] text-[14px] text-white font-medium py-3 hover:bg-[#0f4c67] cursor-pointer transition-colors shadow-sm rounded flex items-center justify-center"
-                  onClick={handleProceedToCheckout}
-                >
-                  Proceed To Checkout
-                </button>
+
+                <div className="flex gap-2">
+                  {cartProducts.length > 0 && (
+                    <button
+                      className="px-3 py-3 border border-[#175e7a] text-[14px] text-[#175e7a] font-medium hover:bg-gray-100 cursor-pointer transition-colors rounded"
+                      onClick={clearCart}
+                    >
+                      Clear Cart
+                    </button>
+                  )}
+                  
+                  <button 
+                    className="flex-1 bg-[#175e7a] text-[14px] text-white font-medium py-3 hover:bg-[#0f4c67] cursor-pointer transition-colors shadow-sm rounded flex items-center justify-center"
+                    onClick={handleProceedToCheckout}
+                  >
+                    Proceed To Checkout
+                  </button>
+                </div>
               </div>
             )}
           </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { X, ArrowLeft } from 'lucide-react';
 import apiService from '@/utils/api/apiService';
 import AddressForm from './AddressForm';
@@ -61,52 +61,34 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [orderId, setOrderId] = useState<string | null>(null);
   const [staraOrderId, setStaraOrderId] = useState<string | null>(null);
   const [paymentId, setPaymentId] = useState<string | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<'success' | 'failed' | 'canceled'>('success');
+  const [cartCleared, setCartCleared] = useState(false);
 
-  const resetCheckoutState = () => {
+  const resetCheckoutState = useCallback(() => {
     setCurrentStep(CheckoutStep.ADDRESS_SELECTION);
     setError(null);
     setPaymentMethod('Razorpay');
     setOrderId(null);
     setPaymentId(null);
-  };
+    setPaymentStatus('success');
+    setCartCleared(false);
+  }, []);
 
-  useEffect(() => {
-    const checkAuthentication = () => {
-      const accessToken = localStorage.getItem('accessToken');
-      if (accessToken) {
-        setIsAuthenticated(true);
-        fetchAddresses();
-      } else {
-        setIsAuthenticated(false);
-        setShowAuthModal(true);
-      }
-    };
-
-    if (isOpen) {
-      checkAuthentication();
-      resetCheckoutState();
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
+  const checkAuthentication = useCallback(() => {
+    const accessToken = localStorage.getItem('accessToken');
+    if (accessToken) {
+      setIsAuthenticated(true);
+      return true;
     } else {
-      document.body.style.overflow = 'auto';
+      setIsAuthenticated(false);
+      setShowAuthModal(true);
+      return false;
     }
+  }, []);
+
+  const fetchAddresses = useCallback(async () => {
+    if (!isAuthenticated) return;
     
-    return () => {
-      document.body.style.overflow = 'auto';
-    };
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (authModalClosed && !isAuthenticated) {
-      onClose();
-    }
-  }, [authModalClosed, isAuthenticated, onClose]);
-
-  const fetchAddresses = async () => {
     setLoading(true);
     try {
       const response = await apiService.getAddresses();
@@ -130,7 +112,56 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [isAuthenticated]);
+
+  // Clear cart function
+  const clearCart = useCallback(async () => {
+    try {
+      // Call the API with the "delete_cart" mode to clear the entire cart
+      await apiService.addToCart({
+        mode: 'delete_cart'
+      });
+      
+      // Update local storage cart as well
+      localStorage.setItem('cartItems', JSON.stringify([]));
+      setCartCleared(true);
+      console.log('Cart cleared successfully');
+    } catch (error) {
+      console.error('Error clearing cart:', error);
+    }
+  }, []);
+
+  // Initialize modal when opened
+  useEffect(() => {
+    if (isOpen) {
+      resetCheckoutState();
+      
+      const isLoggedIn = checkAuthentication();
+      if (isLoggedIn) {
+        fetchAddresses();
+      }
+    }
+  }, [isOpen, checkAuthentication, fetchAddresses, resetCheckoutState]);
+
+  // Handle body overflow when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'auto';
+    }
+    
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
+  }, [isOpen]);
+
+  // Close modal if authentication is closed without logging in
+  useEffect(() => {
+    if (authModalClosed && !isAuthenticated) {
+      onClose();
+    }
+  }, [authModalClosed, isAuthenticated, onClose]);
 
   const handleProceedToPayment = () => {
     if (selectedAddressId && selectedAddress) {
@@ -138,25 +169,48 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
   };
   
-  const handleOrderCreated = (paymentMethod: 'Cod' | 'Razorpay', razorpayOrderId: string, staraOrderID:any) => {
+  const handleOrderCreated = (paymentMethod: 'Cod' | 'Razorpay', razorpayOrderId: string, staraOrderID: any) => {
     setOrderId(razorpayOrderId);
     setStaraOrderId(staraOrderID);
     setPaymentMethod(paymentMethod);
-    console.log(paymentMethod,razorpayOrderId);
+    console.log("Order created:", paymentMethod, razorpayOrderId);
+    
     if (paymentMethod === 'Razorpay') {
       setCurrentStep(CheckoutStep.PAYMENT_PROCESSING);
     } else {
+      // For COD orders, clear cart immediately on successful order placement
+      clearCart();
+      setPaymentStatus('success');
       setCurrentStep(CheckoutStep.ORDER_CONFIRMATION);
     }
   };
   
-  const handlePaymentSuccess = () => {
-    console.log('here',orderId)
+  const handlePaymentSuccess = async (paymentId?: string) => {
+    if (paymentId) {
+      setPaymentId(paymentId);
+    }
+    setPaymentStatus('success');
+    
+    // Clear the cart on successful payment
+    await clearCart();
+    
+    setCurrentStep(CheckoutStep.ORDER_CONFIRMATION);
+    console.log('Payment success:', orderId, paymentId);
+  };
+  
+  const handlePaymentError = (errorMessage?: string) => {
+    setError(errorMessage || 'Payment failed. Please try again.');
+    setPaymentStatus('failed');
     setCurrentStep(CheckoutStep.ORDER_CONFIRMATION);
   };
   
-  const handlePaymentError = () => {
-    resetCheckoutState();
+  const handlePaymentCancel = () => {
+    setPaymentStatus('canceled');
+    setCurrentStep(CheckoutStep.ORDER_CONFIRMATION);
+  };
+
+  const handleRetryPayment = () => {
+    setCurrentStep(CheckoutStep.PAYMENT_PROCESSING);
   };
 
   const handleBackToAddresses = () => {
@@ -204,7 +258,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const handleClose = () => {
     onClose();
-    setTimeout(resetCheckoutState, 100);
   };
 
   if (!isOpen) return null;
@@ -266,6 +319,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   
                   {loading ? (
                     <div className="flex justify-center items-center h-40">
+                      <div className="w-8 h-8 border-4 border-gray-200 border-t-[#175e7a] rounded-full animate-spin mr-2"></div>
                       <p>Loading addresses...</p>
                     </div>
                   ) : showAddressForm ? (
@@ -292,9 +346,17 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                         </div>
 
                         {addresses.length === 0 ? (
-                          <></>
+                          <div className="text-center py-4">
+                            <p className="text-gray-500">No addresses found. Please add a new address.</p>
+                            <button 
+                              onClick={() => setShowAddressForm(true)}
+                              className="mt-2 text-[13px] text-[#175e7a] cursor-pointer hover:text-blue-800 font-medium transition-colors"
+                            >
+                              Add New Address
+                            </button>
+                          </div>
                         ) : (
-                          <div className="space-y-3 max-h-60 pr-1">
+                          <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
                             {addresses.map(address => (
                               <div 
                                 key={address.id}
@@ -352,15 +414,20 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   customerPhone={selectedAddress.phone_number_1}
                   onSuccess={handlePaymentSuccess}
                   onError={handlePaymentError}
+                  onCancel={handlePaymentCancel}
                 />
               )}
 
-              {currentStep === CheckoutStep.ORDER_CONFIRMATION && orderId && (
+              {currentStep === CheckoutStep.ORDER_CONFIRMATION && (
                 <OrderConfirmation
                   orderId={staraOrderId}
                   paymentId={paymentId}
                   paymentMethod={paymentMethod}
+                  paymentStatus={paymentStatus}
+                  errorMessage={error}
                   onContinueShopping={handleContinueShopping}
+                  onRetryPayment={handleRetryPayment}
+                  cartCleared={cartCleared}
                 />
               )}
             </div>

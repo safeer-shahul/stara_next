@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ChevronRight } from 'lucide-react';
 import Image from 'next/image';
 import apiService from '@/utils/api/apiService';
@@ -26,18 +26,40 @@ const ProductSummary: React.FC<ProductSummaryProps> = ({ items, coupon_code_id }
   const [couponCode, setCouponCode] = useState<string>(coupon_code_id || '');
   const [appliedCoupon, setAppliedCoupon] = useState<CouponType | null>(null);
   const [showCoupons, setShowCoupons] = useState<boolean>(false);
+  const isMounted = useRef(true);
+  const fetchInProgress = useRef(false);
+
+  // Helper to safely update state only if component is still mounted
+  const safeSetState = (setter: any, value: any) => {
+    if (isMounted.current) {
+      setter(value);
+    }
+  };
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     const fetchProducts = async () => {
-      setLoading(true);
-      try {
-        if (items.length === 0) {
-          setProducts([]);
-          return;
-        }
+      if (fetchInProgress.current) return;
+      if (items.length === 0) {
+        safeSetState(setProducts, []);
+        safeSetState(setLoading, false);
+        return;
+      }
 
+      fetchInProgress.current = true;
+      safeSetState(setLoading, true);
+      
+      try {
         const productIds = items.map(item => item.product_id);
         const response = await apiService.getPaginatedProducts(1, 30, productIds);
+        
+        if (!isMounted.current) return;
         
         if (response && response.products && Array.isArray(response.products)) {
           const formattedProducts = response.products.map((item: any) => {
@@ -59,25 +81,27 @@ const ProductSummary: React.FC<ProductSummaryProps> = ({ items, coupon_code_id }
             };
           });
           
-          setProducts(formattedProducts);
+          safeSetState(setProducts, formattedProducts);
         } else {
-          setProducts([]);
+          safeSetState(setProducts, []);
         }
       } catch (error) {
         console.error('Error fetching products:', error);
-        setError('Failed to load product details');
-        setProducts([]);
+        safeSetState(setError, 'Failed to load product details');
+        safeSetState(setProducts, []);
       } finally {
-        setLoading(false);
+        safeSetState(setLoading, false);
+        fetchInProgress.current = false;
       }
     };
 
     fetchProducts();
-  }, [items]);
+  }, [items]); // Only re-fetch when items array changes
 
   // Apply initial coupon if provided
   useEffect(() => {
     if (coupon_code_id) {
+      setCouponCode(coupon_code_id);
       handleApplyCoupon();
     }
   }, [coupon_code_id]);

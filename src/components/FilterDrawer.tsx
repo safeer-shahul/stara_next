@@ -165,35 +165,32 @@ export default function FilterDrawer({
   return (
     <>
       <div 
-        className={`fixed inset-y-0 left-0 w-80 bg-white shadow-lg transform transition-transform duration-300 z-50 ${
+        className={`fixed inset-y-0 left-0 w-90 bg-white shadow-lg transform transition-transform duration-300 z-55 ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="flex justify-between items-center p-4 border-b">
-          <h2 className="text-xl font-semibold">FILTER</h2>
+        <div className="flex justify-between items-center p-4 border-b border-gray-200">
+          <h2 className="text-[16px] text-[#7F7F7F] font-semibold">Filter</h2>
           <button onClick={onClose} className="p-1">
-            <X size={24} />
+            <X size={20} />
           </button>
         </div>
         
-        <div className="p-4 border-b">
-          <h3 className="text-lg font-medium mb-4">PRICE</h3>
+        <div className="p-4 border-b  border-gray-200">
+          <h3 className="text-[14px] text-[#7F7F7F] font-medium mb-4">Price Range</h3>
           
-          {/* Custom Range Slider */}
           <div className="px-2 py-6 relative">
             <div className="w-full h-1 bg-gray-300 rounded-full relative">
-              {/* Selected Range */}
               <div 
-                className="absolute h-full bg-black rounded-full" 
+                className="absolute h-full bg-[#175e7a] rounded-full" 
                 style={{
                   left: `${minThumbPosition}%`,
                   width: `${maxThumbPosition - minThumbPosition}%`
                 }}
               ></div>
               
-              {/* Min Thumb */}
               <div 
-                className="absolute w-5 h-5 bg-white border-2 border-black rounded-full -top-2 -ml-2.5 cursor-pointer"
+                className="absolute w-5 h-5 bg-white border-2 border-[#175e7a] rounded-full -top-2 -ml-2.5 cursor-pointer"
                 style={{ left: `${minThumbPosition}%` }}
                 onMouseDown={handleMinThumbMove}
                 onTouchStart={handleMinThumbMove}
@@ -204,9 +201,8 @@ export default function FilterDrawer({
                 tabIndex={0}
               ></div>
               
-              {/* Max Thumb */}
               <div 
-                className="absolute w-5 h-5 bg-white border-2 border-black rounded-full -top-2 -ml-2.5 cursor-pointer" 
+                className="absolute w-5 h-5 bg-white border-2 border-[#175e7a] rounded-full -top-2 -ml-2.5 cursor-pointer" 
                 style={{ left: `${maxThumbPosition}%` }}
                 onMouseDown={handleMaxThumbMove}
                 onTouchStart={handleMaxThumbMove}
@@ -262,10 +258,10 @@ export default function FilterDrawer({
           </div>
         </div>
         
-        <div className="p-4 border-b">
-          <h3 className="text-lg font-medium mb-4">SORT BY</h3>
+        <div className="p-4 border-b border-gray-200">
+          <h3 className="text-[14px] text-[#7F7F7F] font-medium mb-4">Sort By</h3>
           <div className="space-y-2">
-            <label className="flex items-center gap-2 cursor-pointer">
+            <label className="flex text-[14px] items-center gap-2 cursor-pointer">
               <input 
                 type="radio" 
                 name="sort" 
@@ -275,7 +271,7 @@ export default function FilterDrawer({
               />
               <span>Price: Low to High</span>
             </label>
-            <label className="flex items-center gap-2 cursor-pointer">
+            <label className="flex text-[14px] items-center gap-2 cursor-pointer">
               <input 
                 type="radio" 
                 name="sort" 
@@ -285,7 +281,7 @@ export default function FilterDrawer({
               />
               <span>Price: High to Low</span>
             </label>
-            <label className="flex items-center gap-2 cursor-pointer">
+            <label className="flex text-[14px] items-center gap-2 cursor-pointer">
               <input 
                 type="radio" 
                 name="sort" 
@@ -301,23 +297,22 @@ export default function FilterDrawer({
         <div className="p-4 flex gap-3">
           <button 
             onClick={handleApply}
-            className="flex-1 py-2 bg-black text-white rounded hover:bg-gray-800 transition-colors"
+            className="flex-1 py-2 bg-[#175e7a] text-[14px] cursor-pointer text-white rounded hover:bg-gray-800 transition-colors"
           >
-            APPLY
+            Apply
           </button>
           <button 
             onClick={handleReset}
-            className="flex-1 py-2 border border-gray-300 rounded hover:bg-gray-100 transition-colors"
+            className="flex-1 py-2 border border-gray-300 text-[14px] cursor-pointer rounded hover:bg-gray-100 transition-colors"
           >
-            RESET
+            Reset
           </button>
         </div>
       </div>
       
-      {/* Overlay when filter is open */}
       {isOpen && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-40"
+          className="fixed inset-0 bg-black/80 z-50"
           onClick={onClose}
         ></div>
       )}
