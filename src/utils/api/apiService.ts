@@ -401,7 +401,6 @@ class ApiService {
       const response = await this.post<any>('/home_category/create', data);
       return response;
     } catch (error) {
-      console.error('Error creating category:', error);
       throw error;
     }
   }
@@ -429,7 +428,6 @@ class ApiService {
       const response = await this.post<any>('/user/firebase-login', data);
       return response;
     } catch (error) {
-      console.error('Error creating category:', error);
       throw error;
     }
   }
@@ -449,7 +447,6 @@ class ApiService {
       const response = await this.post<any>('/address/add_address', data);
       return response;
     } catch (error) {
-      console.error('Error creating category:', error);
       throw error;
     }
   }
@@ -468,7 +465,6 @@ class ApiService {
       const response = await this.post<any>('/cart/add_to_cart', data);
       return response;
     } catch (error) {
-      console.error('Error creating category:', error);
       throw error;
     }
   }
@@ -478,7 +474,6 @@ class ApiService {
       const response = await this.post<any>('/products/get_product_amount', data);
       return response;
     } catch (error) {
-      console.error('Error creating category:', error);
       throw error;
     }
   }
@@ -488,7 +483,6 @@ class ApiService {
       const response = await this.post<any>('/order/place_order', data);
       return response;
     } catch (error) {
-      console.error('Error creating category:', error);
       throw error;
     }
   }
@@ -498,7 +492,6 @@ class ApiService {
       const response = await this.post<any>('/order/verify_payment', data);
       return response;
     } catch (error) {
-      console.error('Error creating category:', error);
       throw error;
     }
   }
@@ -506,6 +499,15 @@ class ApiService {
   public async getMyOrders(): Promise<any> {
     try {
       const response = await this.get<any>(`/order/get_my_orders`);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  public async addToWishlist(data:any): Promise<any> {
+    try {
+      const response = await this.post<any>('/wishlist/create_wishlist', data);
       return response;
     } catch (error) {
       throw error;
