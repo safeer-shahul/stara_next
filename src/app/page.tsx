@@ -1,12 +1,9 @@
-// /src/app/page.tsx
-
 'use client';
 
 import { useState, useEffect } from 'react';
 import HeroSlider from '@/components/HeroSlider';
 import ShopLayout from './shop/layout';
 import CategoryGrid from '@/components/CategoryGrid';
-// import FashionPortraitSlider from '@/components/FashionPortraitSlider';
 import ProductSlider from '@/components/ProductSlider';
 import apiService from '@/utils/api/apiService';
 import VisitOurStores from '@/components/VisitOurStores';
@@ -41,11 +38,28 @@ export default function Home() {
     }
   };
 
+  // Add wishlist update handler
+  const handleWishlistUpdate = (categoryId: string, productId: string, newStatus: boolean) => {
+    setHomeCategories(currentCategories => 
+      currentCategories.map(category => 
+        category.id === categoryId 
+          ? {
+              ...category,
+              products: category.products.map(product => 
+                product.id === productId 
+                  ? { ...product, favorite: newStatus }
+                  : product
+              )
+            }
+          : category
+      )
+    );
+  };
+
   return (
     <ShopLayout>
       <HeroSlider />
       <CategoryGrid />
-      {/* <FashionPortraitSlider /> */}
       
       {loading && (
         <div className="py-16 text-center">
@@ -68,6 +82,9 @@ export default function Home() {
           title={category.name}
           categoryId={category.id}
           products={category.products}
+          onWishlistUpdate={(productId, newStatus) => 
+            handleWishlistUpdate(category.id, productId, newStatus)
+          }
         />
       ))}
       <VisitOurStores/>

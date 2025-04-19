@@ -10,6 +10,7 @@ import 'swiper/css';
 import 'swiper/css/navigation';
 import 'swiper/css/autoplay';
 import { isMobile } from 'react-device-detect';
+import apiService from '@/utils/api/apiService';
 
 interface ProductImage {
   id: string;
@@ -30,15 +31,17 @@ interface Product {
   created_at: string;
   updated_at: string;
   sub_category: string;
+  favorite?: boolean;
 }
 
 interface ProductSliderProps {
   title: string;
   categoryId: string;
   products: Product[];
+  onWishlistUpdate?: (productId: string, newStatus: boolean) => void;
 }
 
-export default function ProductSlider({ title, categoryId, products }: ProductSliderProps) {
+export default function ProductSlider({ title, categoryId, products,onWishlistUpdate  }: ProductSliderProps) {
   const router = useRouter();
   const [swiperInstance, setSwiperInstance] = useState<any>(null);
   const [windowWidth, setWindowWidth] = useState<number>(0);
@@ -73,10 +76,28 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
     router.push(`/shop/products/${productId}`);
   };
 
-  const handleAddToWishlist = (e: React.MouseEvent, productId: string): void => {
+  const handleAddToWishlist = async (e: React.MouseEvent, product: Product): Promise<void> => {
     e.stopPropagation();
-    console.log('Added to wishlist:', productId);
-    // Implement wishlist functionality here
+    
+    try {
+      const cleanProductId = product.id.replace(/-/g, '');
+      const newFavoriteStatus = !product.favorite;
+      
+      // Call API to toggle wishlist status
+      await apiService.addToWishlist({
+        product: cleanProductId,
+      });
+      
+      // Update parent component state via callback
+      if (onWishlistUpdate) {
+        onWishlistUpdate(product.id, newFavoriteStatus);
+      }
+      
+      console.log(`Product ${product.id} wishlist status toggled to ${newFavoriteStatus}`);
+      
+    } catch (error) {
+      console.error('Error updating wishlist:', error);
+    }
   };
 
   const handleAddToBag = (e: React.MouseEvent, productId: string): void => {
@@ -227,13 +248,20 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
                     
                     {/* Wishlist button */}
                     <button
-                      className={`absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-white/90 shadow-sm transition-opacity ${
+                      className={`absolute cursor-pointer top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-white/90 shadow-sm transition-opacity ${
                         hoveredProduct === product.id ? 'opacity-100' : 'opacity-0'
                       }`}
-                      onClick={(e) => handleAddToWishlist(e, product.id)}
+                      onClick={(e) => handleAddToWishlist(e, product)}
                       aria-label="Add to wishlist"
                     >
-                      <Heart size={16} className="text-gray-700 hover:text-red-500 transition-colors" />
+                      <Heart 
+                        size={16} 
+                        className={`transition-colors ${
+                          product.favorite === true
+                            ? 'text-red-500 fill-red-500' 
+                            : 'text-gray-700 hover:text-red-500'
+                        }`} 
+                      />
                     </button>
                     
                     {/* Add to Bag button */}
