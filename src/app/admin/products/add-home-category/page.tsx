@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Home, ArrowLeft, Search, X } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -21,25 +21,61 @@ interface Product {
 
 function AddHomeCategoryPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const categoryId = searchParams.get('id');
+  const isEditMode = !!categoryId;
+  
   const [categoryName, setCategoryName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   
-  // Product selection state
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [isLoading, setIsLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const productListRef = useRef<HTMLDivElement>(null);
+
+  // Fetch category data if in edit mode
+  useEffect(() => {
+    if (isEditMode) {
+      fetchCategoryData();
+    }
+  }, [categoryId]);
 
   // Fetch initial products
   useEffect(() => {
     loadProducts(1);
   }, []);
+
+  // Fetch category data for editing
+  const fetchCategoryData = async () => {
+    if (!categoryId) return;
+    
+    setIsLoading(true);
+    try {
+      const categoryData = await apiService.homeCategoryByID(categoryId.replace(/-/g, ''));
+      setCategoryName(categoryData.name);
+      
+      // Set selected products from the fetched category
+      if (categoryData.products && Array.isArray(categoryData.products)) {
+        setSelectedProducts(categoryData.products);
+        
+        // Remove selected products from the products list to avoid duplicates
+        setProducts(prevProducts => 
+          prevProducts.filter(p => !categoryData.products.some((cp: Product) => cp.id === p.id))
+        );
+      }
+    } catch (err) {
+      console.error('Error fetching category data:', err);
+      setError('Failed to load category data. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Handle clicks outside the dropdown
   useEffect(() => {
@@ -69,11 +105,16 @@ function AddHomeCategoryPage() {
       if (newProducts.length === 0) {
         setHasMore(false);
       } else {
-        setProducts(prev => 
-          page === 1 
-            ? newProducts 
-            : [...prev, ...newProducts]
-        );
+        setProducts(prev => {
+          // Filter out products that are already selected
+          const filteredNewProducts = newProducts.filter(
+            (newProduct:any) => !selectedProducts.some(selectedProduct => selectedProduct.id === newProduct.id)
+          );
+          
+          return page === 1 
+            ? filteredNewProducts 
+            : [...prev, ...filteredNewProducts];
+        });
         setCurrentPage(page);
       }
     } catch (err) {
@@ -121,39 +162,53 @@ function AddHomeCategoryPage() {
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+  
     if (selectedProducts.length === 0) {
       setError("Please select at least one product");
       return;
     }
-    
+  
     setIsSubmitting(true);
     setError(null);
-    
+  
     try {
-      // Extract product IDs
-      const productIds = selectedProducts.map(product => product.id);
-      
-      // Call API to create home category using the existing service method
-      await apiService.createHomeCategory(categoryName, productIds);
-      
-      alert(`Home Category "${categoryName}" created successfully!`);
+      const payload = {
+        name: categoryName,
+        product_ids: selectedProducts.map(product => product.id),
+        ...(isEditMode && { id: categoryId.replace(/-/g, '') }) 
+      };
+  
+      await apiService.createHomeCategory(payload);
+      alert(`Home Category "${categoryName}" ${isEditMode ? 'updated' : 'created'} successfully!`);
       router.push('/admin/products/home-category');
     } catch (err) {
-      console.error('Error creating home category:', err);
-      setError('Failed to create home category. Please try again.');
+      console.error('Error processing home category:', err);
+      setError(`Failed to ${isEditMode ? 'update' : 'create'} home category. Please try again.`);
     } finally {
       setIsSubmitting(false);
     }
   };
+  
+
+  const pageTitle = isEditMode ? 'Edit Home Category' : 'Add New Home Category';
+  const submitButtonText = isEditMode ? (isSubmitting ? 'Updating...' : 'Update Home Category') : (isSubmitting ? 'Creating...' : 'Create Home Category');
+
+  if (isLoading && isEditMode) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <span className="ml-3">Loading category data...</span>
+      </div>
+    );
+  }
 
   return (
     <div>
       <div className="mb-6 flex items-center gap-2">
-        <Link href="/admin/home/categories" className="text-blue-600 hover:text-blue-800">
+        <Link href="/admin/products/home-category" className="text-blue-600 hover:text-blue-800">
           <ArrowLeft className="w-5 h-5" />
         </Link>
-        <h2 className="text-2xl font-bold">Add New Home Category</h2>
+        <h2 className="text-2xl font-bold">{pageTitle}</h2>
       </div>
 
       <div className="bg-white shadow rounded-lg p-6">
@@ -163,7 +218,9 @@ function AddHomeCategoryPage() {
           </div>
           <div>
             <h3 className="text-lg font-medium">Home Category Details</h3>
-            <p className="text-gray-500">Create a new home page category section</p>
+            <p className="text-gray-500">
+              {isEditMode ? 'Update existing home page category section' : 'Create a new home page category section'}
+            </p>
           </div>
         </div>
 
@@ -253,7 +310,7 @@ function AddHomeCategoryPage() {
                         </div>
                       )}
                       
-                      {isLoading && (
+                      {isLoading && !isEditMode && (
                         <div className="p-2 text-center text-gray-500">Loading more products...</div>
                       )}
                     </div>
@@ -315,7 +372,7 @@ function AddHomeCategoryPage() {
             <button
               type="button"
               className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
-              onClick={() => router.push('/admin/home/categories')}
+              onClick={() => router.push('/admin/products/home-category')}
               disabled={isSubmitting}
             >
               Cancel
@@ -329,7 +386,7 @@ function AddHomeCategoryPage() {
               } text-white`}
               disabled={isSubmitting}
             >
-              {isSubmitting ? 'Creating...' : 'Create Home Category'}
+              {submitButtonText}
             </button>
           </div>
         </form>
