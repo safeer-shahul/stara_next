@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { User, LogOut } from 'lucide-react';
+import apiService from '@/utils/api/apiService';
 
 interface UserDropdownProps {
   userProfile?: {
@@ -32,9 +33,9 @@ const UserDropdown = ({ userProfile }: UserDropdownProps) => {
   }, []);
   
   const handleLogout = () => {
-    localStorage.removeItem('accessToken');
     setIsOpen(false);
-    router.refresh();
+    console.log('hello')
+    apiService.logout()
   };
   
   const defaultName = userProfile?.first_name || '';

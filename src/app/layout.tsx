@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { WishlistProvider } from './context/WishlistProvider';
 
 export const metadata: Metadata = {
   title: 'Stara | Demifine Jewellery',
@@ -8,10 +9,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body>
-        {children}
-      </body>
-    </html>
+    <WishlistProvider>
+      <html lang="en">
+        <body>
+          {children}
+        </body>
+      </html>
+    </WishlistProvider>
   );
 }

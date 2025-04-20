@@ -10,7 +10,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [isLoading, setIsLoading] = useState(true);
-  const [adminUser, setAdminUser] = useState<{ name: string; username: string; } | null>(null);
+  const [adminUser, setAdminUser] = useState<{ name: any; username: any; } | null>(null);
 
   console.log('pathname',pathname)
   useEffect(() => {
