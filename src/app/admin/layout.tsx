@@ -87,7 +87,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               </Link>
             </li>
             <li className="mb-2">
-              <Link href="/admin/orders" className={`block py-2 px-4 hover:bg-gray-700 ${pathname.startsWith('/admin/orders') ? 'bg-gray-700' : ''}`}>
+              <Link href="/admin/orders/list" className={`block py-2 px-4 hover:bg-gray-700 ${pathname.startsWith('/admin/orders') ? 'bg-gray-700' : ''}`}>
                 Orders
               </Link>
             </li>

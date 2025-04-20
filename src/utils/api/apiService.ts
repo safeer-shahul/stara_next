@@ -563,6 +563,31 @@ class ApiService {
     }
   }
 
+  public async getPaginatedOrders(
+    page: number = 1,
+    pageSize: number = 10,
+    filters?: {
+      sort_by?: string
+    }
+  ): Promise<any> {
+    try {
+      let url = `/order/get_all_orders?page=${page}&page_size=${pageSize}`;
+      
+      if (filters) {
+        
+        if (filters.sort_by) {
+          url += `&sort_by=${filters.sort_by}`;
+        }
+      }
+      
+      const response = await this.get<any>(url);
+      return response;
+    } catch (error) {
+      console.error('Error fetching paginated products:', error);
+      throw error;
+    }
+  }
+
 }
 
 const apiService = ApiService.getInstance();
