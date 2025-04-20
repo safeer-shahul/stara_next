@@ -111,19 +111,19 @@ export default function HomeCategoryListPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <div className="flex space-x-2">
-                          <Link href={`/admin/products/home-category/view/${category.id}`}>
+                          {/* <Link href={`/admin/products/home-category/view/${category.id}`}>
                             <button className="text-gray-600 hover:text-gray-800">
                               <Eye className="w-4 h-4" />
                             </button>
-                          </Link>
-                          <Link href={`/admin/products/home-category/edit/${category.id}`}>
+                          </Link> */}
+                          <Link href={`/admin/products/add-home-category?id=${category.id}`}>
                             <button className="text-blue-600 hover:text-blue-800">
                               <Edit className="w-4 h-4" />
                             </button>
                           </Link>
-                          <button className="text-red-600 hover:text-red-800">
+                          {/* <button className="text-red-600 hover:text-red-800">
                             <Trash2 className="w-4 h-4" />
-                          </button>
+                          </button> */}
                         </div>
                       </td>
                     </tr>

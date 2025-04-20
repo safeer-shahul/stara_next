@@ -427,13 +427,8 @@ class ApiService {
     }
   }
 
-  public async createHomeCategory(categoryName: string, products: any[]): Promise<any> {
-    try {
-      const data = {
-        name:categoryName,
-        product_ids:products
-      }
-      
+  public async createHomeCategory(data: any): Promise<any> {
+    try {      
       const response = await this.post<any>('/home_category/create', data);
       return response;
     } catch (error) {
@@ -553,6 +548,15 @@ class ApiService {
   public async getWishlist(): Promise<any> {
     try {
       const response = await this.get<any>(`/wishlist/get_all_wishlist_on_product`);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  public async homeCategoryByID(id:any): Promise<any> {
+    try {
+      const response = await this.get<any>(`/home_category/get_home_category_by_id/${id}`);
       return response;
     } catch (error) {
       throw error;
