@@ -298,8 +298,8 @@ export default function ProductDetailPage() {
           </div>
 
           <AddToCartButton 
+            productId={product.id} // Add this prop
             onAddToBag={handleAddToBag}
-            onAddToWishlist={handleAddToWishlist}
             onBuyNow={handleBuyNow}
           />
 

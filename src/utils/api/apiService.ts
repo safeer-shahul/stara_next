@@ -1,4 +1,5 @@
 import axios, { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+import Swal from 'sweetalert2';
 
 // Configuration
 const API_CONFIG = {
@@ -87,25 +88,19 @@ class ApiService {
           const elapsed = Date.now() - started;
           console.log(`Request for ${error.config?.url} failed after ${elapsed} ms.`);
         }
+    
+        const status = error.response?.status;
+    
+        if (status === 401 || status === 403) {
 
-        if (error.response?.status === 401) {
-          // Handle unauthorized access
-          if (typeof window !== 'undefined') {
-            if (window.location.pathname.startsWith('/admin') && 
-                window.location.pathname !== '/admin/login') {
-              console.log('Unauthorized access, redirecting to login');
-              localStorage.removeItem('accessToken');
-              localStorage.removeItem('refreshToken');
-              window.location.href = '/admin/login';
-            } else {
-              localStorage.removeItem('accessToken');
-              localStorage.removeItem('refreshToken');
-            }
-          }
+          this.handleAuthError();
+          return Promise.resolve(null);
         }
+    
         return Promise.reject(error);
       }
     );
+    
 
     this.publicApiClient.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
@@ -120,6 +115,55 @@ class ApiService {
       },
       (error) => Promise.reject(error)
     );
+  }
+
+  public async handleAuthError(): Promise<void> {
+      try {
+        const submitData = {
+          refresh: localStorage.getItem('refreshToken'),
+        };
+
+        const result:any = await this.postPublic(`/api/token/refresh/`, submitData);
+        localStorage.removeItem('accessToken');
+        localStorage.setItem('accessToken',result.access);
+      }  catch (error) {
+        this.logouterror()
+        console.log('err',error)
+      }
+  }
+
+  public async logout(): Promise<void> {
+    if (typeof window !== 'undefined') {
+      if (window.location.pathname.startsWith('/admin') && 
+          window.location.pathname !== '/admin/login') {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        window.location.href = '/admin/login';
+      } else {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        window.location.reload();
+      }
+    }
+    await Swal.fire({
+      icon: 'success',
+      title: 'Successfully Logged Out!',
+      showConfirmButton: false,
+      timer: 1500
+    });
+  }
+
+  public async logouterror(): Promise<void> {
+    if (typeof window !== 'undefined') {
+      if (window.location.pathname.startsWith('/admin') && 
+          window.location.pathname !== '/admin/login') {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+      } else {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+      }
+    }
   }
 
   private getHeaders(isFormData: boolean = false, propagation: number = 0): Record<string, string> {
@@ -196,14 +240,6 @@ class ApiService {
     } catch (error) {
       console.error('Error getting user profile:', error);
       throw error;
-    }
-  }
-
-  public logout(): void {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      window.location.href = '/admin/login';
     }
   }
 
@@ -508,6 +544,15 @@ class ApiService {
   public async addToWishlist(data:any): Promise<any> {
     try {
       const response = await this.post<any>('/wishlist/create_wishlist', data);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  public async getWishlist(): Promise<any> {
+    try {
+      const response = await this.get<any>(`/wishlist/get_all_wishlist_on_product`);
       return response;
     } catch (error) {
       throw error;

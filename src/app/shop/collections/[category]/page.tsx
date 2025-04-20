@@ -6,6 +6,7 @@ import { Loader2, Filter, Heart, ShoppingBag, Home, X } from 'lucide-react';
 import apiService from '@/utils/api/apiService';
 import FilterDrawer from '@/components/FilterDrawer';
 import Link from 'next/link';
+import WishlistButton from '@/components/WishlistButton';
 
 interface ProductItem {
   id: string;
@@ -303,7 +304,10 @@ export default function CategoryPage() {
                       onClick={(e) => handleAddToWishlist(e, product.id)}
                       aria-label="Add to wishlist"
                     >
-                      <Heart size={16} className="text-gray-700 hover:text-red-500 transition-colors" />
+                      <WishlistButton 
+                        productId={product.id} 
+                        size={16} 
+                      />
                     </button>
                     
                     <button

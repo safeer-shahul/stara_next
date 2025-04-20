@@ -152,13 +152,11 @@ export default function Header() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
+    console.log('hello')
     setIsLoggedIn(false);
     setUserProfile(null);
     setIsMenuOpen(false);
-    // Refresh the page after logout
-    window.location.reload();
+    apiService.logout()
   };
 
   return (
