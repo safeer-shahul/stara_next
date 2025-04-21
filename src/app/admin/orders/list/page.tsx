@@ -192,7 +192,7 @@ export default function OrderListPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <div className="flex space-x-2">
-                          <Link href={`/admin/orders/view/${order.order_id}`}>
+                          <Link href={`/admin/orders/view/?id=${order.order_id}`}>
                             <button className="text-blue-600 hover:text-blue-800">
                               <Eye className="w-4 h-4" />
                             </button>

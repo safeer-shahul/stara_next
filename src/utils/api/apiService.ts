@@ -588,6 +588,16 @@ class ApiService {
     }
   }
 
+  public async getOrderById(id:any): Promise<any> {
+    try {
+      const response = await this.get<any>(`/order/get_order_by_id/${id}`);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+
 }
 
 const apiService = ApiService.getInstance();
