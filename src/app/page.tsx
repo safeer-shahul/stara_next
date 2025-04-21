@@ -38,24 +38,6 @@ export default function Home() {
     }
   };
 
-  // Add wishlist update handler
-  const handleWishlistUpdate = (categoryId: string, productId: string, newStatus: boolean) => {
-    setHomeCategories(currentCategories => 
-      currentCategories.map(category => 
-        category.id === categoryId 
-          ? {
-              ...category,
-              products: category.products.map(product => 
-                product.id === productId 
-                  ? { ...product, favorite: newStatus }
-                  : product
-              )
-            }
-          : category
-      )
-    );
-  };
-
   return (
     <ShopLayout>
       <HeroSlider />
@@ -82,9 +64,6 @@ export default function Home() {
           title={category.name}
           categoryId={category.id}
           products={category.products}
-          onWishlistUpdate={(productId, newStatus) => 
-            handleWishlistUpdate(category.id, productId, newStatus)
-          }
         />
       ))}
       <VisitOurStores/>

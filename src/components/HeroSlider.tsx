@@ -4,65 +4,94 @@ import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import apiService from '@/utils/api/apiService';
 
 export default function HeroSlider() {
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [banners, setBanners] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<any>(null);
   const router = useRouter();
 
-  // Slider images and their corresponding category links
-  const slides = [
-    {
-      desktopImage: '/images/slider/desktop/Slide1.webp',
-      mobileImage: '/images/slider/mobile/Slide1.webp',
-      link: '/shop/collections/best-seller', // Redirect to Best Seller category
-    },
-    {
-      desktopImage: '/images/slider/desktop/Slide2.webp',
-      mobileImage: '/images/slider/mobile/Slide2.webp',
-      link: '/shop/collections/new-arrivals', // Redirect to New Arrivals category
-    },
-    {
-      desktopImage: '/images/slider/desktop/Slide3.webp',
-      mobileImage: '/images/slider/mobile/Slide3.webp',
-      link: '/shop/collections/lab-grown-silver', 
-    },
-  ];
+  useEffect(() => {
+    const fetchBanners = async () => {
+      setLoading(true);
+      try {
+        const response = await apiService.getHeroBanners();
+        // Filter banners to only show active ones (status = true)
+        const activeBanners = response.filter((banner:any) => banner.status === true);
+        setBanners(activeBanners);
+        setError(null);
+      } catch (err) {
+        console.error('Failed to fetch hero banners:', err);
+        setError('Failed to load hero banners. Please try again.');
+        setBanners([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBanners();
+  }, []);
 
   // Auto-slide functionality
   useEffect(() => {
+    if (banners.length === 0) return;
+
     const interval = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % slides.length);
+      setCurrentSlide((prev) => (prev + 1) % banners.length);
     }, 5000); // Change slide every 5 seconds
-
+    
     return () => clearInterval(interval);
-  }, [slides.length]);
+  }, [banners.length]);
 
-  // Handle slide change on button click
-  const goToSlide = (index: number) => {
+  const goToSlide = (index:any) => {
     setCurrentSlide(index);
   };
 
-  // Handle next slide
   const nextSlide = () => {
-    setCurrentSlide((prev) => (prev + 1) % slides.length);
+    if (banners.length === 0) return;
+    setCurrentSlide((prev) => (prev + 1) % banners.length);
   };
 
-  // Handle previous slide
   const prevSlide = () => {
-    setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length);
+    if (banners.length === 0) return;
+    setCurrentSlide((prev) => (prev - 1 + banners.length) % banners.length);
   };
 
-  // Handle image click to redirect
-  const handleImageClick = (link: string) => {
-    router.push(link);
+  const handleImageClick = (url:any) => {
+    if (url) {
+      router.push(url);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="w-full h-[300px] md:h-[450px] lg:h-[670px] flex items-center justify-center bg-gray-100">
+        <p>Loading...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="w-full h-[300px] md:h-[450px] lg:h-[670px] flex items-center justify-center bg-gray-100">
+        <p className="text-red-500">{error}</p>
+      </div>
+    );
+  }
+
+  // Don't render slider if no banners available
+  if (banners.length === 0) {
+    return null;
+  }
 
   return (
-    <div className="relative w-full h-[600px] md:h-[300px] lg:h-[670px] overflow-hidden">
+    <div className="relative w-full h-[600px] md:h-[450px] lg:h-[670px] overflow-hidden">
       {/* Slides */}
-      {slides.map((slide, index) => (
+      {banners.map((banner:any, index) => (
         <div
-          key={index}
+          key={banner.id}
           className={`absolute inset-0 transition-opacity duration-1000 ${
             currentSlide === index ? 'opacity-100' : 'opacity-0'
           }`}
@@ -70,55 +99,62 @@ export default function HeroSlider() {
           {/* Desktop Image */}
           <div className="hidden md:block">
             <Image
-              src={slide.desktopImage}
+              src={`${process.env.NEXT_PUBLIC_API_BASE_URL}${banner.big_image}`}
               alt={`Slide ${index + 1}`}
               fill
               className="object-cover cursor-pointer"
-              onClick={() => handleImageClick(slide.link)}
+              onClick={() => banner.url && handleImageClick(banner.url)}
+              style={{ cursor: banner.url ? 'pointer' : 'default' }}
             />
           </div>
 
           {/* Mobile Image */}
           <div className="block md:hidden">
             <Image
-              src={slide.mobileImage}
+              src={`${process.env.NEXT_PUBLIC_API_BASE_URL}${banner.small_image}`}
               alt={`Slide ${index + 1}`}
               fill
               className="object-cover cursor-pointer"
-              onClick={() => handleImageClick(slide.link)}
+              onClick={() => banner.url && handleImageClick(banner.url)}
+              style={{ cursor: banner.url ? 'pointer' : 'default' }}
             />
           </div>
         </div>
       ))}
 
-      {/* Left Navigation Button */}
-      <button
-        onClick={prevSlide}
-        className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white p-3 rounded-full hover:bg-opacity-70 transition-opacity"
-      >
-        <ChevronLeft />
-      </button>
-
-      {/* Right Navigation Button */}
-      <button
-        onClick={nextSlide}
-        className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white p-3 rounded-full hover:bg-opacity-70 transition-opacity"
-      >
-        <ChevronRight />
-      </button>
-
-      {/* Dot Navigation */}
-      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2">
-        {slides.map((_, index) => (
+      {/* Only show navigation buttons if there are multiple banners */}
+      {banners.length > 1 && (
+        <>
+          {/* Left Navigation Button */}
           <button
-            key={index}
-            onClick={() => goToSlide(index)}
-            className={`w-3 h-3 rounded-full ${
-              currentSlide === index ? 'bg-white' : 'bg-gray-400'
-            }`}
-          />
-        ))}
-      </div>
+            onClick={prevSlide}
+            className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white p-3 rounded-full hover:bg-opacity-70 transition-opacity"
+          >
+            <ChevronLeft />
+          </button>
+
+          {/* Right Navigation Button */}
+          <button
+            onClick={nextSlide}
+            className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white p-3 rounded-full hover:bg-opacity-70 transition-opacity"
+          >
+            <ChevronRight />
+          </button>
+
+          {/* Dot Navigation */}
+          <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2">
+            {banners.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => goToSlide(index)}
+                className={`w-3 h-3 rounded-full ${
+                  currentSlide === index ? 'bg-white' : 'bg-gray-400'
+                }`}
+              />
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -118,7 +118,7 @@ const BillSummary: React.FC<BillSummaryProps> = ({
       const response = await apiService.createProductsOrder({
         items: orderItems,
         payment_mode: paymentMethod,
-        address_id: addressID.replace(/-/g, '')
+        address: addressID.replace(/-/g, '')
       });
       
       console.log('Order creation response:', response);

@@ -43,7 +43,7 @@ export default function ProductsPage() {
           </div>
         </Link>
 
-        <Link href="/admin/products/home-category">
+        <Link href="/admin/hero/list">
           <div className="bg-white rounded-lg shadow-md p-6 flex flex-col items-center justify-center h-48 cursor-pointer hover:shadow-lg transition-shadow">
             <div className="bg-blue-50 p-4 rounded-lg mb-4">
               <Package className="w-12 h-12 text-blue-600" />

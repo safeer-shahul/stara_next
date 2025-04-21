@@ -297,7 +297,7 @@ export default function CategoryPage() {
                       </div>
                     )}
                     
-                    <button
+                    <div
                       className={`absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-white/90 shadow-sm transition-opacity ${
                         hoveredProduct === product.id ? 'opacity-100' : 'opacity-0'
                       }`}
@@ -308,7 +308,7 @@ export default function CategoryPage() {
                         productId={product.id} 
                         size={16} 
                       />
-                    </button>
+                    </div>
                     
                     <button
                       className={`absolute bottom-3 right-3 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 text-white shadow-sm transition-opacity ${

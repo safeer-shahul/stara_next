@@ -269,10 +269,10 @@ class ApiService {
     }
   }
 
-  public async post<T>(url: string, data: any, propagation: number = 0, isFormData: boolean = false): Promise<T> {
+  public async post<T>(url: string, data: any, isFormData: boolean = false): Promise<T> {
     try {
       const response = await this.apiClient.post<T>(url, data, {
-        headers: this.getHeaders(isFormData, propagation),
+        headers: this.getHeaders(isFormData),
       });
       return response.data;
     } catch (error) {
@@ -323,7 +323,7 @@ class ApiService {
       formData.append('category_name', categoryName);
       formData.append('category_image', categoryImage);
       
-      const response = await this.post<any>('/category/create_category', formData, 0, true);
+      const response = await this.post<any>('/category/create_category', formData, true);
       return response;
     } catch (error) {
       console.error('Error creating category:', error);
@@ -597,7 +597,23 @@ class ApiService {
     }
   }
 
+  public async getHeroBanners(): Promise<any> {
+    try {
+      const response = await this.get<any>(`/hero/get_hero`);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
 
+  public async createHeroBanner(data:any): Promise<any> {
+    try {
+      const response = await this.post<any>('/hero/create_hero', data,true);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
 }
 
 const apiService = ApiService.getInstance();
