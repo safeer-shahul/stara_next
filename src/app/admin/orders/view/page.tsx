@@ -122,7 +122,7 @@ export default function OrderDetailsPage() {
             {/* Order Header Information */}
             <div className="mb-6">
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4">
-                <h3 className="text-lg font-medium">Order #{order.order_id.substring(0, 8)}</h3>
+                <h3 className="text-lg font-medium">Order #{order.order_id.replace(/-/g, '')}</h3>
                 <span className={`text-sm px-3 py-1 rounded-full font-medium mt-2 sm:mt-0 ${
                   order.status === "Pending" 
                     ? "bg-orange-100 text-orange-800" 
@@ -243,7 +243,7 @@ export default function OrderDetailsPage() {
               <h4 className="text-md font-medium mb-3 text-gray-700">Order Information</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <p><span className="font-medium">Order ID:</span> {order.order_id}</p>
+                  <p><span className="font-medium">Order ID:</span> {order.order_id.replace(/-/g, '')}</p>
                   {order.razorpay_order_id && (
                     <p><span className="font-medium">Razorpay Order ID:</span> {order.razorpay_order_id}</p>
                   )}
