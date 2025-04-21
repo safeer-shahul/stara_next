@@ -3,9 +3,22 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Package, ArrowLeft, Truck, Calendar, CreditCard } from 'lucide-react';
+import { Package, ArrowLeft, Truck, Calendar, CreditCard, MapPin } from 'lucide-react';
 import apiService from '@/utils/api/apiService';
 import { useSearchParams } from 'next/navigation';
+
+interface AddressData {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  address: string;
+  state: string;
+  town: string;
+  pincode: number;
+  phone_number_1: string;
+  phone_number_2?: string;
+  user: number;
+}
 
 interface OrderData {
   order_id: string;
@@ -39,6 +52,7 @@ interface OrderData {
       created_at: string;
       updated_at: string;
       sub_category: string;
+      quantity?: number;
     };
     created_at: string;
     updated_at: string;
@@ -48,7 +62,8 @@ interface OrderData {
     order_id: string;
     product_id: string;
   }>;
-  address: any;
+  address: string;
+  address_details?: AddressData;
 }
 
 export default function OrderDetailsPage() {
@@ -167,6 +182,22 @@ export default function OrderDetailsPage() {
                     {" "}({order.payment_mode})
                   </p>
                 </div>
+                {order.address_details && (
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    <div className="flex items-center mb-2">
+                      <MapPin className="w-4 h-4 text-gray-500 mr-2" />
+                      <h4 className="text-sm font-medium text-gray-700">Shipping Address</h4>
+                    </div>
+                    <p className="text-sm">{order.address_details.address}</p>
+                    <p className="text-sm">{order.address_details.town}, {order.address_details.state} - {order.address_details.pincode}</p>
+                    <p className="text-sm mt-2">
+                      <span className="font-medium">Phone:</span> {order.address_details.phone_number_1}
+                      {order.address_details.phone_number_2 && (
+                        <>, {order.address_details.phone_number_2}</>
+                      )}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Package, Plus, Edit, Trash2, Eye, ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react';
+import { Package, Plus, Edit, ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react';
 import apiService from '@/utils/api/apiService';
 
 export default function HomeCategoryListPage() {
