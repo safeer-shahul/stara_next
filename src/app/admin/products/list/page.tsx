@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Package, Plus, Edit, Trash2, Eye, ChevronLeft, ChevronRight, ImageIcon } from 'lucide-react';
+import { Package, Plus, Edit,ChevronLeft, ChevronRight, ImageIcon } from 'lucide-react';
 import apiService from '@/utils/api/apiService';
 
 export default function ProductsListPage() {
@@ -170,19 +170,19 @@ export default function ProductsListPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <div className="flex space-x-2">
-                          <Link href={`/admin/products/view/${product.id}`}>
+                          {/* <Link href={`/admin/products/view/${product.id}`}>
                             <button className="text-gray-600 hover:text-gray-800">
                               <Eye className="w-4 h-4" />
                             </button>
-                          </Link>
-                          <Link href={`/admin/products/edit/${product.id}`}>
+                          </Link> */}
+                          <Link href={`/admin/products/add-product?id=${product.id}`}>
                             <button className="text-blue-600 hover:text-blue-800">
                               <Edit className="w-4 h-4" />
                             </button>
                           </Link>
-                          <button className="text-red-600 hover:text-red-800">
+                          {/* <button className="text-red-600 hover:text-red-800">
                             <Trash2 className="w-4 h-4" />
-                          </button>
+                          </button> */}
                         </div>
                       </td>
                     </tr>

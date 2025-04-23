@@ -1,7 +1,7 @@
 'use client';
 
 import { useWishlist } from '@/app/context/WishlistProvider';
-import { ArrowRight, Heart, ShoppingBag } from 'lucide-react';
+import { ArrowRight, Heart,  ShoppingCart } from 'lucide-react';
 import { useEffect, useState } from 'react'; 
 
 interface AddToCartButtonProps {
@@ -46,7 +46,7 @@ export default function AddToCartButton({
           }`}
           onClick={onAddToBag}
         >
-          <ShoppingBag className="h-5 w-5" />
+          <ShoppingCart className="h-5 w-5" />
           <span className="text-sm flex items-center gap-1">
             ADD TO BAG
             <ArrowRight className="h-4 w-4" />
@@ -64,7 +64,7 @@ export default function AddToCartButton({
         className="w-full bg-black hover:bg-[#4A4A4A] text-white text-sm py-3 cursor-pointer"
         onClick={onBuyNow}
       >
-        BUY IT NOW
+        BUY NOW
       </button>
     </div>
   );

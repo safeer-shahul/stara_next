@@ -599,7 +599,7 @@ class ApiService {
 
   public async getHeroBanners(): Promise<any> {
     try {
-      const response = await this.get<any>(`/hero/get_hero`);
+      const response = await this.getPublic<any>(`/hero/get_hero`);
       return response;
     } catch (error) {
       throw error;
@@ -609,6 +609,15 @@ class ApiService {
   public async createHeroBanner(data:any): Promise<any> {
     try {
       const response = await this.post<any>('/hero/create_hero', data,true);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  public async getHeroBannerById(id:any): Promise<any> {
+    try {
+      const response = await this.get<any>(`/hero/get_hero_by_id/${id}`);
       return response;
     } catch (error) {
       throw error;

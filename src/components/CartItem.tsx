@@ -1,21 +1,26 @@
 'use client';
 
-import { Plus, Minus, Trash2 } from 'lucide-react';
+import { Plus, Minus, Trash2, AlertCircle } from 'lucide-react';
 import Image from 'next/image';
 
 type CartItemProps = {
   product: any;
   onRemove: (id: string) => void;
   onQuantityChange: (id: string, change: number) => void;
+  maxQuantity?: number; // Add this prop to receive available quantity
 };
 
-const CartItem = ({ product, onRemove, onQuantityChange }: CartItemProps) => {
-  // Maximum quantity allowed per item
+const CartItem = ({ product, onRemove, onQuantityChange, maxQuantity }: CartItemProps) => {
+  // Use maxQuantity from props if available, otherwise fallback to default MAX_QUANTITY
   const MAX_QUANTITY = 10;
+  const availableQuantity = typeof maxQuantity === 'number' ? maxQuantity : MAX_QUANTITY;
+  
+  // Check if item is out of stock
+  const isOutOfStock = availableQuantity <= 0;
   
   // Handle increment button click
   const handleIncrement = () => {
-    if (product.quantity < MAX_QUANTITY) {
+    if (product.quantity < availableQuantity && !isOutOfStock) {
       onQuantityChange(product.id, 1);
     }
   };
@@ -57,10 +62,22 @@ const CartItem = ({ product, onRemove, onQuantityChange }: CartItemProps) => {
           )}
         </div>
         
+        {isOutOfStock ? (
+          <div className="flex items-center mt-2 text-red-500 text-xs">
+            <AlertCircle size={14} className="mr-1" />
+            Out of Stock
+          </div>
+        ) : (
+          <div className="flex items-center mt-2  text-xs">
+            {/* <AlertCircle size={14} className="mr-1" /> */}
+            Qty: {availableQuantity} available
+          </div>
+        )}
+        
         <div className="flex items-center mt-2">
           <button 
             className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-              product.quantity <= 1 ? 'opacity-50 cursor-not-allowed' : ''
+              product.quantity <= 1 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
             }`}
             onClick={handleDecrement}
             disabled={product.quantity <= 1}
@@ -72,17 +89,17 @@ const CartItem = ({ product, onRemove, onQuantityChange }: CartItemProps) => {
           
           <button 
             className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-              product.quantity >= MAX_QUANTITY ? 'opacity-50 cursor-not-allowed' : ''
+              product.quantity >= availableQuantity || isOutOfStock ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
             }`}
             onClick={handleIncrement}
-            disabled={product.quantity >= MAX_QUANTITY}
+            disabled={product.quantity >= availableQuantity || isOutOfStock}
           >
             <Plus size={10} />
           </button>
           
           <button 
-            onClick={() => onRemove(product.id)} 
-            className="ml-2"
+            onClick={() => onRemove(product.id)}
+            className="ml-2 cursor-pointer"
             aria-label="Remove item"
           >
             <Trash2 size={16} className="text-gray-500" />

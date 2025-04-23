@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Search, User, Heart, ShoppingBag, Menu, X, ChevronDown, LogOut } from 'lucide-react';
+import { Search, User, Heart, Menu, X, ChevronDown, LogOut, ShoppingCart } from 'lucide-react';
 import MegaDropdown from './MegaDropdown';
 import MobileDropdown from './MobileDropdown';
 import { menuItems } from './menuData';
@@ -189,7 +189,7 @@ export default function Header() {
             </div>
           </div>
 
-          <div className="flex items-center space-x-4">
+          <div className="flex  space-x-4">
             <button className="md:hidden" onClick={() => setIsMenuOpen(!isMenuOpen)}>
               {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
@@ -207,12 +207,15 @@ export default function Header() {
             
             <Link href="/wishlist" className="hidden md:block relative">
               <Heart size={22} />
-              <span className="absolute -top-2 -right-2 bg-[#175e7a] text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">0</span>
+              <span className="absolute bottom-[-9px] left-1/2 transform -translate-x-1/2 bg-[#175e7a] text-white text-[11px] rounded-full h-5 w-5 flex items-center justify-center">
+                0
+              </span>
             </Link>
             
+            {/* Shopping Cart Icon */}
             <a href="#" className="relative" onClick={handleCartClick}>
-              <ShoppingBag size={22} />
-              <span className="absolute -top-2 -right-2 bg-[#175e7a] text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+              <ShoppingCart size={22} />
+              <span className="absolute bottom-[-9px] left-1/2 transform -translate-x-1/2 bg-[#175e7a] text-white text-[11px] rounded-full h-5 w-5 flex items-center justify-center">
                 0
               </span>
             </a>

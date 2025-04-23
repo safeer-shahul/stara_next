@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation, Autoplay } from 'swiper/modules';
-import { ShoppingBag, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ShoppingCart } from 'lucide-react';
 import 'swiper/css';
 import 'swiper/css/navigation';
 import 'swiper/css/autoplay';
@@ -240,7 +240,7 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
                       aria-label="Add to bag"
                       disabled={product.quantity <= 0}
                     >
-                      <ShoppingBag size={18} />
+                      <ShoppingCart size={18} />
                     </button>
                   </div>
                   
