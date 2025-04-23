@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
-import { Loader2, Filter, Heart, ShoppingBag, Home, X } from 'lucide-react';
+import { Loader2, Filter, Home, X, ShoppingCart } from 'lucide-react';
 import apiService from '@/utils/api/apiService';
 import FilterDrawer from '@/components/FilterDrawer';
 import Link from 'next/link';
@@ -318,7 +318,7 @@ export default function CategoryPage() {
                       aria-label="Add to bag"
                       disabled={!product.product_status}
                     >
-                      <ShoppingBag size={18} />
+                      <ShoppingCart size={18} />
                     </button>
                   </div>
                   

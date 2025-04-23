@@ -1,18 +1,26 @@
 "use client";
 
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Package, ArrowLeft, Upload, X } from 'lucide-react';
 import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import apiService from '@/utils/api/apiService';
 import Image from 'next/image';
-export default function AddProductPage() {
+import { useParams } from 'next/navigation';
+
+export default function ProductFormPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const productId = searchParams.get('id');
+  console.log('productId',productId)
+  const isEditMode = !!productId;
+  
   const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(isEditMode);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Form fields - only what's required in the payload
+  // Form fields
   const [productName, setProductName] = useState('');
   const [productPrice, setProductPrice] = useState('');
   const [quantity, setQuantity] = useState('');
@@ -29,26 +37,71 @@ export default function AddProductPage() {
   const [imageErrors, setImageErrors] = useState<string | null>(null);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   
-  // Category selection (not sent to backend)
+  // Existing images from the database (for edit mode)
+  const [existingImages, setExistingImages] = useState<any[]>([]);
+  const [deletedImageIds, setDeletedImageIds] = useState<string[]>([]);
+  
+  // Category selection
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
   
   // Categories data
   const [categories, setCategories] = useState<any[]>([]);
 
-  // Fetch categories on component mount
+  // Fetch data on component mount
   useEffect(() => {
-    const fetchCategories = async () => {
+    const fetchData = async () => {
       try {
+        // Fetch categories in both add and edit modes
         const allCategories = await apiService.getAllCategories();
         setCategories(allCategories);
+        
+        // If in edit mode, fetch product details
+        if (isEditMode) {
+          setIsFetching(true);
+          const productData = await apiService.getProductByID(productId);
+          
+          // Populate form fields
+          setProductName(productData.product_name || '');
+          setProductPrice(productData.product_price ? productData.product_price.toString() : '');
+          setQuantity(productData.quantity ? productData.quantity.toString() : '');
+          setProductWeight(productData.product_weight ? productData.product_weight.toString() : '');
+          setProductBoxWeight(productData.product_box_weight ? productData.product_box_weight.toString() : '');
+          setProductDescription(productData.product_description || '');
+          setProductStatus(productData.product_status || false);
+          setSubCategory(productData.sub_category || '');
+          setStrikePrice(productData.strike_price ? productData.strike_price.toString() : '');
+          setProductCode(productData.product_code || '');
+          
+          // Handle existing images
+          if (productData.images && productData.images.length > 0) {
+            setExistingImages(productData.images);
+          }
+          
+          // Find and set the selected category based on subcategory
+          if (productData.sub_category) {
+            for (const cat of allCategories) {
+              const subCat = (cat as any).sub_categories?.find(
+                (sc: any) => sc.id === productData.sub_category
+              );
+              if (subCat) {
+                setSelectedCategoryId(cat.id);
+                break;
+              }
+            }
+          }
+        }
+        
+        setError(null);
       } catch (err) {
-        console.error('Error fetching categories:', err);
-        setError('Failed to load categories. Please refresh the page.');
+        console.error(`Error fetching ${isEditMode ? 'product data' : 'categories'}:`, err);
+        setError(`Failed to load ${isEditMode ? 'product data' : 'categories'}. Please try again.`);
+      } finally {
+        setIsFetching(false);
       }
     };
 
-    fetchCategories();
-  }, []);
+    fetchData();
+  }, [isEditMode, productId]);
 
   // Update subcategory when category changes
   const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -96,8 +149,8 @@ export default function AddProductPage() {
     setImagePreviews([...imagePreviews, ...newPreviews]);
   };
   
-  // Remove an image
-  const removeImage = (index: number) => {
+  // Remove a new image (not yet uploaded)
+  const removeNewImage = (index: number) => {
     // Update files array
     const updatedFiles = [...productImages];
     updatedFiles.splice(index, 1);
@@ -112,6 +165,15 @@ export default function AddProductPage() {
     setImagePreviews(updatedPreviews);
     
     setImageErrors(null);
+  };
+  
+  // Remove an existing image (in edit mode)
+  const removeExistingImage = (imageId: string) => {
+    // Add to deleted images list
+    setDeletedImageIds([...deletedImageIds, imageId]);
+    
+    // Remove from existing images list (visually)
+    setExistingImages(existingImages.filter(img => img.id !== imageId));
   };
 
   // Clean up previews when component unmounts
@@ -130,7 +192,8 @@ export default function AddProductPage() {
     }
     
     // Validate minimum images requirement
-    if (productImages.length < 2) {
+    const totalImagesCount = isEditMode ? existingImages.length + productImages.length : productImages.length;
+    if (totalImagesCount < 2) {
       setImageErrors('Please upload at least 2 product images');
       return;
     }
@@ -152,24 +215,42 @@ export default function AddProductPage() {
       formData.append('product_code', productCode);
       formData.append('product_weight', product_weight);
       formData.append('product_box_weight', product_box_weight);
-
+  
+      // In edit mode, add product ID and deleted image IDs if any
+      if (isEditMode) {
+        formData.append('id', productId);
+        if (deletedImageIds.length > 0) {
+          formData.append('delete', JSON.stringify(deletedImageIds));
+        }
+      }
+      
       // Append all product images with the same key
       productImages.forEach(image => {
         formData.append('product_images', image);
       });
       
-      // Call API to create product
-      await apiService.post('/products/add_product', formData, 0, true);
+      // Call the same API endpoint for both create and update
+      await apiService.post('/products/add_product', formData, true);
       
-      alert(`Product "${productName}" created successfully!`);
+      alert(`Product "${productName}" ${isEditMode ? 'updated' : 'created'} successfully!`);
       router.push('/admin/products/list');
     } catch (err) {
-      console.error('Error creating product:', err);
-      setError('Failed to create product. Please try again.');
+      console.error(`Error ${isEditMode ? 'updating' : 'creating'} product:`, err);
+      setError(`Failed to ${isEditMode ? 'update' : 'create'} product. Please try again.`);
     } finally {
       setIsLoading(false);
     }
   };
+
+  // Show loading state while fetching data
+  if (isFetching) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <p className="ml-4 text-lg text-gray-600">Loading product data...</p>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -177,7 +258,7 @@ export default function AddProductPage() {
         <Link href="/admin/products/list" className="text-blue-600 hover:text-blue-800">
           <ArrowLeft className="w-5 h-5" />
         </Link>
-        <h2 className="text-2xl font-bold">Add New Product</h2>
+        <h2 className="text-2xl font-bold">{isEditMode ? 'Edit Product' : 'Add New Product'}</h2>
       </div>
 
       <div className="bg-white shadow rounded-lg p-6">
@@ -187,7 +268,7 @@ export default function AddProductPage() {
           </div>
           <div>
             <h3 className="text-lg font-medium">Product Details</h3>
-            <p className="text-gray-500">Create a new product listing</p>
+            <p className="text-gray-500">{isEditMode ? 'Edit product information' : 'Create a new product listing'}</p>
           </div>
         </div>
 
@@ -200,8 +281,7 @@ export default function AddProductPage() {
         <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-
-            <div className="mb-4">
+              <div className="mb-4">
                 <label htmlFor="productCode" className="block text-sm font-medium text-gray-700 mb-1">
                   Product Code *
                 </label>
@@ -252,7 +332,9 @@ export default function AddProductPage() {
                 {selectedCategoryId && (
                   <p className="text-sm text-gray-600 mt-1">
                     Selected subcategory: {
-                      categories.find(cat => cat.id === selectedCategoryId)?.sub_categories?.[0]?.sub_category_name || 'None available'
+                      categories.find(cat => cat.id === selectedCategoryId)?.sub_categories?.find(
+                        (sc: any) => sc.id === subCategory
+                      )?.sub_category_name || 'None available'
                     }
                   </p>
                 )}
@@ -327,7 +409,7 @@ export default function AddProductPage() {
 
               <div className="mb-4">
                 <label htmlFor="product_weight" className="block text-sm font-medium text-gray-700 mb-1">
-                Product Weight *
+                  Product Weight *
                 </label>
                 <input
                   type="number"
@@ -343,7 +425,7 @@ export default function AddProductPage() {
 
               <div className="mb-4">
                 <label htmlFor="product_box_weight" className="block text-sm font-medium text-gray-700 mb-1">
-                Product Box Weight *
+                  Product Box Weight *
                 </label>
                 <input
                   type="number"
@@ -356,7 +438,6 @@ export default function AddProductPage() {
                   disabled={isLoading}
                 />
               </div>
-
             </div>
 
             <div>
@@ -391,26 +472,61 @@ export default function AddProductPage() {
                 </div>
               )}
               
-              <div className="flex flex-wrap gap-4 mb-4">
-                {imagePreviews.map((preview, index) => (
-                  <div key={index} className="relative h-32 w-32 border rounded overflow-hidden group">
-                 <Image 
-                    src={preview} 
-                    alt={`Preview ${index + 1}`} 
-                    className="h-full w-full object-cover" 
-                    width={128}
-                    height={128}
-                  />
-                    <button
-                      type="button"
-                      onClick={() => removeImage(index)}
-                      className="absolute top-2 right-2 bg-white rounded-full p-1 shadow opacity-80 hover:opacity-100"
-                    >
-                      <X className="w-4 h-4 text-red-600" />
-                    </button>
+              {/* Show existing images in edit mode */}
+              {isEditMode && existingImages.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mt-4 mb-2">Current Images:</p>
+                  <div className="flex flex-wrap gap-4 mb-4">
+                    {existingImages.map((image, index) => (
+                      <div key={image.id} className="relative h-32 w-32 border rounded overflow-hidden group">
+                        <Image 
+                          src={`${process.env.NEXT_PUBLIC_API_BASE_URL}${image.product_image}`}
+                          alt={`Product image ${index + 1}`}
+                          className="h-full w-full object-cover"
+                          width={128}
+                          height={128}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeExistingImage(image.id)}
+                          className="absolute top-2 right-2 bg-white rounded-full p-1 shadow opacity-80 hover:opacity-100"
+                        >
+                          <X className="w-4 h-4 text-red-600" />
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
+              )}
+              
+              {/* New Images */}
+              {productImages.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mt-4 mb-2">
+                    {isEditMode ? 'New Images to Upload:' : 'Selected Images:'}
+                  </p>
+                  <div className="flex flex-wrap gap-4 mb-4">
+                    {imagePreviews.map((preview, index) => (
+                      <div key={index} className="relative h-32 w-32 border rounded overflow-hidden group">
+                        <Image 
+                          src={preview} 
+                          alt={`Preview ${index + 1}`} 
+                          className="h-full w-full object-cover" 
+                          width={128}
+                          height={128}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeNewImage(index)}
+                          className="absolute top-2 right-2 bg-white rounded-full p-1 shadow opacity-80 hover:opacity-100"
+                        >
+                          <X className="w-4 h-4 text-red-600" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div 
                 onClick={() => fileInputRef.current?.click()}
@@ -431,9 +547,16 @@ export default function AddProductPage() {
               </div>
               
               <div className="mt-2 flex items-center">
-                <div className="text-sm text-gray-500">
-                  {productImages.length} {productImages.length === 1 ? 'image' : 'images'} selected
-                </div>
+                {isEditMode ? (
+                  <div className="text-sm text-gray-500">
+                    {existingImages.length} existing {existingImages.length === 1 ? 'image' : 'images'} | 
+                    {' '}{productImages.length} new {productImages.length === 1 ? 'image' : 'images'} selected
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-500">
+                    {productImages.length} {productImages.length === 1 ? 'image' : 'images'} selected
+                  </div>
+                )}
                 {productImages.length > 0 && (
                   <button
                     type="button"
@@ -443,7 +566,7 @@ export default function AddProductPage() {
                     }}
                     className="ml-3 text-sm text-red-600 hover:text-red-800"
                   >
-                    Clear all
+                    Clear {isEditMode ? 'new ' : ''}images
                   </button>
                 )}
               </div>
@@ -469,7 +592,10 @@ export default function AddProductPage() {
               } text-white`}
               disabled={isLoading}
             >
-              {isLoading ? 'Creating...' : 'Create Product'}
+              {isLoading 
+                ? (isEditMode ? 'Updating...' : 'Creating...') 
+                : (isEditMode ? 'Update Product' : 'Create Product')
+              }
             </button>
           </div>
         </form>

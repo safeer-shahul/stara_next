@@ -1,6 +1,6 @@
 'use client';
 
-import { ShoppingBag, Lock, HelpCircle, ChevronRight } from 'lucide-react';
+import { Lock, HelpCircle, ChevronRight, ShoppingCart } from 'lucide-react';
 
 type ActiveComponentType = 'orders' | 'change-password' | 'support' | null;
 
@@ -15,7 +15,7 @@ export default function MenuCard({ onMenuItemClick, activeItem }: MenuCardProps)
     {
       id: 'orders',
       label: 'Orders',
-      icon: <ShoppingBag size={18} />,
+      icon: <ShoppingCart size={18} />,
       description: 'View your order history'
     },
     {

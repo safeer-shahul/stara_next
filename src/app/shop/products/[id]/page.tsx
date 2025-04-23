@@ -297,11 +297,17 @@ export default function ProductDetailPage() {
             </label>
           </div>
 
-          <AddToCartButton 
-            productId={product.id} // Add this prop
-            onAddToBag={handleAddToBag}
-            onBuyNow={handleBuyNow}
-          />
+          {product.quantity > 0 ? (
+            <AddToCartButton 
+              productId={product.id}
+              onAddToBag={handleAddToBag}
+              onBuyNow={handleBuyNow}
+            />
+          ) : (
+            <div className="py-4 text-center bg-gray-100 rounded-md text-red-500 font-medium">
+              Out of Stock
+            </div>
+          )}
 
           <div className="flex items-center justify-between pt-4 cursor-pointer" onClick={openModal}>
             <p className="text-sm">Details: {product.product_description}</p>
