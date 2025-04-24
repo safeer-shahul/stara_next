@@ -51,7 +51,7 @@ const UserDropdown = ({ userProfile }: UserDropdownProps) => {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center justify-center w-8 h-8 rounded-full bg-[#175e7a] text-white hover:bg-opacity-90 focus:outline-none"
+        className="flex items-center justify-center w-8 h-8 cursor-pointer rounded-full bg-[#175e7a] text-white hover:bg-opacity-90 focus:outline-none"
       >
         <span className="text-sm font-medium">{initials}</span>
       </button>

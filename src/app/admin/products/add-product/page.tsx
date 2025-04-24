@@ -220,7 +220,7 @@ export default function ProductFormPage() {
       if (isEditMode) {
         formData.append('id', productId);
         if (deletedImageIds.length > 0) {
-          formData.append('delete', JSON.stringify(deletedImageIds));
+          formData.append('delete_ids', JSON.stringify(deletedImageIds));
         }
       }
       

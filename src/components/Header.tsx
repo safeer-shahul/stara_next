@@ -195,7 +195,7 @@ export default function Header() {
             </button>
             
             {/* User account icon - conditionally render dropdown or open auth modal */}
-            <div className="hidden md:block">
+            <div className="hidden md:block cursor-pointer">
               {isLoggedIn ? (
                 <UserDropdown userProfile={userProfile} />
               ) : (
@@ -207,7 +207,7 @@ export default function Header() {
             
             <Link href="/wishlist" className="hidden md:block relative">
               <Heart size={22} />
-              <span className="absolute bottom-[-9px] left-1/2 transform -translate-x-1/2 bg-[#175e7a] text-white text-[11px] rounded-full h-5 w-5 flex items-center justify-center">
+              <span className="absolute bottom-[-20px] left-1/2 transform -translate-x-1/2 bg-[#175e7a] text-white text-[11px] rounded-full h-5 w-5 flex items-center justify-center">
                 0
               </span>
             </Link>
@@ -215,7 +215,7 @@ export default function Header() {
             {/* Shopping Cart Icon */}
             <a href="#" className="relative" onClick={handleCartClick}>
               <ShoppingCart size={22} />
-              <span className="absolute bottom-[-9px] left-1/2 transform -translate-x-1/2 bg-[#175e7a] text-white text-[11px] rounded-full h-5 w-5 flex items-center justify-center">
+              <span className="absolute bottom-[-20px] left-1/2 transform -translate-x-1/2 bg-[#175e7a] text-white text-[11px] rounded-full h-5 w-5 flex items-center justify-center">
                 0
               </span>
             </a>

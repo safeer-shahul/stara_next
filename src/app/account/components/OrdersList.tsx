@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { PackageOpen } from 'lucide-react';
+import { MapPin, PackageOpen } from 'lucide-react';
 import Image from 'next/image';
 import apiService from '@/utils/api/apiService';
 import CancelOrderModal from './CancelOrderModal';
@@ -167,6 +167,22 @@ export default function OrdersList() {
                   <span>•</span>
                   <span className="font-medium text-gray-900">₹{parseFloat(order.total_price).toFixed(2)}</span>
                 </div>
+
+                {order.address_details && (
+                  <div className="py-4 bg-gray-50 rounded-lg">
+                    <div className="flex items-center">
+                      <MapPin className="w-4 h-4 text-gray-500 mr-2" />
+                      <h4 className="text-sm font-bold text-gray-700">Delivering to:</h4>
+                    </div>
+                    <p className="text-sm ml-6">{order.address_details.address}, {order.address_details.town}, {order.address_details.state} - {order.address_details.pincode}</p>
+                    <p className="text-sm ml-6">
+                      <span className="font-medium">Phone:</span> {order.address_details.phone_number_1}
+                      {order.address_details.phone_number_2 && (
+                        <>, {order.address_details.phone_number_2}</>
+                      )}
+                    </p>
+                  </div>
+                )}
                 
                 <div className="mt-3 space-y-2">
                   {order.order_items.map((item: any) => (
