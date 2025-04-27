@@ -11,6 +11,7 @@ import 'swiper/css/navigation';
 import 'swiper/css/autoplay';
 import { isMobile } from 'react-device-detect';
 import WishlistButton from '@/components/WishlistButton';
+import CartDrawer from '@/components/CartDrawer';
 
 interface ProductImage {
   id: string;
@@ -43,6 +44,9 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
   const router = useRouter();
   const [swiperInstance, setSwiperInstance] = useState<any>(null);
   const [windowWidth, setWindowWidth] = useState<number>(0);
+  const [hoveredProduct, setHoveredProduct] = useState<string | null>(null);
+  const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   
   useEffect(() => {
     const handleResize = () => {
@@ -68,16 +72,81 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
     }
   }, [windowWidth, swiperInstance]);
 
-  const [hoveredProduct, setHoveredProduct] = useState<string | null>(null);
-
   const handleProductClick = (productId: string): void => {
     router.push(`/shop/products/${productId}`);
   };
 
+  // Updated handleAddToBag function with the same logic as ProductDetail page
   const handleAddToBag = (e: React.MouseEvent, productId: string): void => {
     e.stopPropagation();
-    console.log('Added to bag:', productId);
-    // Implement add to bag functionality here
+    
+    // Set the selected product ID to pass to CartDrawer
+    setSelectedProductId(productId);
+    
+    // Open the cart drawer
+    setIsCartOpen(true);
+    
+    // For backward compatibility, also update localStorage
+    // Get current cart items
+    const storedCartItems = JSON.parse(localStorage.getItem('cartItems') || '[]');
+    
+    // Check if we're dealing with the old format (array of strings)
+    if (storedCartItems.length > 0 && typeof storedCartItems[0] === 'string') {
+      // Convert old format items, removing hyphens
+      const formattedCartIds = storedCartItems.map((id: any) => id.replace(/-/g, ''));
+      
+      // Add new product ID
+      const productIdWithoutHyphens = productId.replace(/-/g, '');
+      const updatedCart = [...formattedCartIds, productIdWithoutHyphens];
+      
+      // Count occurrences and convert to new format
+      const productCounts: any = {};
+      updatedCart.forEach(id => {
+        productCounts[id] = (productCounts[id] || 0) + 1;
+      });
+      
+      // Convert to new format with quantities
+      const newFormatCart = Object.keys(productCounts).map(id => ({
+        id,
+        quantity: productCounts[id]
+      }));
+      
+      localStorage.setItem('cartItems', JSON.stringify(newFormatCart));
+    } else {
+      // Already using new format
+      const productIdWithoutHyphens = productId.replace(/-/g, '');
+      
+      // Find if product already exists in cart
+      const existingItemIndex = storedCartItems.findIndex(
+        (item: any) => item.id === productIdWithoutHyphens
+      );
+      
+      let updatedCartItems;
+      
+      if (existingItemIndex >= 0) {
+        // Product already exists, increase quantity
+        updatedCartItems = [...storedCartItems];
+        updatedCartItems[existingItemIndex] = {
+          ...updatedCartItems[existingItemIndex],
+          quantity: updatedCartItems[existingItemIndex].quantity + 1
+        };
+      } else {
+        // Product doesn't exist in cart, add it with quantity 1
+        updatedCartItems = [
+          ...storedCartItems, 
+          { id: productIdWithoutHyphens, quantity: 1 }
+        ];
+      }
+      
+      localStorage.setItem('cartItems', JSON.stringify(updatedCartItems));
+    }
+  };
+
+  // Handle cart drawer close
+  const handleCartClose = () => {
+    setIsCartOpen(false);
+    // Reset selected product ID when cart is closed
+    setSelectedProductId(null);
   };
 
   // Navigation handlers for manual control
@@ -170,6 +239,7 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
             const discount = calculateDiscount(product.product_price, product.strike_price);
             const mainImage = product.images[0]?.product_image || "";
             const hoverImage = product.images[1]?.product_image || product.images[0]?.product_image || "";
+            const inStock = product.quantity > 0;
             
             return (
               <SwiperSlide key={product.id}>
@@ -206,14 +276,14 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
                     />
                     
                     {/* Stock badge */}
-                    {product.quantity <= 0 && (
+                    {!inStock && (
                       <div className="absolute top-2 left-2 bg-red-100 text-red-800 px-2 py-1 text-xs font-medium z-10">
                         Out of Stock
                       </div>
                     )}
                     
                     {/* Discount badge */}
-                    {discount && (
+                    {discount && inStock && (
                       <div className="absolute top-2 left-2 bg-green-100 text-green-800 px-2 py-1 text-xs font-medium z-10">
                         {discount}
                       </div>
@@ -231,17 +301,18 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
                       />
                     </div>
                     
-                    {/* Add to Bag button */}
-                    <button
-                      className={`absolute bottom-3 right-3 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 text-white shadow-sm transition-opacity ${
-                        hoveredProduct === product.id ? 'opacity-100' : 'opacity-0'
-                      }`}
-                      onClick={(e) => handleAddToBag(e, product.id)}
-                      aria-label="Add to bag"
-                      disabled={product.quantity <= 0}
-                    >
-                      <ShoppingCart size={18} />
-                    </button>
+                    {/* Add to Bag button - Only show for in-stock items */}
+                    {inStock && (
+                      <button
+                        className={`absolute bottom-3 right-3 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 text-white shadow-sm transition-opacity ${
+                          hoveredProduct === product.id ? 'opacity-100' : 'opacity-0'
+                        }`}
+                        onClick={(e) => handleAddToBag(e, product.id)}
+                        aria-label="Add to bag"
+                      >
+                        <ShoppingCart size={18} />
+                      </button>
+                    )}
                   </div>
                   
                   {/* Product Info */}
@@ -282,6 +353,13 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
           <ChevronRight size={isMobile ? 20 : 24} />
         </button>
       </div>
+      
+      {/* Cart Drawer */}
+      <CartDrawer 
+        isOpen={isCartOpen} 
+        onClose={handleCartClose} 
+        productId={selectedProductId} 
+      />
     </div>
   );
 }

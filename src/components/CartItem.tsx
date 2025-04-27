@@ -70,7 +70,7 @@ const CartItem = ({ product, onRemove, onQuantityChange, maxQuantity }: CartItem
         ) : (
           <div className="flex items-center mt-2  text-xs">
             {/* <AlertCircle size={14} className="mr-1" /> */}
-            Qty: {availableQuantity} available
+            Available Stock: {availableQuantity} 
           </div>
         )}
         

@@ -14,13 +14,17 @@ interface HomeCategory {
   products: any[];
 }
 
+
+
 export default function Home() {
   const [homeCategories, setHomeCategories] = useState<HomeCategory[]>([]);
+  const [userProfile, setUserProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchHomeCategories();
+    checkAndFetchUserProfile();
   }, []);
 
   const fetchHomeCategories = async () => {
@@ -35,6 +39,25 @@ export default function Home() {
       setHomeCategories([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkAndFetchUserProfile = async () => {
+    // Check if accessToken exists in localStorage
+    const accessToken = localStorage.getItem('accessToken');
+    
+    if (accessToken) {
+      try {
+        // Call getUserProfile API
+        const profile = await apiService.getUserProfile();
+        setUserProfile(profile);
+      } catch (err) {
+        console.error('Failed to fetch user profile:', err);
+        // On error, remove accessToken from localStorage
+        localStorage.removeItem('accessToken');
+        // Refresh the page
+        window.location.reload();
+      }
     }
   };
 

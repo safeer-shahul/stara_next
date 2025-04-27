@@ -6,8 +6,9 @@ import MenuCard from './components/MenuCard';
 import OrdersList from './components/OrdersList';
 import ChangePassword from './components/ChangePassword';
 import Support from './components/Support';
+import Wishlist from './components/Wishlist';
 
-type ActiveComponentType = 'orders' | 'change-password' | 'support' | null;
+type ActiveComponentType = 'orders' | 'change-password' | 'support' | 'wishlist' |  null;
 
 export default function AccountPage() {
   const [activeComponent, setActiveComponent] = useState<ActiveComponentType>(null);
@@ -21,6 +22,8 @@ export default function AccountPage() {
         return <ChangePassword />;
       case 'support':
         return <Support />;
+      case 'wishlist':
+        return <Wishlist />;
       default:
         return null;
     }
