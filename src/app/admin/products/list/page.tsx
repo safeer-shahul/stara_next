@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Package, Plus, Edit,ChevronLeft, ChevronRight, ImageIcon } from 'lucide-react';
+import { Package, Plus, Edit,ChevronLeft, ChevronRight, ImageIcon, ArrowLeft } from 'lucide-react';
 import apiService from '@/utils/api/apiService';
 
 export default function ProductsListPage() {
@@ -64,7 +64,12 @@ export default function ProductsListPage() {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">Products</h2>
+        <div className="flex items-center gap-2">
+          <Link href="/admin/products" className="text-blue-600 hover:text-blue-800">
+            <ArrowLeft className="w-5 h-5" />
+          </Link>
+          <h2 className="text-2xl font-bold">Products</h2>
+        </div>
         <Link href="/admin/products/add-product">
           <button className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center">
             <Plus className="w-5 h-5 mr-2" />
@@ -72,6 +77,7 @@ export default function ProductsListPage() {
           </button>
         </Link>
       </div>
+   
 
       <div className="bg-white shadow rounded-lg overflow-hidden">
         <div className="p-4 border-b flex justify-between items-center">

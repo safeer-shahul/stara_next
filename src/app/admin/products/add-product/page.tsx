@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import apiService from '@/utils/api/apiService';
 import Image from 'next/image';
-import { useParams } from 'next/navigation';
+// import { useParams } from 'next/navigation';
 
 export default function ProductFormPage() {
   const router = useRouter();

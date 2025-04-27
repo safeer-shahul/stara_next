@@ -317,11 +317,14 @@ class ApiService {
     }
   }
 
-  public async createCategory(categoryName: string, categoryImage: File): Promise<any> {
+  public async createCategory(categoryName: string, categoryImage: any,categoryId:any): Promise<any> {
     try {
       const formData = new FormData();
       formData.append('category_name', categoryName);
       formData.append('category_image', categoryImage);
+      if(categoryId){
+        formData.append('id',categoryId)
+      }
       
       const response = await this.post<any>('/category/create_category', formData, true);
       return response;
@@ -627,6 +630,15 @@ class ApiService {
   public async getMyWishlist(): Promise<any> {
     try {
       const response = await this.get<any>(`/wishlist/get_all_wishlist`);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  public async getCategoryById(id:any): Promise<any> {
+    try {
+      const response = await this.get<any>(`/category/get_category/${id}`);
       return response;
     } catch (error) {
       throw error;

@@ -1,20 +1,54 @@
 // app/admin/products/add-category/page.tsx
 "use client";
 
-import { useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useRef, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Folder, ArrowLeft, Upload, Image as ImageIcon } from 'lucide-react';
 import Link from 'next/link';
 import apiService from '@/utils/api/apiService';
 
-export default function AddCategoryPage() {
+export default function AddEditCategoryPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const categoryId = searchParams.get('id');
+  const isEditMode = !!categoryId;
+
   const [categoryName, setCategoryName] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [existingImagePath, setExistingImagePath] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch category data if in edit mode
+  useEffect(() => {
+    if (isEditMode) {
+      fetchCategoryDetails();
+    }
+  }, [categoryId]);
+
+  const fetchCategoryDetails = async () => {
+    if (!categoryId) return;
+    
+    setIsLoading(true);
+    try {
+      const category = await apiService.getCategoryById(categoryId);
+      setCategoryName(category.category_name);
+      console.log('category',category)
+      if (category.category_image) {
+        setExistingImagePath(category.category_image);
+        console.log('existingImagePath',existingImagePath)
+        setImagePreview(`${process.env.NEXT_PUBLIC_API_BASE_URL}${category.category_image}`);
+      }
+    } catch (err) {
+      console.error('Error fetching category:', err);
+      setError('Failed to load category details. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -37,6 +71,7 @@ export default function AddCategoryPage() {
         } else {
           setError(null);
           setImageFile(file);
+          setExistingImagePath(null); // Clear existing image path if a new file is selected
         }
       };
       img.src = reader.result as string;
@@ -47,7 +82,7 @@ export default function AddCategoryPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!imageFile) {
+    if (!isEditMode && !imageFile) {
       setError("Please upload a category image");
       return;
     }
@@ -60,13 +95,18 @@ export default function AddCategoryPage() {
     setError(null);
     
     try {
-      await apiService.createCategory(categoryName, imageFile);
+      if (isEditMode) {
+        await apiService.createCategory(categoryName, imageFile, categoryId);
+        alert(`Category "${categoryName}" updated successfully!`);
+      } else {
+        await apiService.createCategory(categoryName, imageFile,'');
+        alert(`Category "${categoryName}" created successfully!`);
+      }
       
-      alert(`Category "${categoryName}" created successfully!`);
       router.push('/admin/products/categories');
     } catch (err) {
-      console.error('Error creating category:', err);
-      setError('Failed to create category. Please try again.');
+      console.error(`Error ${isEditMode ? 'updating' : 'creating'} category:`, err);
+      setError(`Failed to ${isEditMode ? 'update' : 'create'} category. Please try again.`);
     } finally {
       setIsSubmitting(false);
     }
@@ -76,13 +116,22 @@ export default function AddCategoryPage() {
     fileInputRef.current?.click();
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <p className="mt-4 text-gray-600">Loading category details...</p>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="mb-6 flex items-center gap-2">
         <Link href="/admin/products/categories" className="text-blue-600 hover:text-blue-800">
           <ArrowLeft className="w-5 h-5" />
         </Link>
-        <h2 className="text-2xl font-bold">Add New Category</h2>
+        <h2 className="text-2xl font-bold">{isEditMode ? 'Edit Category' : 'Add New Category'}</h2>
       </div>
 
       <div className="bg-white shadow rounded-lg p-6">
@@ -92,7 +141,7 @@ export default function AddCategoryPage() {
           </div>
           <div>
             <h3 className="text-lg font-medium">Category Details</h3>
-            <p className="text-gray-500">Create a new product category</p>
+            <p className="text-gray-500">{isEditMode ? 'Update existing category' : 'Create a new product category'}</p>
           </div>
         </div>
 
@@ -120,7 +169,7 @@ export default function AddCategoryPage() {
 
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Category Image *
+              Category Image {!isEditMode && '*'}
             </label>
             
             <div 
@@ -152,6 +201,7 @@ export default function AddCategoryPage() {
                       e.stopPropagation();
                       setImagePreview(null);
                       setImageFile(null);
+                      setExistingImagePath(null);
                       setError(null);
                     }}
                   >
@@ -191,7 +241,7 @@ export default function AddCategoryPage() {
               } text-white`}
               disabled={isSubmitting}
             >
-              {isSubmitting ? 'Creating...' : 'Create Category'}
+              {isSubmitting ? (isEditMode ? 'Updating...' : 'Creating...') : (isEditMode ? 'Update Category' : 'Create Category')}
             </button>
           </div>
         </form>

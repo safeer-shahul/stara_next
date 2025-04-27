@@ -4,35 +4,35 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Search, User, Heart, Menu, X, ChevronDown, LogOut, ShoppingCart } from 'lucide-react';
-import MegaDropdown from './MegaDropdown';
-import MobileDropdown from './MobileDropdown';
-import { menuItems } from './menuData';
+import { Search, User, Heart, Menu, X, LogOut, ShoppingCart } from 'lucide-react';
+// import MegaDropdown from './MegaDropdown';
+// import MobileDropdown from './MobileDropdown';
+// import { menuItems } from './menuData';
 import CartDrawer from './CartDrawer';
 import UserDropdown from './auth/UserDropdown';
 import AuthModal from './auth/AuthModal';
 import apiService from '@/utils/api/apiService';
 
-type MenuItem = {
-  name: string;
-  link?: string;
-  hasDropdown?: boolean;
-  badge?: { text: string; color: string };
-  dropdownContent?: { title: string; items: { name: string; link: string; badge?: { text: string; color: string } }[] }[];
-};
+// type MenuItem = {
+//   name: string;
+//   link?: string;
+//   hasDropdown?: boolean;
+//   badge?: { text: string; color: string };
+//   dropdownContent?: { title: string; items: { name: string; link: string; badge?: { text: string; color: string } }[] }[];
+// };
 
-type Category = {
-  id: number;
-  category_name: string;
-  slug: string;
-  category_image: string;
-  sub_categories: { id: number; name: string; slug: string }[];
-};
+// type Category = {
+//   id: number;
+//   category_name: string;
+//   slug: string;
+//   category_image: string;
+//   sub_categories: { id: number; name: string; slug: string }[];
+// };
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [activeDropdown, setActiveDropdown] = useState<number | null>(null);
+  // const [activeDropdown, setActiveDropdown] = useState<number | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
@@ -61,6 +61,7 @@ export default function Header() {
       } catch (err) {
         console.error('Failed to fetch categories:', err);
         setError('Failed to load categories');
+        console.log(error)
       } finally {
         setLoading(false);
       }
@@ -126,18 +127,18 @@ export default function Header() {
   };
 
   // Simplified hover handlers
-  const handleMouseEnter = (index: number) => {
-    setActiveDropdown(index);
-  };
+  // const handleMouseEnter = (index: number) => {
+  //   setActiveDropdown(index);
+  // };
 
-  const handleMouseLeave = () => {
-    setActiveDropdown(null);
-  };
+  // const handleMouseLeave = () => {
+  //   setActiveDropdown(null);
+  // };
 
-  // For mobile menu
-  const toggleDropdown = (index: number) => {
-    setActiveDropdown(activeDropdown === index ? null : index);
-  };
+  // // For mobile menu
+  // const toggleDropdown = (index: number) => {
+  //   setActiveDropdown(activeDropdown === index ? null : index);
+  // };
 
   const handleCartClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
