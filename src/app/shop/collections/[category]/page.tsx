@@ -39,12 +39,12 @@ export default function CategoryPage() {
   
   // Filter state
   const [showFilter, setShowFilter] = useState(false);
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 25000]);
+  const [priceRange, setPriceRange] = useState<[number, number]>([0,50000]);
   const [sortBy, setSortBy] = useState<string>('');
   const [hoveredProduct, setHoveredProduct] = useState<string | null>(null);
   
   // Check if filters are active
-  const isFilterActive = priceRange[0] > 0 || priceRange[1] < 25000 || sortBy !== '';
+  const isFilterActive = priceRange[0] > 0 || priceRange[1] < 50000 || sortBy !== '';
 
   useEffect(() => {
     const fetchCategoryProducts = async () => {
@@ -115,7 +115,7 @@ export default function CategoryPage() {
   };
 
   const resetFilters = () => {
-    setPriceRange([0, 25000]);
+    setPriceRange([0, 50000]);
     setSortBy('');
     setCurrentPage(1);
     setProducts([]); 
@@ -191,7 +191,7 @@ export default function CategoryPage() {
       <div className="flex flex-col sm:flex-row items-center justify-between mb-6 gap-3">
         {/* Active Filters Display */}
         <div className="flex-grow flex flex-wrap items-center gap-2">
-          {isFilterActive && priceRange[0] !== 0 && priceRange[1] !== 25000 && (
+          {isFilterActive && priceRange[0] !== 0 && priceRange[1] !== 50000 && (
             <div className="inline-flex items-center px-3 py-1 text-sm bg-gray-100 border border-gray-300 rounded-md">
               <span>{formatRupee(priceRange[0])} - {formatRupee(priceRange[1])}</span>
               <button 

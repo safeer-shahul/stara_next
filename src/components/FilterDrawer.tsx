@@ -4,7 +4,7 @@ import { X } from 'lucide-react';
 
 interface FilterDrawerProps {
   isOpen: boolean;
-onClose: () => void;
+  onClose: () => void;
   priceRange: [number, number];
   setPriceRange: (range: [number, number]) => void;
   sortBy: string;
@@ -31,13 +31,18 @@ export default function FilterDrawer({
     setLocalPriceRange(priceRange);
   }, [priceRange]);
 
+  // Constants for validation
+  const minValue = 0; // No negative values
+  const maxValue = 50000; // 5 lakhs
+  const minMaxValue = 500; // Minimum value for max price
+
   const handleApply = () => {
     setPriceRange(localPriceRange);
     applyFilters();
   };
 
   const handleReset = () => {
-    setLocalPriceRange([0, 25000]);
+    setLocalPriceRange([0, 50000]);
     resetFilters();
   };
 
@@ -47,8 +52,6 @@ export default function FilterDrawer({
   };
 
   // Custom slider implementation
-  const minValue = 0;
-  const maxValue = 25000;
   const sliderWidth = 100; // Percentage width
 
   // Calculate slider thumb positions
@@ -69,8 +72,9 @@ export default function FilterDrawer({
       const position = ((clientX - rect.left) / rect.width) * 100;
       const value = Math.round(((position / 100) * (maxValue - minValue)) + minValue);
       
-      // Ensure min doesn't exceed max
-      if (value >= 0 && value <= localPriceRange[1]) {
+      // Ensure min doesn't go below 0 and doesn't exceed max - minMaxValue
+      // This ensures there's always at least minMaxValue difference between min and max
+      if (value >= minValue && value <= (localPriceRange[1] - minMaxValue)) {
         setLocalPriceRange([value, localPriceRange[1]]);
       }
     };
@@ -120,8 +124,8 @@ export default function FilterDrawer({
       const position = ((clientX - rect.left) / rect.width) * 100;
       const value = Math.round(((position / 100) * (maxValue - minValue)) + minValue);
       
-      // Ensure max doesn't go below min
-      if (value >= localPriceRange[0] && value <= maxValue) {
+      // Ensure max is at least minMaxValue more than min and doesn't exceed maxValue (5 lakhs)
+      if (value >= (localPriceRange[0] + minMaxValue) && value <= maxValue) {
         setLocalPriceRange([localPriceRange[0], value]);
       }
     };
@@ -161,6 +165,14 @@ export default function FilterDrawer({
       document.addEventListener('touchend', handleTouchEnd);
     }
   };
+
+  // Ensure initial values respect the constraints
+  useEffect(() => {
+    const [min, max] = localPriceRange;
+    if (max < min + minMaxValue) {
+      setLocalPriceRange([min, min + minMaxValue]);
+    }
+  }, []);
 
   return (
     <>
@@ -225,10 +237,13 @@ export default function FilterDrawer({
                   value={localPriceRange[0]} 
                   onChange={(e) => {
                     const value = parseInt(e.target.value);
-                    if (!isNaN(value) && value >= 0 && value <= localPriceRange[1]) {
+                    // Ensure value is not negative and not greater than max - minMaxValue
+                    if (!isNaN(value) && value >= minValue && value <= (localPriceRange[1] - minMaxValue)) {
                       setLocalPriceRange([value, localPriceRange[1]]);
                     }
                   }}
+                  min={minValue}
+                  max={localPriceRange[1] - minMaxValue}
                   className="w-20 outline-none text-sm ml-1"
                 />
               </div>
@@ -243,10 +258,13 @@ export default function FilterDrawer({
                   value={localPriceRange[1]} 
                   onChange={(e) => {
                     const value = parseInt(e.target.value);
-                    if (!isNaN(value) && value >= localPriceRange[0]) {
+                    // Ensure value is at least minMaxValue more than min and not greater than maxValue
+                    if (!isNaN(value) && value >= (localPriceRange[0] + minMaxValue) && value <= maxValue) {
                       setLocalPriceRange([localPriceRange[0], value]);
                     }
                   }}
+                  min={localPriceRange[0] + minMaxValue}
+                  max={maxValue}
                   className="w-20 outline-none text-sm ml-1"
                 />
               </div>
@@ -255,6 +273,8 @@ export default function FilterDrawer({
           
           <div className="mt-4 text-sm text-gray-500 flex justify-between">
             <span>Range: {formatRupee(localPriceRange[0])} - {formatRupee(localPriceRange[1])}</span>
+            {/* <span className="text-xs text-gray-400">Min gap: ₹500 | Max: ₹5,00,000</span> */}
+            <span className="text-xs text-gray-400">Max: ₹50000</span>
           </div>
         </div>
         
