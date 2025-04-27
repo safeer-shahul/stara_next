@@ -1,6 +1,6 @@
 'use client';
 
-import { Lock, HelpCircle, ChevronRight, ShoppingCart } from 'lucide-react';
+import { Lock, HelpCircle, ChevronRight, ShoppingCart, Heart } from 'lucide-react';
 
 type ActiveComponentType = 'orders' | 'change-password' | 'support' | null;
 
@@ -23,6 +23,12 @@ export default function MenuCard({ onMenuItemClick, activeItem }: MenuCardProps)
       label: 'Change Password',
       icon: <Lock size={18} />,
       description: 'Update your password'
+    },
+    {
+      id: 'wishlist',
+      label: 'Wishlist',
+      icon: <Heart size={18} />,
+      description: 'Your wishlist products'
     },
     {
       id: 'support',

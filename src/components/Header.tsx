@@ -205,17 +205,17 @@ export default function Header() {
               )}
             </div>
             
-            <Link href="/wishlist" className="hidden md:block relative">
+            <Link href="/account/wishlist" className="hidden md:block relative">
               <Heart size={22} />
-              <span className="absolute bottom-[-20px] left-1/2 transform -translate-x-1/2 bg-[#175e7a] text-white text-[11px] rounded-full h-5 w-5 flex items-center justify-center">
+              <span className={`absolute ${isLoggedIn ? 'bottom-[-10px]' : 'bottom-[-20px]'} left-1/2 transform -translate-x-1/2 bg-[#175e7a] text-white text-[11px] rounded-full h-5 w-5 flex items-center justify-center`}>
                 0
               </span>
             </Link>
-            
+
             {/* Shopping Cart Icon */}
             <a href="#" className="relative" onClick={handleCartClick}>
               <ShoppingCart size={22} />
-              <span className="absolute bottom-[-20px] left-1/2 transform -translate-x-1/2 bg-[#175e7a] text-white text-[11px] rounded-full h-5 w-5 flex items-center justify-center">
+              <span className={`absolute ${isLoggedIn ? 'bottom-[-10px]' : 'bottom-[-20px]'} left-1/2 transform -translate-x-1/2 bg-[#175e7a] text-white text-[11px] rounded-full h-5 w-5 flex items-center justify-center`}>
                 0
               </span>
             </a>

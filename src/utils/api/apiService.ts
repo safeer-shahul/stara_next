@@ -623,6 +623,15 @@ class ApiService {
       throw error;
     }
   }
+
+  public async getMyWishlist(): Promise<any> {
+    try {
+      const response = await this.get<any>(`/wishlist/get_all_wishlist`);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
 }
 
 const apiService = ApiService.getInstance();

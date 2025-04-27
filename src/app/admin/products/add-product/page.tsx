@@ -170,7 +170,7 @@ export default function ProductFormPage() {
   // Remove an existing image (in edit mode)
   const removeExistingImage = (imageId: string) => {
     // Add to deleted images list
-    setDeletedImageIds([...deletedImageIds, imageId]);
+    setDeletedImageIds([...deletedImageIds, imageId.replace(/-/g, '')]);
     
     // Remove from existing images list (visually)
     setExistingImages(existingImages.filter(img => img.id !== imageId));
@@ -218,10 +218,10 @@ export default function ProductFormPage() {
   
       // In edit mode, add product ID and deleted image IDs if any
       if (isEditMode) {
-        formData.append('id', productId);
-        if (deletedImageIds.length > 0) {
-          formData.append('delete_ids', JSON.stringify(deletedImageIds));
-        }
+        formData.append('id', productId.replace(/-/g, ''));
+        // if (deletedImageIds.length > 0) {
+          formData.append('for_delete', JSON.stringify(deletedImageIds));
+        // }
       }
       
       // Append all product images with the same key
