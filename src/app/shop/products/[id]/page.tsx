@@ -142,10 +142,6 @@ export default function ProductDetailPage() {
     }
   };
 
-  const handleAddToWishlist = () => {
-    console.log('Add to wishlist clicked');
-  };
-
   const handleBuyNow = () => {
     if (product) {
       // Prepare checkout data with just this product

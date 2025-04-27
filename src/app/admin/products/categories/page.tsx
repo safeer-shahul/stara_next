@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Folder, Plus, ChevronRight, Edit, Trash2, ChevronLeft, ImageIcon } from 'lucide-react';
+import { Folder, Plus, Edit, ImageIcon, ArrowLeft } from 'lucide-react';
 import apiService from '@/utils/api/apiService';
 
 interface Category {
@@ -64,7 +64,12 @@ export default function CategoriesPage() {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">Categories</h2>
+        <div className="flex items-center gap-2">
+          <Link href="/admin/products" className="text-blue-600 hover:text-blue-800">
+            <ArrowLeft className="w-5 h-5" />
+          </Link>
+          <h2 className="text-2xl font-bold">Categories</h2>
+        </div>
         <Link href="/admin/products/add-category">
           <button className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center">
             <Plus className="w-5 h-5 mr-2" />
@@ -142,19 +147,11 @@ export default function CategoriesPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <div className="flex space-x-2">
+                        <Link href={`/admin/products/add-category?id=${category.id}`}>
                           <button className="text-blue-600 hover:text-blue-800">
                             <Edit className="w-4 h-4" />
                           </button>
-                          <button className="text-red-600 hover:text-red-800">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                          <Link href={`/admin/products/list?category=${category.id}`}>
-                            <button className="text-gray-600 hover:text-gray-800">
-                              <ChevronRight className="w-4 h-4" />
-                            </button>
-                          </Link>
-                        </div>
+                        </Link>
                       </td>
                     </tr>
                   ))
@@ -178,7 +175,9 @@ export default function CategoriesPage() {
                   disabled={currentPage === 1}
                   className={`px-3 py-1 rounded border ${currentPage === 1 ? 'text-gray-400 border-gray-200' : 'text-blue-600 border-blue-600'}`}
                 >
-                  <ChevronLeft className="w-4 h-4" />
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
                 </button>
                 <span className="px-3 py-1 text-sm">
                   Page {currentPage} of {totalPages}
@@ -188,7 +187,9 @@ export default function CategoriesPage() {
                   disabled={currentPage === totalPages}
                   className={`px-3 py-1 rounded border ${currentPage === totalPages ? 'text-gray-400 border-gray-200' : 'text-blue-600 border-blue-600'}`}
                 >
-                  <ChevronRight className="w-4 h-4" />
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
                 </button>
               </div>
             </div>
