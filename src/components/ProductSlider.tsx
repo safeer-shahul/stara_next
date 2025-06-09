@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation, Autoplay } from 'swiper/modules';
 import { ChevronLeft, ChevronRight, ShoppingCart } from 'lucide-react';
@@ -47,6 +47,7 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
   const [hoveredProduct, setHoveredProduct] = useState<string | null>(null);
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [isNavigating, setIsNavigating] = useState<string | null>(null);
   
   useEffect(() => {
     const handleResize = () => {
@@ -72,12 +73,31 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
     }
   }, [windowWidth, swiperInstance]);
 
-  const handleProductClick = (productId: string): void => {
-    router.push(`/shop/products/${productId}`);
-  };
+  // Optimized product click handler with loading state
+  const handleProductClick = useCallback(async (productId: string): Promise<void> => {
+    try {
+      setIsNavigating(productId);
+      
+      // Use replace for faster navigation and avoid back button issues
+      await router.push(`/shop/products/${productId}`);
+    } catch (error) {
+      console.error('Navigation error:', error);
+    } finally {
+      // Reset loading state after a delay to prevent flashing
+      setTimeout(() => setIsNavigating(null), 100);
+    }
+  }, [router]);
+
+  // Prefetch product pages on hover for better UX
+  const handleProductHover = useCallback((productId: string) => {
+    setHoveredProduct(productId);
+    
+    // Prefetch the product page for faster navigation
+    router.prefetch(`/shop/products/${productId}`);
+  }, [router]);
 
   // Updated handleAddToBag function with the same logic as ProductDetail page
-  const handleAddToBag = (e: React.MouseEvent, productId: string): void => {
+  const handleAddToBag = useCallback((e: React.MouseEvent, productId: string): void => {
     e.stopPropagation();
     
     // Set the selected product ID to pass to CartDrawer
@@ -140,30 +160,30 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
       
       localStorage.setItem('cartItems', JSON.stringify(updatedCartItems));
     }
-  };
+  }, []);
 
   // Handle cart drawer close
-  const handleCartClose = () => {
+  const handleCartClose = useCallback(() => {
     setIsCartOpen(false);
     // Reset selected product ID when cart is closed
     setSelectedProductId(null);
-  };
+  }, []);
 
   // Navigation handlers for manual control
-  const goNext = () => {
+  const goNext = useCallback(() => {
     if (swiperInstance) {
       swiperInstance.slideNext();
     }
-  };
+  }, [swiperInstance]);
 
-  const goPrev = () => {
+  const goPrev = useCallback(() => {
     if (swiperInstance) {
       swiperInstance.slidePrev();
     }
-  };
+  }, [swiperInstance]);
 
   // Calculate discount percentage
-  const calculateDiscount = (price: string, strikePrice: string): string => {
+  const calculateDiscount = useCallback((price: string, strikePrice: string): string => {
     if (!strikePrice || parseFloat(strikePrice) <= 0) return '';
     
     const currentPrice = parseFloat(price);
@@ -173,7 +193,7 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
     
     const discount = ((originalPrice - currentPrice) / originalPrice) * 100;
     return `${Math.round(discount)}% OFF`;
-  };
+  }, []);
 
   // Check if products exist and have length
   if (!products || products.length === 0) {
@@ -240,19 +260,29 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
             const mainImage = product.images[0]?.product_image || "";
             const hoverImage = product.images[1]?.product_image || product.images[0]?.product_image || "";
             const inStock = product.quantity > 0;
+            const isCurrentlyNavigating = isNavigating === product.id;
             
             return (
               <SwiperSlide key={product.id}>
                 <div 
                   className="relative group"
-                  onMouseEnter={() => setHoveredProduct(product.id)}
+                  onMouseEnter={() => handleProductHover(product.id)}
                   onMouseLeave={() => setHoveredProduct(null)}
                 >
                   {/* Product Image Container */}
                   <div 
-                    className="relative w-full aspect-square cursor-pointer overflow-hidden"
+                    className={`relative w-full aspect-square cursor-pointer overflow-hidden transition-opacity duration-200 ${
+                      isCurrentlyNavigating ? 'opacity-75' : 'opacity-100'
+                    }`}
                     onClick={() => handleProductClick(product.id)}
                   >
+                    {/* Loading overlay */}
+                    {isCurrentlyNavigating && (
+                      <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-20">
+                        <div className="w-6 h-6 border-2 border-gray-300 border-t-gray-800 rounded-full animate-spin"></div>
+                      </div>
+                    )}
+                    
                     {/* Main image */}
                     <Image
                       src={`${process.env.NEXT_PUBLIC_API_BASE_URL}${mainImage}`}
@@ -262,6 +292,8 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
                       className={`object-cover object-center transition-all duration-500 ease-in-out transform ${
                         hoveredProduct === product.id ? 'scale-110 opacity-0' : 'scale-100 opacity-100'
                       }`}
+                      priority={false}
+                      loading="lazy"
                     />
                     
                     {/* Hover image */}
@@ -273,6 +305,7 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
                       className={`object-cover object-center transition-all duration-500 ease-in-out transform ${
                         hoveredProduct === product.id ? 'scale-100 opacity-100' : 'scale-110 opacity-0'
                       }`}
+                      loading="lazy"
                     />
                     
                     {/* Stock badge */}
@@ -304,7 +337,7 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
                     {/* Add to Bag button - Only show for in-stock items */}
                     {inStock && (
                       <button
-                        className={`absolute bottom-3 right-3 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 text-white shadow-sm transition-opacity ${
+                        className={`absolute bottom-3 cursor-pointer right-3 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 text-white shadow-sm transition-opacity ${
                           hoveredProduct === product.id ? 'opacity-100' : 'opacity-0'
                         }`}
                         onClick={(e) => handleAddToBag(e, product.id)}
@@ -318,10 +351,15 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
                   {/* Product Info */}
                   <div className="mt-4">
                     <h3 
-                      className="text-sm md:text-base font-medium cursor-pointer hover:text-blue-500 transition-colors"
+                      className={`text-sm md:text-base font-medium cursor-pointer hover:text-blue-500 transition-colors ${
+                        isCurrentlyNavigating ? 'text-gray-500' : ''
+                      }`}
                       onClick={() => handleProductClick(product.id)}
                     >
                       {product.product_name}
+                      {isCurrentlyNavigating && (
+                        <span className="ml-2 text-xs text-gray-400">Loading...</span>
+                      )}
                     </h3>
                     <div className="flex items-center mt-1 gap-2">
                       <span className="text-sm font-semibold">₹ {parseFloat(product.product_price).toLocaleString()}</span>

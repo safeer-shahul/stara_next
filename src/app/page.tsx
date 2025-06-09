@@ -14,8 +14,6 @@ interface HomeCategory {
   products: any[];
 }
 
-
-
 export default function Home() {
   const [homeCategories, setHomeCategories] = useState<HomeCategory[]>([]);
   const [userProfile, setUserProfile] = useState<any>(null);
@@ -23,9 +21,22 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Scroll to top when component mounts
+    window.scrollTo(0, 0);
+    
     fetchHomeCategories();
     checkAndFetchUserProfile();
   }, []);
+
+  // Alternative: Use this if you want to scroll to top after data loads
+  useEffect(() => {
+    if (!loading && !error) {
+      // Small delay to ensure DOM is updated
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+      }, 100);
+    }
+  }, [loading, error]);
 
   const fetchHomeCategories = async () => {
     setLoading(true);
@@ -45,7 +56,7 @@ export default function Home() {
   const checkAndFetchUserProfile = async () => {
     // Check if accessToken exists in localStorage
     const accessToken = localStorage.getItem('accessToken');
-    
+        
     if (accessToken) {
       try {
         // Call getUserProfile API
