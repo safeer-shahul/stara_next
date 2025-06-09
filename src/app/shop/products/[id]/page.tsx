@@ -191,11 +191,11 @@ export default function ProductDetailPage() {
   };
 
   if (isLoading) {
-    return <div className="container mx-auto p-12 text-center">Loading product details...</div>;
+    return <div className="min-h-screen flex items-center justify-center">Loading product details...</div>;
   }
 
   if (error || !product) {
-    return <div className="container mx-auto p-12 text-center text-red-500">{error || 'Product not found'}</div>;
+    return <div className="min-h-screen flex items-center justify-center text-red-500">{error || 'Product not found'}</div>;
   }
 
   // Prepare image data for the slider with full URLs
@@ -222,126 +222,136 @@ export default function ProductDetailPage() {
   };
 
   return (
-    <div className="container mx-auto p-2 md:p-12">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <ProductImageSlider 
-          images={productImages} 
-          productName={product.product_name}
-          hasOffer={true}
-          offerLabel="BUY 1 GET 1"
-        />
-
-        <div className="space-y-4 pl-0 md:pl-24">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-normal">{product.product_name}</h1>
-
-            <div className="flex items-center space-x-1">
-              <div className="flex text-[#36454F]">
-                {[...Array(staticProductData.rating)].map((_, i) => (
-                  <Star key={i} className="w-3 h-3" fill="currentColor" />
-                ))}
-              </div>
-              <span className="text-[12px] text-gray-500">({staticProductData.reviewCount})</span>
-            </div>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            {formattedStrikePrice && (
-              <p className="text-[12px] line-through">MRP: {formattedStrikePrice}</p>
-            )}
-            <p className="text-lg font-semibold text-[15px]">{formattedPrice}</p>
-            {formattedStrikePrice && (
-              <div className="bg-black text-white text-xs px-2 py-1 rounded-md flex items-center">
-                SAVE {calculateDiscount(product.product_price, product.strike_price)}
-              </div>
-            )}
-          </div>
-
-          <p className="text-sm text-gray-500">Inclusive of all taxes</p>
-          
-          <div className="text-xs text-gray-500">
-            <span className="font-medium">Product Code:</span> {product.product_code}
-          </div>
-
-          <div className="flex items-center text-sm border-t py-5 border-b border-gray-200 gap-2">
-            <Tag size={16} className="text-green-700"/>
-            <div>
-              <span className="text-green-700">
-                Buy 1 Get 1 Free Use Code: <span className="font-bold">B1G1</span> at checkout.
-              </span>
-              <a href="#" className="text-green-700 underline ml-1 font-bold">See All Offers</a>
-            </div>
-          </div>
-
-          {product.product_status && product.quantity > 0 && (
-            <div className="flex items-center text-sm space-x-2">
-              <CheckCircle2 className='text-[#2e7e52]'/>
-              <span className='text-[14px]'>In stock - ready to ship</span>
-            </div>
-          )}
-
-          <div className="flex items-center space-x-2">
-            <input 
-              type="checkbox" 
-              id="giftOption"
-              checked={isGift}
-              onChange={() => setIsGift(!isGift)}
-              className="h-4 w-4 rounded border-gray-300"
+    <div className="min-h-screen bg-white">
+      <div className="container mx-auto px-2 py-4 md:px-12 md:py-6 max-w-7xl">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+          {/* Product Images */}
+          <div className="w-full">
+            <ProductImageSlider 
+              images={productImages} 
+              productName={product.product_name}
+              hasOffer={true}
+              offerLabel="BUY 1 GET 1"
             />
-            <label htmlFor="giftOption" className="text-sm">
-              Is it a gift? Make it Special <span className="font-semibold">{staticProductData.giftSpecialPrice}</span>
-            </label>
           </div>
 
-          {product.quantity > 0 ? (
-            <AddToCartButton 
-              productId={product.id}
-              onAddToBag={handleAddToBag}
-              onBuyNow={handleBuyNow}
-            />
-          ) : (
-            <div className="py-4 text-center bg-gray-100 rounded-md text-red-500 font-medium">
-              Out of Stock
-            </div>
-          )}
+          {/* Product Details */}
+          <div className="space-y-4 md:space-y-6 md:pl-8">
+            <div className="flex items-start justify-between">
+              <h1 className="text-xl md:text-2xl font-normal leading-tight">{product.product_name}</h1>
 
-          <div className="flex items-center justify-between pt-4 cursor-pointer" onClick={openModal}>
-            <p className="text-sm">Details: {product.product_description}</p>
-            <span className="text-[#C69A7F] text-sm underline">View More</span>
-          </div>
-
-          <div className="flex flex-row justify-center items-center gap-12 bg-[#F1EEE4] px-8 py-6 rounded-md">
-            <div className="flex flex-col items-center text-center">
-              <div className="w-9 h-9 mb-2 relative">
-                <Image
-                  src="/images/icons/warranty1.webp"
-                  alt="Lifetime Warranty"
-                  fill
-                  className="object-contain"
-                />
+              <div className="flex items-center space-x-1 flex-shrink-0 ml-4">
+                <div className="flex text-[#36454F]">
+                  {[...Array(staticProductData.rating)].map((_, i) => (
+                    <Star key={i} className="w-3 h-3" fill="currentColor" />
+                  ))}
+                </div>
+                <span className="text-[12px] text-gray-500">({staticProductData.reviewCount})</span>
               </div>
-              <p className="text-[12px] font-medium">Lifetime Warranty</p>
             </div>
+
+            <div className="flex items-center space-x-2">
+              {formattedStrikePrice && (
+                <p className="text-[12px] line-through text-gray-500">MRP: {formattedStrikePrice}</p>
+              )}
+              <p className="text-lg font-semibold">{formattedPrice}</p>
+              {formattedStrikePrice && (
+                <div className="bg-black text-white text-xs px-2 py-1 rounded-md">
+                  SAVE {calculateDiscount(product.product_price, product.strike_price)}
+                </div>
+              )}
+            </div>
+
+            <p className="text-sm text-gray-500">Inclusive of all taxes</p>
             
-            <div className="flex flex-col items-center text-center">
-              <div className="w-9 h-9 mb-2 relative">
-                <Image
-                  src="/images/icons/organic1.webp"
-                  alt="Skin Safe Jewellery"
-                  fill
-                  className="object-contain"
+            <div className="text-xs text-gray-500">
+              <span className="font-medium">Product Code:</span> {product.product_code}
+            </div>
+
+            <div className="flex items-start text-sm border-t py-4 border-b border-gray-200 gap-2">
+              <Tag size={16} className="text-green-700 flex-shrink-0 mt-0.5"/>
+              <div className="flex-1">
+                <span className="text-green-700">
+                  Buy 1 Get 1 Free Use Code: <span className="font-bold">B1G1</span> at checkout.
+                </span>
+                <a href="#" className="text-green-700 underline ml-1 font-bold">See All Offers</a>
+              </div>
+            </div>
+
+            {product.product_status && product.quantity > 0 && (
+              <div className="flex items-center text-sm space-x-2">
+                <CheckCircle2 className='text-[#2e7e52] flex-shrink-0'/>
+                <span className='text-[14px]'>In stock - ready to ship</span>
+              </div>
+            )}
+
+            <div className="flex items-start space-x-2">
+              <input 
+                type="checkbox" 
+                id="giftOption"
+                checked={isGift}
+                onChange={() => setIsGift(!isGift)}
+                className="h-4 w-4 rounded border-gray-300 mt-0.5 flex-shrink-0 cursor-pointer"
+              />
+              <label htmlFor="giftOption" className="text-sm flex-1">
+                Is it a gift? Make it Special <span className="font-semibold">{staticProductData.giftSpecialPrice}</span>
+              </label>
+            </div>
+
+            {product.quantity > 0 ? (
+              <div className="py-2">
+                <AddToCartButton 
+                  productId={product.id}
+                  onAddToBag={handleAddToBag}
+                  onBuyNow={handleBuyNow}
                 />
               </div>
-              <p className="text-[12px] font-medium">Skin Safe Jewellery</p>
+            ) : (
+              <div className="py-4 text-center bg-gray-100 rounded-md text-red-500 font-medium">
+                Out of Stock
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pt-2 cursor-pointer" onClick={openModal}>
+              <p className="text-sm flex-1 truncate pr-4">Details: {product.product_description}</p>
+              <span className="text-[#C69A7F] text-sm underline flex-shrink-0">View More</span>
+            </div>
+
+            <div className="flex flex-row justify-center items-center gap-8 md:gap-12 bg-[#F1EEE4] px-4 md:px-8 py-4 md:py-6 rounded-md">
+              <div className="flex flex-col items-center text-center">
+                <div className="w-8 h-8 md:w-9 md:h-9 mb-2 relative">
+                  <Image
+                    src="/images/icons/warranty1.webp"
+                    alt="Lifetime Warranty"
+                    fill
+                    className="object-contain"
+                  />
+                </div>
+                <p className="text-[11px] md:text-[12px] font-medium">Lifetime Warranty</p>
+              </div>
+              
+              <div className="flex flex-col items-center text-center">
+                <div className="w-8 h-8 md:w-9 md:h-9 mb-2 relative">
+                  <Image
+                    src="/images/icons/organic1.webp"
+                    alt="Skin Safe Jewellery"
+                    fill
+                    className="object-contain"
+                  />
+                </div>
+                <p className="text-[11px] md:text-[12px] font-medium">Skin Safe Jewellery</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <DeliveryPincodeChecker 
+                defaultDeliveryTime="3-4 Days"
+                checkPincodeHandler={checkPincode}
+              />
+
+              <PolicyIcons/>
             </div>
           </div>
-
-          <DeliveryPincodeChecker 
-            defaultDeliveryTime="3-4 Days"
-            checkPincodeHandler={checkPincode}
-          />
-
-          <PolicyIcons/>
         </div>
       </div>
       

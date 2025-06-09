@@ -1,38 +1,17 @@
-// /src/components/header.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Search, User, Heart, Menu, X, LogOut, ShoppingCart } from 'lucide-react';
-// import MegaDropdown from './MegaDropdown';
-// import MobileDropdown from './MobileDropdown';
-// import { menuItems } from './menuData';
 import CartDrawer from './CartDrawer';
 import UserDropdown from './auth/UserDropdown';
 import AuthModal from './auth/AuthModal';
 import apiService from '@/utils/api/apiService';
 
-// type MenuItem = {
-//   name: string;
-//   link?: string;
-//   hasDropdown?: boolean;
-//   badge?: { text: string; color: string };
-//   dropdownContent?: { title: string; items: { name: string; link: string; badge?: { text: string; color: string } }[] }[];
-// };
-
-// type Category = {
-//   id: number;
-//   category_name: string;
-//   slug: string;
-//   category_image: string;
-//   sub_categories: { id: number; name: string; slug: string }[];
-// };
-
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
-  // const [activeDropdown, setActiveDropdown] = useState<number | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
@@ -40,6 +19,8 @@ export default function Header() {
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [wishlistCount, setWishlistCount] = useState<number>(0);
+  const [cartCount, setCartCount] = useState<number>(0);
 
   // Fetch categories for header menu
   useEffect(() => {
@@ -69,8 +50,39 @@ export default function Header() {
     
     fetchCategories();
   }, []);
+  
 
-  // Check authentication status on mount and when local storage changes
+  // Function to get cart count from localStorage
+  const getCartCountFromLocalStorage = () => {
+    try {
+      const cartItems = localStorage.getItem('cartItems');
+      if (cartItems) {
+        const parsedCartItems = JSON.parse(cartItems);
+        return Array.isArray(parsedCartItems) ? parsedCartItems.length : 0;
+      }
+      return 0;
+    } catch (error) {
+      console.error('Error reading cart from localStorage:', error);
+      return 0;
+    }
+  };
+
+  // Function to get wishlist count from localStorage
+  const getWishlistCountFromLocalStorage = () => {
+    try {
+      const wishList = localStorage.getItem('wishlist');
+      if (wishList) {
+        const parsedWishlist = JSON.parse(wishList);
+        return Array.isArray(parsedWishlist) ? parsedWishlist.length : 0;
+      }
+      return 0;
+    } catch (error) {
+      console.error('Error reading wishlist from localStorage:', error);
+      return 0;
+    }
+  };
+
+  // Check authentication status and update counts
   useEffect(() => {
     const checkAuthStatus = () => {
       const token = localStorage.getItem('accessToken');
@@ -79,10 +91,14 @@ export default function Header() {
         console.log('testtttt token')
         setIsLoggedIn(true);
         fetchUserProfile();
+        // For logged-in users, we'll fetch counts from API in fetchUserProfile
       } else {
         console.log('testtttt noooo token')
         setIsLoggedIn(false);
         setUserProfile(null);
+        // For non-logged-in users, get counts from localStorage
+        setCartCount(getCartCountFromLocalStorage());
+        setWishlistCount(getWishlistCountFromLocalStorage());
       }
     };
 
@@ -93,6 +109,14 @@ export default function Header() {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'accessToken') {
         checkAuthStatus();
+      } else if (e.key === 'cartItems') {
+        if (!isLoggedIn) {
+          setCartCount(getCartCountFromLocalStorage());
+        }
+      } else if (e.key === 'wishList') {
+        if (!isLoggedIn) {
+          setWishlistCount(getWishlistCountFromLocalStorage());
+        }
       }
     };
 
@@ -112,33 +136,45 @@ export default function Header() {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('userLoggedIn', handleUserLogin);
     };
-  }, []);
+  }, [isLoggedIn]);
+
+  // Also listen for local changes to cart and wishlist when not logged in
+  useEffect(() => {
+    if (!isLoggedIn) {
+      const interval = setInterval(() => {
+        setCartCount(getCartCountFromLocalStorage());
+        setWishlistCount(getWishlistCountFromLocalStorage());
+      }, 1000); // Check every second for local changes
+      
+      return () => clearInterval(interval);
+    }
+  }, [isLoggedIn]);
 
   const fetchUserProfile = async () => {
     try {
       const response = await apiService.getUserProfile();
+      console.log(response, 'getmecustomer');
+      setUserProfile(response);
       
-      console.log(response,'getmecustomer')
-        setUserProfile(response);
-    
+      // For logged in users, get counts from API
+      if (response?.cart_items_count !== undefined) {
+        setCartCount(response.cart_items_count);
+      } else {
+        setCartCount(getCartCountFromLocalStorage());
+      }
+      
+      if (response?.wishlist_item_count !== undefined) {
+        setWishlistCount(response.wishlist_item_count);
+      } else {
+        setWishlistCount(getWishlistCountFromLocalStorage());
+      }
     } catch (error) {
       console.error('Failed to fetch user profile:', error);
+      // Fallback to localStorage if API fails
+      setCartCount(getCartCountFromLocalStorage());
+      setWishlistCount(getWishlistCountFromLocalStorage());
     }
   };
-
-  // Simplified hover handlers
-  // const handleMouseEnter = (index: number) => {
-  //   setActiveDropdown(index);
-  // };
-
-  // const handleMouseLeave = () => {
-  //   setActiveDropdown(null);
-  // };
-
-  // // For mobile menu
-  // const toggleDropdown = (index: number) => {
-  //   setActiveDropdown(activeDropdown === index ? null : index);
-  // };
 
   const handleCartClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
@@ -190,7 +226,7 @@ export default function Header() {
             </div>
           </div>
 
-          <div className="flex  space-x-4">
+          <div className="flex space-x-4">
             <button className="md:hidden" onClick={() => setIsMenuOpen(!isMenuOpen)}>
               {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
@@ -208,8 +244,8 @@ export default function Header() {
             
             <Link href="/account/wishlist" className="hidden md:block relative">
               <Heart size={22} />
-              <span className={`absolute ${isLoggedIn ? 'bottom-[-1px]' : 'bottom-[-11px]'} left-1/2 transform -translate-x-1/2 bg-[#F0FBFF] text-[#175e7a] text-[11px]  h-3 w-6 flex items-center justify-center`}>
-                0
+              <span className={`absolute ${isLoggedIn ? 'bottom-[-1px]' : 'bottom-[-11px]'} left-1/2 transform -translate-x-1/2 bg-[#F0FBFF] text-[#175e7a] text-[11px] h-3 w-6 flex items-center justify-center`}>
+                {wishlistCount}
               </span>
             </Link>
 
@@ -217,7 +253,7 @@ export default function Header() {
             <a href="#" className="relative" onClick={handleCartClick}>
               <ShoppingCart size={22} />
               <span className={`absolute ${isLoggedIn ? 'bottom-[-1px]' : 'bottom-[-11px]'} left-1/2 transform -translate-x-1/2 bg-[#F0FBFF] text-[#175e7a] text-[11px] h-3 w-6 flex items-center justify-center`}>
-                0
+                {cartCount}
               </span>
             </a>
           </div>
@@ -237,39 +273,8 @@ export default function Header() {
                   </Link>
                 </li>
               ))}
-              
-              {/* Keep the commented out original menu items code for reference */}
-              {/* {menuItems.map((item: MenuItem, index: number) => (
-                <li 
-                  key={index} 
-                  className="relative"
-                  onMouseEnter={() => item.hasDropdown ? handleMouseEnter(index) : null}
-                >
-                  {item.hasDropdown ? (
-                    <button
-                      className={`flex items-center hover:text-gray-600 text-[14px] focus:outline-none ${activeDropdown === index ? 'font-medium' : ''}`}
-                    >
-                      {item.name}
-                      {item.badge && <span className={`ml-1 ${item.badge.color} text-xs px-2 py-0.5 rounded-full`}>{item.badge.text}</span>}
-                      <ChevronDown className="ml-1" size={16} />
-                    </button>
-                  ) : (
-                    <Link href={item.link || '#'} className="hover:text-gray-600 flex items-center text-[14px]">
-                      {item.name}
-                      {item.badge && <span className={`ml-1 ${item.badge.color} text-xs px-2 py-0.5 rounded-full`}>{item.badge.text}</span>}
-                    </Link>
-                  )}
-                </li>
-              ))} */}
             </ul>
           </div>
-
-          {/* MegaDropdown code kept but commented out */}
-          {/* {activeDropdown !== null && menuItems[activeDropdown]?.hasDropdown && (
-            <div onMouseLeave={handleMouseLeave}>
-              <MegaDropdown isOpen={true} categories={menuItems[activeDropdown].dropdownContent!} />
-            </div>
-          )} */}
         </nav>
 
         {isMenuOpen && (
@@ -303,6 +308,13 @@ export default function Header() {
                   Login / Register
                 </button>
               )}
+
+              <Link href="/account/wishlist" className="flex items-center justify-between py-2 border-b border-gray-100">
+                <span>My Wishlist</span>
+                <span className="bg-[#F0FBFF] text-[#175e7a] text-xs px-2 py-0.5 rounded-full">
+                  {wishlistCount}
+                </span>
+              </Link>
               
               <ul className="space-y-2">
                 {/* Display dynamically loaded categories for mobile */}
@@ -313,29 +325,6 @@ export default function Header() {
                     </Link>
                   </li>
                 ))}
-                
-                {/* Keep the commented out original mobile menu items code for reference */}
-                {/* {menuItems.map((item: MenuItem, index: number) => (
-                  <li key={index}>
-                    {item.hasDropdown ? (
-                      <>
-                        <button className="flex items-center w-full py-2 hover:text-gray-600 text-[14px] justify-between" onClick={() => toggleDropdown(index)}>
-                          <span className="flex items-center">
-                            {item.name}
-                            {item.badge && <span className={`ml-1 ${item.badge.color} text-xs px-2 py-0.5 rounded-full`}>{item.badge.text}</span>}
-                          </span>
-                          <ChevronDown size={16} />
-                        </button>
-                        {activeDropdown === index && <MobileDropdown isOpen={true} categories={item.dropdownContent!} />}
-                      </>
-                    ) : (
-                      <Link href={item.link || '#'} className="block py-2 hover:text-gray-600 flex items-center">
-                        {item.name}
-                        {item.badge && <span className={`ml-1 ${item.badge.color} text-xs px-2 py-0.5 rounded-full`}>{item.badge.text}</span>}
-                      </Link>
-                    )}
-                  </li>
-                ))} */}
               </ul>
               
               {/* Mobile logout button if logged in */}

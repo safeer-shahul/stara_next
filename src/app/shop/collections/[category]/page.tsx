@@ -1,12 +1,13 @@
 'use client';
-import { useEffect, useState } from 'react';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useEffect, useState, useCallback } from 'react';
+import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Loader2, Filter, Home, X, ShoppingCart } from 'lucide-react';
 import apiService from '@/utils/api/apiService';
 import FilterDrawer from '@/components/FilterDrawer';
 import Link from 'next/link';
 import WishlistButton from '@/components/WishlistButton';
+import CartDrawer from '@/components/CartDrawer';
 
 interface ProductItem {
   id: string;
@@ -24,6 +25,7 @@ interface ProductItem {
 export default function CategoryPage() {
   const params = useParams();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const categorySlug = params?.category as string;
   const subCategoryId = searchParams.get('id');
   console.log(categorySlug, subCategoryId);
@@ -42,6 +44,11 @@ export default function CategoryPage() {
   const [priceRange, setPriceRange] = useState<[number, number]>([0,50000]);
   const [sortBy, setSortBy] = useState<string>('');
   const [hoveredProduct, setHoveredProduct] = useState<string | null>(null);
+  
+  // Navigation and cart state
+  const [isNavigating, setIsNavigating] = useState<string | null>(null);
+  const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   
   // Check if filters are active
   const isFilterActive = priceRange[0] > 0 || priceRange[1] < 50000 || sortBy !== '';
@@ -100,50 +107,135 @@ export default function CategoryPage() {
     fetchCategoryProducts();
   }, [subCategoryId, categorySlug, currentPage, priceRange, sortBy]);
 
-  const loadMoreProducts = () => {
+  const loadMoreProducts = useCallback(() => {
     setCurrentPage(prev => prev + 1);
-  };
+  }, []);
 
-  const toggleFilter = () => {
+  const toggleFilter = useCallback(() => {
     setShowFilter(!showFilter);
-  };
+  }, [showFilter]);
 
-  const applyFilters = () => {
+  const applyFilters = useCallback(() => {
     setCurrentPage(1); 
     setProducts([]); 
     setShowFilter(false); 
-  };
+  }, []);
 
-  const resetFilters = () => {
+  const resetFilters = useCallback(() => {
     setPriceRange([0, 50000]);
     setSortBy('');
     setCurrentPage(1);
     setProducts([]); 
-  };
+  }, []);
 
   // Format price as rupee
-  const formatRupee = (value: number) => {
+  const formatRupee = useCallback((value: number) => {
     return `₹ ${value.toLocaleString()}`;
-  };
+  }, []);
 
-  const handleAddToWishlist = (e: React.MouseEvent, productId: string) => {
+  // Optimized product click handler with prefetching and loading state
+  const handleProductClick = useCallback(async (productId: string) => {
+    try {
+      setIsNavigating(productId);
+      
+      // Use Next.js router for faster navigation
+      await router.push(`/shop/products/${productId}`);
+    } catch (error) {
+      console.error('Navigation error:', error);
+    } finally {
+      // Reset loading state after a delay to prevent flashing
+      setTimeout(() => setIsNavigating(null), 100);
+    }
+  }, [router]);
+
+  // Prefetch product pages on hover for better UX
+  const handleProductHover = useCallback((productId: string) => {
+    setHoveredProduct(productId);
+    
+    // Prefetch the product page for faster navigation
+    router.prefetch(`/shop/products/${productId}`);
+  }, [router]);
+
+  const handleAddToWishlist = useCallback((e: React.MouseEvent, productId: string) => {
     e.stopPropagation();
     console.log('Added to wishlist:', productId);
     // Implement wishlist functionality here
-  };
+  }, []);
 
-  const handleAddToBag = (e: React.MouseEvent, productId: string) => {
+  const handleAddToBag = useCallback((e: React.MouseEvent, productId: string): void => {
     e.stopPropagation();
-    console.log('Added to bag:', productId);
-    // Implement add to bag functionality here
-  };
+    
+    // Set the selected product ID to pass to CartDrawer
+    setSelectedProductId(productId);
+    
+    // Open the cart drawer
+    setIsCartOpen(true);
+    
+    // For backward compatibility, also update localStorage
+    // Get current cart items
+    const storedCartItems = JSON.parse(localStorage.getItem('cartItems') || '[]');
+    
+    // Check if we're dealing with the old format (array of strings)
+    if (storedCartItems.length > 0 && typeof storedCartItems[0] === 'string') {
+      // Convert old format items, removing hyphens
+      const formattedCartIds = storedCartItems.map((id: any) => id.replace(/-/g, ''));
+      
+      // Add new product ID
+      const productIdWithoutHyphens = productId.replace(/-/g, '');
+      const updatedCart = [...formattedCartIds, productIdWithoutHyphens];
+      
+      // Count occurrences and convert to new format
+      const productCounts: any = {};
+      updatedCart.forEach(id => {
+        productCounts[id] = (productCounts[id] || 0) + 1;
+      });
+      
+      // Convert to new format with quantities
+      const newFormatCart = Object.keys(productCounts).map(id => ({
+        id,
+        quantity: productCounts[id]
+      }));
+      
+      localStorage.setItem('cartItems', JSON.stringify(newFormatCart));
+    } else {
+      // Already using new format
+      const productIdWithoutHyphens = productId.replace(/-/g, '');
+      
+      // Find if product already exists in cart
+      const existingItemIndex = storedCartItems.findIndex(
+        (item: any) => item.id === productIdWithoutHyphens
+      );
+      
+      let updatedCartItems;
+      
+      if (existingItemIndex >= 0) {
+        // Product already exists, increase quantity
+        updatedCartItems = [...storedCartItems];
+        updatedCartItems[existingItemIndex] = {
+          ...updatedCartItems[existingItemIndex],
+          quantity: updatedCartItems[existingItemIndex].quantity + 1
+        };
+      } else {
+        // Product doesn't exist in cart, add it with quantity 1
+        updatedCartItems = [
+          ...storedCartItems, 
+          { id: productIdWithoutHyphens, quantity: 1 }
+        ];
+      }
+      
+      localStorage.setItem('cartItems', JSON.stringify(updatedCartItems));
+    }
+  }, []);
 
-  const handleProductClick = (productId: string) => {
-    window.location.href = `/shop/products/${productId}`;
-  };
+  // Handle cart drawer close
+  const handleCartClose = useCallback(() => {
+    setIsCartOpen(false);
+    // Reset selected product ID when cart is closed
+    setSelectedProductId(null);
+  }, []);
 
   // Calculate discount percentage
-  const calculateDiscount = (price: string, strikePrice: string): string => {
+  const calculateDiscount = useCallback((price: string, strikePrice: string): string => {
     if (!strikePrice || parseFloat(strikePrice) <= 0) return '';
     
     const currentPrice = parseFloat(price);
@@ -153,7 +245,7 @@ export default function CategoryPage() {
     
     const discount = ((originalPrice - currentPrice) / originalPrice) * 100;
     return `${Math.round(discount)}% OFF`;
-  };
+  }, []);
 
   if (loading && products.length === 0) {
     return (
@@ -253,18 +345,28 @@ export default function CategoryPage() {
               const discount = calculateDiscount(product.product_price, product.strike_price);
               const mainImage = product.images?.[0]?.product_image || '';
               const hoverImage = product.images?.[1]?.product_image || product.images?.[0]?.product_image || '';
+              const isCurrentlyNavigating = isNavigating === product.id;
               
               return (
                 <div 
                   key={product.id}
                   className="relative group"
-                  onMouseEnter={() => setHoveredProduct(product.id)}
+                  onMouseEnter={() => handleProductHover(product.id)}
                   onMouseLeave={() => setHoveredProduct(null)}
                 >
                   <div 
-                    className="relative w-full aspect-square cursor-pointer overflow-hidden"
+                    className={`relative w-full aspect-square cursor-pointer overflow-hidden transition-opacity duration-200 ${
+                      isCurrentlyNavigating ? 'opacity-75' : 'opacity-100'
+                    }`}
                     onClick={() => handleProductClick(product.id)}
                   >
+                    {/* Loading overlay */}
+                    {isCurrentlyNavigating && (
+                      <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-20">
+                        <div className="w-6 h-6 border-2 border-gray-300 border-t-gray-800 rounded-full animate-spin"></div>
+                      </div>
+                    )}
+                    
                     <Image
                       src={mainImage ? `${process.env.NEXT_PUBLIC_API_BASE_URL}${mainImage}` : '/images/placeholder.png'}
                       alt={product.product_name}
@@ -273,6 +375,8 @@ export default function CategoryPage() {
                       className={`object-cover object-center transition-all duration-500 ease-in-out transform ${
                         hoveredProduct === product.id ? 'scale-110 opacity-0' : 'scale-100 opacity-100'
                       }`}
+                      priority={false}
+                      loading="lazy"
                     />
                     
                     <Image
@@ -283,6 +387,7 @@ export default function CategoryPage() {
                       className={`object-cover object-center transition-all duration-500 ease-in-out transform ${
                         hoveredProduct === product.id ? 'scale-100 opacity-100' : 'scale-110 opacity-0'
                       }`}
+                      loading="lazy"
                     />
                     
                     {!product.product_status && (
@@ -324,10 +429,15 @@ export default function CategoryPage() {
                   
                   <div className="mt-4">
                     <h3 
-                      className="text-sm md:text-base font-medium cursor-pointer hover:text-blue-500 transition-colors"
+                      className={`text-sm md:text-base font-medium cursor-pointer hover:text-blue-500 transition-colors ${
+                        isCurrentlyNavigating ? 'text-gray-500' : ''
+                      }`}
                       onClick={() => handleProductClick(product.id)}
                     >
                       {product.product_name}
+                      {isCurrentlyNavigating && (
+                        <span className="ml-2 text-xs text-gray-400">Loading...</span>
+                      )}
                     </h3>
                     <div className="flex items-center mt-1 gap-2">
                       <span className="text-sm font-semibold">₹{parseFloat(product.product_price).toLocaleString()}</span>
@@ -370,6 +480,13 @@ export default function CategoryPage() {
           <p className="text-gray-500">No products found in this collection.</p>
         </div>
       )}
+      
+      {/* Cart Drawer */}
+      <CartDrawer 
+        isOpen={isCartOpen} 
+        onClose={handleCartClose} 
+        productId={selectedProductId} 
+      />
     </div>
   );
 }
