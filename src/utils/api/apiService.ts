@@ -674,7 +674,7 @@ class ApiService {
 
   public async getAllCoupons(): Promise<any> {
     try {
-      const response = await this.get<any>(`/coupons/all`);
+      const response = await this.get<any>(`/coupon/get_all_coupons`);
       return response;
     } catch (error) {
       throw error;
@@ -683,7 +683,7 @@ class ApiService {
 
   public async createCoupon(data:any): Promise<any> {
     try {
-      const response = await this.post<any>('/coupons/create_offer', data,true);
+      const response = await this.post<any>('/coupon/add_coupon', data,true);
       return response;
     } catch (error) {
       throw error;
@@ -692,7 +692,7 @@ class ApiService {
 
   public async couponByID(id:any): Promise<any> {
     try {
-      const response = await this.get<any>(`/coupons/get_offers/${id}`);
+      const response = await this.get<any>(`/coupon/get_coupon/${id}`);
       return response;
     } catch (error) {
       throw error;

@@ -489,7 +489,7 @@ export default function ProductFormPage() {
                         <button
                           type="button"
                           onClick={() => removeExistingImage(image.id)}
-                          className="absolute top-2 right-2 bg-white rounded-full p-1 shadow opacity-80 hover:opacity-100"
+                          className="absolute top-2 right-2 bg-white cursor-pointer rounded-full p-1 shadow opacity-80 hover:opacity-100"
                         >
                           <X className="w-4 h-4 text-red-600" />
                         </button>
@@ -518,7 +518,7 @@ export default function ProductFormPage() {
                         <button
                           type="button"
                           onClick={() => removeNewImage(index)}
-                          className="absolute top-2 right-2 bg-white rounded-full p-1 shadow opacity-80 hover:opacity-100"
+                          className="absolute top-2 right-2 bg-white cursor-pointer rounded-full p-1 shadow opacity-80 hover:opacity-100"
                         >
                           <X className="w-4 h-4 text-red-600" />
                         </button>
@@ -564,7 +564,7 @@ export default function ProductFormPage() {
                       setProductImages([]);
                       setImagePreviews([]);
                     }}
-                    className="ml-3 text-sm text-red-600 hover:text-red-800"
+                    className="ml-3 text-sm text-red-600 cursor-pointer hover:text-red-800"
                   >
                     Clear {isEditMode ? 'new ' : ''}images
                   </button>
@@ -577,7 +577,7 @@ export default function ProductFormPage() {
             <Link href="/admin/products/list">
               <button
                 type="button"
-                className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
+                className="px-4 py-2 border border-gray-300 cursor-pointer rounded text-gray-700 hover:bg-gray-50"
                 disabled={isLoading}
               >
                 Cancel
@@ -588,7 +588,7 @@ export default function ProductFormPage() {
               className={`px-4 py-2 rounded ${
                 isLoading 
                   ? 'bg-blue-400 cursor-not-allowed' 
-                  : 'bg-blue-600 hover:bg-blue-700'
+                  : 'bg-blue-600 cursor-pointer hover:bg-blue-700'
               } text-white`}
               disabled={isLoading}
             >

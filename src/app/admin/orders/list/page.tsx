@@ -192,10 +192,9 @@ export default function OrderListPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <div className="flex space-x-2">
-                          <Link href={`/admin/orders/view/?id=${order.order_id}`}>
-                            <button className="text-blue-600 hover:text-blue-800">
+                          <Link className="text-blue-600 cursor-pointer hover:text-blue-800"
+                           href={`/admin/orders/view/?id=${order.order_id}`}>
                               <Eye className="w-4 h-4" />
-                            </button>
                           </Link>
                         </div>
                       </td>
@@ -219,7 +218,7 @@ export default function OrderListPage() {
                 <button 
                   onClick={handlePrevPage}
                   disabled={currentPage === 1}
-                  className={`px-3 py-1 rounded border ${currentPage === 1 ? 'text-gray-400 border-gray-200' : 'text-blue-600 border-blue-600'}`}
+                  className={`px-3 py-1 rounded border ${currentPage === 1 ? 'text-gray-400 border-gray-200' : 'text-blue-600 cursor-pointer border-blue-600'}`}
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
@@ -229,7 +228,7 @@ export default function OrderListPage() {
                 <button 
                   onClick={handleNextPage}
                   disabled={currentPage === totalPages}
-                  className={`px-3 py-1 rounded border ${currentPage === totalPages ? 'text-gray-400 border-gray-200' : 'text-blue-600 border-blue-600'}`}
+                  className={`px-3 py-1 rounded border ${currentPage === totalPages ? 'text-gray-400 border-gray-200' : 'text-blue-600 cursor-pointer border-blue-600'}`}
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>

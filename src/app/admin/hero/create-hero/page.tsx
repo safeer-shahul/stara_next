@@ -200,7 +200,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                 </div>
                 <button 
                   type="button"
-                  className="text-blue-600 hover:text-blue-800"
+                  className="text-blue-600 cursor-pointer hover:text-blue-800"
                   onClick={(e) => {
                     e.stopPropagation();
                     setBigImagePreview(null);
@@ -257,7 +257,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                     </div>
                     <button 
                     type="button"
-                    className="text-blue-600 hover:text-blue-800"
+                    className="text-blue-600 cursor-pointer hover:text-blue-800"
                     onClick={(e) => {
                         e.stopPropagation();
                         setSmallImagePreview(null);
@@ -307,7 +307,7 @@ const handleSubmit = async (e: React.FormEvent) => {
               Status *
             </label>
             <div className="flex items-center">
-              <label className="inline-flex items-center mr-6">
+              <label className="inline-flex cursor-pointer items-center mr-6">
                 <input
                   type="radio"
                   className="form-radio h-4 w-4 text-blue-600"
@@ -317,7 +317,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                 />
                 <span className="ml-2">Active</span>
               </label>
-              <label className="inline-flex items-center">
+              <label className="inline-flex cursor-pointer items-center">
                 <input
                   type="radio"
                   className="form-radio h-4 w-4 text-blue-600"
@@ -334,7 +334,7 @@ const handleSubmit = async (e: React.FormEvent) => {
           <div className="flex justify-end mt-6 space-x-3">
             <button
               type="button"
-              className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
+              className="px-4 py-2 border cursor-pointer border-gray-300 rounded text-gray-700 hover:bg-gray-50"
               onClick={() => router.push('/admin/hero/list')}
               disabled={isSubmitting}
             >
@@ -345,7 +345,7 @@ const handleSubmit = async (e: React.FormEvent) => {
               className={`px-4 py-2 rounded ${
                 isSubmitting 
                   ? 'bg-blue-400 cursor-not-allowed' 
-                  : 'bg-blue-600 hover:bg-blue-700'
+                  : 'bg-blue-600 cursor-pointer hover:bg-blue-700'
               } text-white`}
               disabled={isSubmitting}
             >

@@ -29,7 +29,6 @@ function AddCouponPage() {
   const [couponName, setCouponName] = useState('');
   const [discountType, setDiscountType] = useState('percentage');
   const [discountValue, setDiscountValue] = useState('');
-  const [quantity, setQuantity] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -96,7 +95,6 @@ function AddCouponPage() {
       setCouponName(couponData.coupon_name);
       setDiscountType(couponData.discount_type);
       setDiscountValue(couponData.discount_value.toString());
-      setQuantity(couponData.quantity.toString());
       
       // Set dates if they exist
       if (couponData.start_date) {
@@ -279,13 +277,8 @@ function AddCouponPage() {
       return;
     }
 
-    if (!couponName || !discountValue || !quantity) {
+    if (!couponName || !discountValue) {
       setError("Please fill in all required fields");
-      return;
-    }
-
-    if (parseInt(quantity) <= 0) {
-      setError("Quantity must be greater than 0");
       return;
     }
 
@@ -310,7 +303,6 @@ function AddCouponPage() {
       }
       formData.append('discount_type', discountType);
       formData.append('discount_value', discountValue);
-      formData.append('quantity', quantity);
       formData.append('start_date', startDate);
       formData.append('end_date', endDate);
       
@@ -322,7 +314,7 @@ function AddCouponPage() {
       // Add product IDs for products to be removed (only in edit mode)
       if (isEditMode && removedProductIds.length > 0) {
         removedProductIds.forEach(productId => {
-          formData.append('delete_product_ids', productId);
+          formData.append('remove_product_ids', productId);
         });
       }
       
@@ -428,13 +420,13 @@ function AddCouponPage() {
                   <button
                     type="button"
                     onClick={generateCouponCode}
-                    className="px-3 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 text-sm"
+                    className="px-3 py-2 bg-gray-100 cursor-pointer text-gray-700 rounded hover:bg-gray-200 text-sm"
                     disabled={isSubmitting}
                   >
                     Generate
                   </button>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">Leave empty for system generated code</p>
+                {/* <p className="text-xs text-gray-500 mt-1">Leave empty for system generated code</p> */}
               </div>
 
               <div className="mb-4">
@@ -471,46 +463,27 @@ function AddCouponPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label htmlFor="discountValue" className="block text-sm font-medium text-gray-700 mb-1">
-                    Discount Value *
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      id="discountValue"
-                      className="w-full p-2 border border-gray-300 rounded pr-8"
-                      value={discountValue}
-                      onChange={(e) => setDiscountValue(e.target.value)}
-                      placeholder={discountType === 'percentage' ? '20' : '100'}
-                      min="0"
-                      max={discountType === 'percentage' ? '100' : undefined}
-                      step={discountType === 'percentage' ? '1' : '0.01'}
-                      required
-                      disabled={isSubmitting}
-                    />
-                    <span className="absolute right-2 top-2 text-gray-500">
-                      {discountType === 'percentage' ? '%' : '₹'}
-                    </span>
-                  </div>
-                </div>
-                
-                <div>
-                  <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 mb-1">
-                    Quantity *
-                  </label>
+              <div className="mb-4">
+                <label htmlFor="discountValue" className="block text-sm font-medium text-gray-700 mb-1">
+                  Discount Value *
+                </label>
+                <div className="relative">
                   <input
                     type="number"
-                    id="quantity"
-                    className="w-full p-2 border border-gray-300 rounded"
-                    value={quantity}
-                    onChange={(e) => setQuantity(e.target.value)}
-                    placeholder="100"
-                    min="1"
+                    id="discountValue"
+                    className="w-full p-2 border border-gray-300 rounded pr-8"
+                    value={discountValue}
+                    onChange={(e) => setDiscountValue(e.target.value)}
+                    placeholder={discountType === 'percentage' ? '20' : '100'}
+                    min="0"
+                    max={discountType === 'percentage' ? '100' : undefined}
+                    step={discountType === 'percentage' ? '1' : '0.01'}
                     required
                     disabled={isSubmitting}
                   />
+                  <span className="absolute right-2 top-2 text-gray-500">
+                    {discountType === 'percentage' ? '%' : '₹'}
+                  </span>
                 </div>
               </div>
 
@@ -524,7 +497,7 @@ function AddCouponPage() {
                     <input
                       type="date"
                       id="startDate"
-                      className={`w-full p-2 border border-gray-300 rounded pr-10 ${
+                      className={`w-full p-2 border border-gray-300 rounded ${
                         isStartDateDisabled() ? 'bg-gray-100 cursor-not-allowed' : ''
                       }`}
                       value={startDate}
@@ -533,7 +506,6 @@ function AddCouponPage() {
                       required
                       disabled={isSubmitting || isStartDateDisabled()}
                     />
-                    <Calendar className="absolute right-3 top-2.5 h-4 w-4 text-gray-400 pointer-events-none" />
                   </div>
                   {isStartDateDisabled() && (
                     <p className="text-xs text-gray-500 mt-1">
@@ -550,14 +522,13 @@ function AddCouponPage() {
                     <input
                       type="date"
                       id="endDate"
-                      className="w-full p-2 border border-gray-300 rounded pr-10"
+                      className="w-full p-2 border border-gray-300 rounded"
                       value={endDate}
                       onChange={(e) => setEndDate(e.target.value)}
                       min={startDate || getTodayDate()}
                       required
                       disabled={isSubmitting}
                     />
-                    <Calendar className="absolute right-3 top-2.5 h-4 w-4 text-gray-400 pointer-events-none" />
                   </div>
                 </div>
               </div>
@@ -657,11 +628,6 @@ function AddCouponPage() {
                         Valid from {new Date(startDate).toLocaleDateString()} to {new Date(endDate).toLocaleDateString()}
                       </div>
                     )}
-                    {quantity && (
-                      <div className="text-xs text-purple-600 mt-1">
-                        Quantity: {quantity} coupons available
-                      </div>
-                    )}
                   </div>
                 )}
                 
@@ -689,7 +655,7 @@ function AddCouponPage() {
                         </div>
                         <button 
                           type="button" 
-                          className="ml-2 text-red-500 hover:text-red-700"
+                          className="ml-2 text-red-500 cursor-pointer hover:text-red-700"
                           onClick={() => handleRemoveProduct(product)}
                           disabled={isSubmitting}
                         >
@@ -710,7 +676,7 @@ function AddCouponPage() {
           <div className="flex justify-end mt-6 space-x-3">
             <button
               type="button"
-              className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
+              className="px-4 py-2 border cursor-pointer border-gray-300 rounded text-gray-700 hover:bg-gray-50"
               onClick={() => router.push('/admin/coupons/list')}
               disabled={isSubmitting}
             >
@@ -721,7 +687,7 @@ function AddCouponPage() {
               className={`px-4 py-2 rounded ${
                 isSubmitting 
                   ? 'bg-purple-400 cursor-not-allowed' 
-                  : 'bg-purple-600 hover:bg-purple-700'
+                  : 'bg-purple-600 cursor-pointer hover:bg-purple-700'
               } text-white`}
               disabled={isSubmitting}
             >

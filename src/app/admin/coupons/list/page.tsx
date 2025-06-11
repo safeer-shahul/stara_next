@@ -88,11 +88,9 @@ export default function CouponListPage() {
         <div className="flex items-center gap-2">
           <h2 className="text-2xl font-bold">Coupons</h2>
         </div>
-        <Link href="/admin/coupons/create">
-          <button className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center">
+        <Link className="bg-blue-600 cursor-pointer text-white px-4 py-2 rounded-lg flex items-center" href="/admin/coupons/create">
             <Plus className="w-5 h-5 mr-2" />
             Add Coupon
-          </button>
         </Link>
       </div>
 
@@ -126,12 +124,6 @@ export default function CouponListPage() {
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Discount
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      <div className="flex items-center">
-                        <Hash className="w-4 h-4 mr-1" />
-                        Quantity
-                      </div>
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       <div className="flex items-center">
@@ -184,11 +176,6 @@ export default function CouponListPage() {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900 font-medium">
-                              {coupon.quantity}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">
                               {formatDate(coupon.start_date)}
                             </div>
@@ -205,10 +192,8 @@ export default function CouponListPage() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             <div className="flex space-x-2">
-                              <Link href={`/admin/coupons/create?id=${coupon.id}`}>
-                                <button className="text-blue-600 hover:text-blue-800">
+                              <Link className="text-blue-600 cursor-pointer hover:text-blue-800" href={`/admin/coupons/create?id=${coupon.id}`}>
                                   <Edit className="w-4 h-4" />
-                                </button>
                               </Link>
                             </div>
                           </td>
