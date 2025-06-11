@@ -1,10 +1,10 @@
 'use client';
-
 import { useState, useEffect } from 'react';
 import HeroSlider from '@/components/HeroSlider';
 import ShopLayout from './shop/layout';
 import CategoryGrid from '@/components/CategoryGrid';
 import ProductSlider from '@/components/ProductSlider';
+import OffersGrid from '@/components/OffersGrid';
 import apiService from '@/utils/api/apiService';
 import VisitOurStores from '@/components/VisitOurStores';
 
@@ -16,6 +16,7 @@ interface HomeCategory {
 
 export default function Home() {
   const [homeCategories, setHomeCategories] = useState<HomeCategory[]>([]);
+  const [offers, setOffers] = useState<any[]>([]);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -25,6 +26,7 @@ export default function Home() {
     window.scrollTo(0, 0);
     
     fetchHomeCategories();
+    fetchOffers();
     checkAndFetchUserProfile();
   }, []);
 
@@ -53,10 +55,26 @@ export default function Home() {
     }
   };
 
+  const fetchOffers = async () => {
+    try {
+      const response = await apiService.getValidOffers();
+      console.log('Offers data:', response);
+      // Extract the data array from the API response
+      if (response && response.data) {
+        setOffers(response.data);
+      } else {
+        setOffers([]);
+      }
+    } catch (err) {
+      console.error('Failed to fetch offers:', err);
+      setOffers([]);
+    }
+  };
+
   const checkAndFetchUserProfile = async () => {
     // Check if accessToken exists in localStorage
     const accessToken = localStorage.getItem('accessToken');
-        
+    
     if (accessToken) {
       try {
         // Call getUserProfile API
@@ -76,6 +94,9 @@ export default function Home() {
     <ShopLayout>
       <HeroSlider />
       <CategoryGrid />
+      
+      {/* Offers Grid - Only shows if offers exist */}
+      <OffersGrid offers={offers} />
       
       {loading && (
         <div className="py-16 text-center">

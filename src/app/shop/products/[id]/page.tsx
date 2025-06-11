@@ -236,7 +236,7 @@ export default function ProductDetailPage() {
           </div>
 
           {/* Product Details */}
-          <div className="space-y-4 md:space-y-6 md:pl-8">
+          <div className="space-y-2 md:space-y-2 md:pl-8">
             <div className="flex items-start justify-between">
               <h1 className="text-xl md:text-2xl font-normal leading-tight">{product.product_name}</h1>
 
@@ -268,7 +268,7 @@ export default function ProductDetailPage() {
               <span className="font-medium">Product Code:</span> {product.product_code}
             </div>
 
-            <div className="flex items-start text-sm border-t py-4 border-b border-gray-200 gap-2">
+            {/* <div className="flex items-start text-sm border-t py-4 border-b border-gray-200 gap-2">
               <Tag size={16} className="text-green-700 flex-shrink-0 mt-0.5"/>
               <div className="flex-1">
                 <span className="text-green-700">
@@ -276,7 +276,7 @@ export default function ProductDetailPage() {
                 </span>
                 <a href="#" className="text-green-700 underline ml-1 font-bold">See All Offers</a>
               </div>
-            </div>
+            </div> */}
 
             {product.product_status && product.quantity > 0 && (
               <div className="flex items-center text-sm space-x-2">
@@ -285,7 +285,7 @@ export default function ProductDetailPage() {
               </div>
             )}
 
-            <div className="flex items-start space-x-2">
+            {/* <div className="flex items-start space-x-2">
               <input 
                 type="checkbox" 
                 id="giftOption"
@@ -296,7 +296,7 @@ export default function ProductDetailPage() {
               <label htmlFor="giftOption" className="text-sm flex-1">
                 Is it a gift? Make it Special <span className="font-semibold">{staticProductData.giftSpecialPrice}</span>
               </label>
-            </div>
+            </div> */}
 
             {product.quantity > 0 ? (
               <div className="py-2">

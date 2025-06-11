@@ -654,6 +654,15 @@ class ApiService {
     }
   }
 
+  public async getValidOffers(): Promise<any> {
+    try {
+      const response = await this.get<any>(`/offers/offers/valid`);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
+
   public async offerByID(id:any): Promise<any> {
     try {
       const response = await this.get<any>(`/offers/get_offers/${id}`);
