@@ -70,11 +70,9 @@ export default function CategoriesPage() {
           </Link>
           <h2 className="text-2xl font-bold">Categories</h2>
         </div>
-        <Link href="/admin/products/add-category">
-          <button className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center">
+        <Link href="/admin/products/add-category" className="bg-blue-600 cursor-pointer text-white px-4 py-2 rounded-lg flex items-center">
             <Plus className="w-5 h-5 mr-2" />
             Add Category
-          </button>
         </Link>
       </div>
 
@@ -148,9 +146,7 @@ export default function CategoriesPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <Link href={`/admin/products/add-category?id=${category.id}`}>
-                          <button className="text-blue-600 hover:text-blue-800">
-                            <Edit className="w-4 h-4" />
-                          </button>
+                            <Edit className="w-4 h-4 text-blue-600 cursor-pointer hover:text-blue-800" />
                         </Link>
                       </td>
                     </tr>
@@ -173,7 +169,7 @@ export default function CategoriesPage() {
                 <button 
                   onClick={handlePrevPage}
                   disabled={currentPage === 1}
-                  className={`px-3 py-1 rounded border ${currentPage === 1 ? 'text-gray-400 border-gray-200' : 'text-blue-600 border-blue-600'}`}
+                  className={`px-3 py-1 rounded border ${currentPage === 1 ? 'text-gray-400 border-gray-200' : 'text-blue-600 cursor-pointer border-blue-600'}`}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -185,7 +181,7 @@ export default function CategoriesPage() {
                 <button 
                   onClick={handleNextPage}
                   disabled={currentPage === totalPages}
-                  className={`px-3 py-1 rounded border ${currentPage === totalPages ? 'text-gray-400 border-gray-200' : 'text-blue-600 border-blue-600'}`}
+                  className={`px-3 py-1 rounded border ${currentPage === totalPages ? 'text-gray-400 border-gray-200' : 'text-blue-600 cursor-pointer border-blue-600'}`}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

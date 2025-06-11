@@ -350,7 +350,7 @@ function AddHomeCategoryPage() {
                         </div>
                         <button 
                           type="button" 
-                          className="ml-2 text-red-500 hover:text-red-700"
+                          className="ml-2 text-red-500 cursor-pointer hover:text-red-700"
                           onClick={() => handleRemoveProduct(product)}
                           disabled={isSubmitting}
                         >
@@ -371,7 +371,7 @@ function AddHomeCategoryPage() {
           <div className="flex justify-end mt-6 space-x-3">
             <button
               type="button"
-              className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
+              className="px-4 py-2 border border-gray-300 rounded cursor-pointer text-gray-700 hover:bg-gray-50"
               onClick={() => router.push('/admin/products/home-category')}
               disabled={isSubmitting}
             >
@@ -382,7 +382,7 @@ function AddHomeCategoryPage() {
               className={`px-4 py-2 rounded ${
                 isSubmitting 
                   ? 'bg-blue-400 cursor-not-allowed' 
-                  : 'bg-blue-600 hover:bg-blue-700'
+                  : 'bg-blue-600 cursor-pointer hover:bg-blue-700'
               } text-white`}
               disabled={isSubmitting}
             >

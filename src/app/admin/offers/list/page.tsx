@@ -74,11 +74,9 @@ export default function OfferListPage() {
           </Link> */}
           <h2 className="text-2xl font-bold">Offers</h2>
         </div>
-        <Link href="/admin/offers/create">
-          <button className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center">
+        <Link className="bg-blue-600 text-white cursor-pointer px-4 py-2 rounded-lg flex items-center" href="/admin/offers/create">
             <Plus className="w-5 h-5 mr-2" />
             Add Offer
-          </button>
         </Link>
       </div>
 
@@ -185,10 +183,8 @@ export default function OfferListPage() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             <div className="flex space-x-2">
-                              <Link href={`/admin/offers/create?id=${offer.id}`}>
-                                <button className="text-blue-600 hover:text-blue-800">
+                              <Link className="text-blue-600 cursor-pointer hover:text-blue-800" href={`/admin/offers/create?id=${offer.id}`}>
                                   <Edit className="w-4 h-4" />
-                                </button>
                               </Link>
                             </div>
                           </td>

@@ -62,11 +62,10 @@ export default function HomeCategoryListPage() {
           </Link>
           <h2 className="text-2xl font-bold">Home Categories</h2>
         </div>
-        <Link href="/admin/products/add-home-category">
-          <button className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center">
+        <Link className="bg-blue-600 text-white cursor-pointer px-4 py-2 rounded-lg flex items-center"href="/admin/products/add-home-category">
+          
             <Plus className="w-5 h-5 mr-2" />
             Add Category
-          </button>
         </Link>
       </div>
 
@@ -116,10 +115,8 @@ export default function HomeCategoryListPage() {
                               <Eye className="w-4 h-4" />
                             </button>
                           </Link> */}
-                          <Link href={`/admin/products/add-home-category?id=${category.id}`}>
-                            <button className="text-blue-600 hover:text-blue-800">
+                          <Link className="text-blue-600 hover:text-blue-800 cursor-pointer" href={`/admin/products/add-home-category?id=${category.id}`}>
                               <Edit className="w-4 h-4" />
-                            </button>
                           </Link>
                           {/* <button className="text-red-600 hover:text-red-800">
                             <Trash2 className="w-4 h-4" />
@@ -146,7 +143,7 @@ export default function HomeCategoryListPage() {
                 <button 
                   onClick={handlePrevPage}
                   disabled={currentPage === 1}
-                  className={`px-3 py-1 rounded border ${currentPage === 1 ? 'text-gray-400 border-gray-200' : 'text-blue-600 border-blue-600'}`}
+                  className={`px-3 py-1 rounded border ${currentPage === 1 ? 'text-gray-400 border-gray-200' : 'text-blue-600 cursor-pointer border-blue-600'}`}
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
@@ -156,7 +153,7 @@ export default function HomeCategoryListPage() {
                 <button 
                   onClick={handleNextPage}
                   disabled={currentPage === totalPages}
-                  className={`px-3 py-1 rounded border ${currentPage === totalPages ? 'text-gray-400 border-gray-200' : 'text-blue-600 border-blue-600'}`}
+                  className={`px-3 py-1 rounded border ${currentPage === totalPages ? 'text-gray-400 border-gray-200' : 'text-blue-600 cursor-pointer border-blue-600'}`}
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>

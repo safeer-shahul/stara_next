@@ -226,7 +226,7 @@ export default function AddEditCategoryPage() {
           <div className="flex justify-end mt-6 space-x-3">
             <button
               type="button"
-              className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
+              className="px-4 cursor-pointer py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
               onClick={() => router.push('/admin/products/categories')}
               disabled={isSubmitting}
             >
@@ -237,7 +237,7 @@ export default function AddEditCategoryPage() {
               className={`px-4 py-2 rounded ${
                 isSubmitting 
                   ? 'bg-blue-400 cursor-not-allowed' 
-                  : 'bg-blue-600 hover:bg-blue-700'
+                  : 'bg-blue-600 cursor-pointer hover:bg-blue-700'
               } text-white`}
               disabled={isSubmitting}
             >

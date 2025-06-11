@@ -456,7 +456,7 @@ function AddOfferPage() {
                         <button
                           type="button"
                           onClick={() => fileInputRef.current?.click()}
-                          className="text-sm text-blue-600 hover:text-blue-800 underline"
+                          className="text-sm text-blue-600 cursor-pointer hover:text-blue-800 underline"
                           disabled={isSubmitting}
                         >
                           Click to change image
@@ -687,7 +687,7 @@ function AddOfferPage() {
                         </div>
                         <button 
                           type="button" 
-                          className="ml-2 text-red-500 hover:text-red-700"
+                          className="ml-2 cursor-pointer text-red-500 hover:text-red-700"
                           onClick={() => handleRemoveProduct(product)}
                           disabled={isSubmitting}
                         >
@@ -708,7 +708,7 @@ function AddOfferPage() {
           <div className="flex justify-end mt-6 space-x-3">
             <button
               type="button"
-              className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
+              className="px-4 py-2 border cursor-pointer border-gray-300 rounded text-gray-700 hover:bg-gray-50"
               onClick={() => router.push('/admin/offers')}
               disabled={isSubmitting}
             >
@@ -719,7 +719,7 @@ function AddOfferPage() {
               className={`px-4 py-2 rounded ${
                 isSubmitting 
                   ? 'bg-orange-400 cursor-not-allowed' 
-                  : 'bg-orange-600 hover:bg-orange-700'
+                  : 'bg-orange-600 cursor-pointer hover:bg-orange-700'
               } text-white`}
               disabled={isSubmitting}
             >
