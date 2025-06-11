@@ -644,6 +644,61 @@ class ApiService {
       throw error;
     }
   }
+
+  public async getAllOffers(): Promise<any> {
+    try {
+      const response = await this.get<any>(`/offers/offers/all`);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  public async offerByID(id:any): Promise<any> {
+    try {
+      const response = await this.get<any>(`/offers/get_offers/${id}`);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  public async createOffer(data:any): Promise<any> {
+    try {
+      const response = await this.post<any>('/offers/create_offer', data,true);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  public async getAllCoupons(): Promise<any> {
+    try {
+      const response = await this.get<any>(`/coupons/all`);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  public async createCoupon(data:any): Promise<any> {
+    try {
+      const response = await this.post<any>('/coupons/create_offer', data,true);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  public async couponByID(id:any): Promise<any> {
+    try {
+      const response = await this.get<any>(`/coupons/get_offers/${id}`);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
+
 }
 
 const apiService = ApiService.getInstance();
