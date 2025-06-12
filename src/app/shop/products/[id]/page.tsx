@@ -2,8 +2,8 @@
 
 import { CheckCircle2, Star, Tag } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import Image from "next/image";
-import { useParams } from 'next/navigation';
+import Image from 'next/image';
+import { useParams, useSearchParams } from 'next/navigation'; // Import useSearchParams
 import ProductImageSlider from '@/components/ProductImageSlider';
 import AddToCartButton from '@/components/AddToCartButton';
 import DeliveryPincodeChecker from '@/components/DeliveryPincodeChecker';
@@ -12,7 +12,7 @@ import CartDrawer from '@/components/CartDrawer';
 import CheckoutModal from '@/components/CheckoutModal';
 import apiService from '@/utils/api/apiService';
 
-// Keep static data for features that aren't in the API
+// Static product data
 const staticProductData = {
   discount: '38%',
   offer: 'Buy 1 Get 1 Free Use Code: BIG1 at checkout',
@@ -33,8 +33,10 @@ const staticProductData = {
 
 export default function ProductDetailPage() {
   const params = useParams();
+  const searchParams = useSearchParams(); // Get query parameters
   const productId = params.id as string;
-  
+  const fromOffer = searchParams.get('from') === 'offer'; // Check if from offer page
+
   const [isGift, setIsGift] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
@@ -56,7 +58,6 @@ export default function ProductDetailPage() {
         if (productId) {
           setIsLoading(true);
           const fetchedProduct = await apiService.getProductByID(productId);
-          console.log(fetchedProduct,'fetchedProduct')
           setProduct(fetchedProduct);
         }
       } catch (err) {
@@ -74,69 +75,45 @@ export default function ProductDetailPage() {
 
   const openModal = () => {
     setIsModalOpen(true);
-    console.log('clicked view more',isModalOpen);
   };
 
   const handleAddToBag = () => {
     if (product) {
-      // Set the selected product ID to pass to CartDrawer
       setSelectedProductId(product.id);
-      
-      // Open the cart drawer
       setIsCartOpen(true);
-      
-      // For backward compatibility, also update localStorage
-      // Get current cart items
+
       const storedCartItems = JSON.parse(localStorage.getItem('cartItems') || '[]');
-      
-      // Check if we're dealing with the old format (array of strings)
+      const productIdWithoutHyphens = product.id.replace(/-/g, '');
+
       if (storedCartItems.length > 0 && typeof storedCartItems[0] === 'string') {
-        // Convert old format items, removing hyphens
-        const formattedCartIds = storedCartItems.map((id:any) => id.replace(/-/g, ''));
-        
-        // Add new product ID
-        const productIdWithoutHyphens = product.id.replace(/-/g, '');
+        const formattedCartIds = storedCartItems.map((id: any) => id.replace(/-/g, ''));
         const updatedCart = [...formattedCartIds, productIdWithoutHyphens];
-        
-        // Count occurrences and convert to new format
-        const productCounts:any = {};
-        updatedCart.forEach(id => {
+        const productCounts: any = {};
+        updatedCart.forEach((id) => {
           productCounts[id] = (productCounts[id] || 0) + 1;
         });
-        
-        // Convert to new format with quantities
-        const newFormatCart = Object.keys(productCounts).map(id => ({
+        const newFormatCart = Object.keys(productCounts).map((id) => ({
           id,
-          quantity: productCounts[id]
+          quantity: productCounts[id],
         }));
-        
         localStorage.setItem('cartItems', JSON.stringify(newFormatCart));
       } else {
-        // Already using new format
-        const productIdWithoutHyphens = product.id.replace(/-/g, '');
-        
-        // Find if product already exists in cart
         const existingItemIndex = storedCartItems.findIndex(
-          (item:any) => item.id === productIdWithoutHyphens
+          (item: any) => item.id === productIdWithoutHyphens
         );
-        
         let updatedCartItems;
-        
         if (existingItemIndex >= 0) {
-          // Product already exists, increase quantity
           updatedCartItems = [...storedCartItems];
           updatedCartItems[existingItemIndex] = {
             ...updatedCartItems[existingItemIndex],
-            quantity: updatedCartItems[existingItemIndex].quantity + 1
+            quantity: updatedCartItems[existingItemIndex].quantity + 1,
           };
         } else {
-          // Product doesn't exist in cart, add it with quantity 1
           updatedCartItems = [
-            ...storedCartItems, 
-            { id: productIdWithoutHyphens, quantity: 1 }
+            ...storedCartItems,
+            { id: productIdWithoutHyphens, quantity: 1 },
           ];
         }
-        
         localStorage.setItem('cartItems', JSON.stringify(updatedCartItems));
       }
     }
@@ -144,18 +121,15 @@ export default function ProductDetailPage() {
 
   const handleBuyNow = () => {
     if (product) {
-      // Prepare checkout data with just this product
       const productIdWithoutHyphens = product.id.replace(/-/g, '');
       setCheckoutData({
         items: [
           {
             product_id: productIdWithoutHyphens,
-            quantity: 1
-          }
-        ]
+            quantity: 1,
+          },
+        ],
       });
-      
-      // Open checkout modal directly
       setIsCheckoutOpen(true);
     }
   };
@@ -163,7 +137,7 @@ export default function ProductDetailPage() {
   const handleCheckoutClose = () => {
     setIsCheckoutOpen(false);
   };
-  
+
   const handleAddressSelected = (addressId: string): void => {
     console.log(`Proceeding with address ID: ${addressId}`);
     setIsCheckoutOpen(false);
@@ -171,22 +145,20 @@ export default function ProductDetailPage() {
 
   const checkPincode = async (pincode: string) => {
     console.log(`Checking pincode: ${pincode}`);
-    
     if (pincode && pincode.length === 6 && !isNaN(Number(pincode))) {
       return {
         deliveryDate: `22nd and 25th Mar`,
-        cashOnDelivery: true
+        cashOnDelivery: true,
       };
     } else {
       return {
-        error: "Please enter a valid 6-digit pincode"
+        error: 'Please enter a valid 6-digit pincode',
       };
     }
   };
 
   const handleCartClose = () => {
     setIsCartOpen(false);
-    // Reset selected product ID when cart is closed
     setSelectedProductId(null);
   };
 
@@ -198,25 +170,20 @@ export default function ProductDetailPage() {
     return <div className="min-h-screen flex items-center justify-center text-red-500">{error || 'Product not found'}</div>;
   }
 
-  // Prepare image data for the slider with full URLs
   const productImages = product.images.map((img: any) => {
     return `${process.env.NEXT_PUBLIC_API_BASE_URL}${img.product_image}`;
   });
 
-  // Format price with currency symbol
   const formattedPrice = `₹${parseFloat(product.product_price).toLocaleString('en-IN')}`;
-  const formattedStrikePrice = product.strike_price && parseFloat(product.strike_price) > 0 
-    ? `₹${parseFloat(product.strike_price).toLocaleString('en-IN')}` 
+  const formattedStrikePrice = product.strike_price && parseFloat(product.strike_price) > 0
+    ? `₹${parseFloat(product.strike_price).toLocaleString('en-IN')}`
     : null;
 
   const calculateDiscount = (price: string, strikePrice: string): string => {
     if (!strikePrice || parseFloat(strikePrice) <= 0) return '';
-    
     const currentPrice = parseFloat(price);
     const originalPrice = parseFloat(strikePrice);
-    
     if (currentPrice >= originalPrice) return '';
-    
     const discount = ((originalPrice - currentPrice) / originalPrice) * 100;
     return `${Math.round(discount)}%`;
   };
@@ -227,8 +194,8 @@ export default function ProductDetailPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
           {/* Product Images */}
           <div className="w-full">
-            <ProductImageSlider 
-              images={productImages} 
+            <ProductImageSlider
+              images={productImages}
               productName={product.product_name}
               hasOffer={true}
               offerLabel="BUY 1 GET 1"
@@ -239,7 +206,6 @@ export default function ProductDetailPage() {
           <div className="space-y-2 md:space-y-2 md:pl-8">
             <div className="flex items-start justify-between">
               <h1 className="text-xl md:text-2xl font-normal leading-tight">{product.product_name}</h1>
-
               <div className="flex items-center space-x-1 flex-shrink-0 ml-4">
                 <div className="flex text-[#36454F]">
                   {[...Array(staticProductData.rating)].map((_, i) => (
@@ -263,48 +229,30 @@ export default function ProductDetailPage() {
             </div>
 
             <p className="text-sm text-gray-500">Inclusive of all taxes</p>
-            
+
             <div className="text-xs text-gray-500">
               <span className="font-medium">Product Code:</span> {product.product_code}
             </div>
 
-            {/* <div className="flex items-start text-sm border-t py-4 border-b border-gray-200 gap-2">
-              <Tag size={16} className="text-green-700 flex-shrink-0 mt-0.5"/>
-              <div className="flex-1">
-                <span className="text-green-700">
-                  Buy 1 Get 1 Free Use Code: <span className="font-bold">B1G1</span> at checkout.
-                </span>
-                <a href="#" className="text-green-700 underline ml-1 font-bold">See All Offers</a>
-              </div>
-            </div> */}
-
             {product.product_status && product.quantity > 0 && (
               <div className="flex items-center text-sm space-x-2">
-                <CheckCircle2 className='text-[#2e7e52] flex-shrink-0'/>
-                <span className='text-[14px]'>In stock - ready to ship</span>
+                <CheckCircle2 className="text-[#2e7e52] flex-shrink-0" />
+                <span className="text-[14px]">In stock - ready to ship</span>
               </div>
             )}
 
-            {/* <div className="flex items-start space-x-2">
-              <input 
-                type="checkbox" 
-                id="giftOption"
-                checked={isGift}
-                onChange={() => setIsGift(!isGift)}
-                className="h-4 w-4 rounded border-gray-300 mt-0.5 flex-shrink-0 cursor-pointer"
-              />
-              <label htmlFor="giftOption" className="text-sm flex-1">
-                Is it a gift? Make it Special <span className="font-semibold">{staticProductData.giftSpecialPrice}</span>
-              </label>
-            </div> */}
-
-            {product.quantity > 0 ? (
+            {/* Conditionally render AddToCartButton if not from offer page */}
+            {product.quantity > 0 && !fromOffer ? (
               <div className="py-2">
-                <AddToCartButton 
+                <AddToCartButton
                   productId={product.id}
                   onAddToBag={handleAddToBag}
                   onBuyNow={handleBuyNow}
                 />
+              </div>
+            ) : product.quantity > 0 && fromOffer ? (
+              <div className="py-4 text-center bg-gray-100 rounded-md text-gray-500 font-medium">
+                Select this product from the offer page
               </div>
             ) : (
               <div className="py-4 text-center bg-gray-100 rounded-md text-red-500 font-medium">
@@ -329,7 +277,6 @@ export default function ProductDetailPage() {
                 </div>
                 <p className="text-[11px] md:text-[12px] font-medium">Lifetime Warranty</p>
               </div>
-              
               <div className="flex flex-col items-center text-center">
                 <div className="w-8 h-8 md:w-9 md:h-9 mb-2 relative">
                   <Image
@@ -344,28 +291,25 @@ export default function ProductDetailPage() {
             </div>
 
             <div className="space-y-4">
-              <DeliveryPincodeChecker 
+              <DeliveryPincodeChecker
                 defaultDeliveryTime="3-4 Days"
                 checkPincodeHandler={checkPincode}
               />
-
-              <PolicyIcons/>
+              <PolicyIcons />
             </div>
           </div>
         </div>
       </div>
-      
-      {/* Cart Drawer */}
-      <CartDrawer 
-        isOpen={isCartOpen} 
-        onClose={handleCartClose} 
-        productId={selectedProductId} 
+
+      <CartDrawer
+        isOpen={isCartOpen}
+        onClose={handleCartClose}
+        productId={selectedProductId}
       />
 
-      {/* Checkout Modal for Buy Now */}
-      <CheckoutModal 
-        isOpen={isCheckoutOpen} 
-        onClose={handleCheckoutClose} 
+      <CheckoutModal
+        isOpen={isCheckoutOpen}
+        onClose={handleCheckoutClose}
         onProceed={handleAddressSelected}
         orderItems={checkoutData.items}
       />
