@@ -117,6 +117,7 @@ export default function OfferProductsPage() {
     return offerSlots.filter(slot => slot.product?.id === productId).length;
   }, [offerSlots]);
 
+  // Fixed: Only check for empty slots of the specific type, regardless of what's in other types
   const canAddProduct = useCallback((productId: string, type: 'buy' | 'get') => {
     const emptySlots = offerSlots.filter(slot => slot.type === type && !slot.product);
     return emptySlots.length > 0;
@@ -195,7 +196,7 @@ export default function OfferProductsPage() {
             handleProductAdd(product, 'buy');
           }}
           disabled={!canAddToBuy}
-          className="flex-1 flex items-center justify-center gap-1 py-1.5 px-2 bg-blue-50 text-blue-600 border border-blue-200 rounded-md hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium"
+          className="flex-1 flex items-center cursor-pointer justify-center gap-1 py-1.5 px-2 bg-blue-50 text-blue-600 border border-blue-200 rounded-md hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium"
         >
           <ShoppingBag size={12} />
           Buy {buyCount > 0 && `(${buyCount})`}
@@ -206,7 +207,7 @@ export default function OfferProductsPage() {
             handleProductAdd(product, 'get');
           }}
           disabled={!canAddToGet}
-          className="flex-1 flex items-center justify-center gap-1 py-1.5 px-2 bg-green-50 text-green-600 border border-green-200 rounded-md hover:bg-green-100 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium"
+          className="flex-1 flex items-center cursor-pointer justify-center gap-1 py-1.5 px-2 bg-green-50 text-green-600 border border-green-200 rounded-md hover:bg-green-100 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium"
         >
           <Gift size={12} />
           Get {getCount > 0 && `(${getCount})`}
@@ -365,29 +366,52 @@ export default function OfferProductsPage() {
       </div>
 
       {isMobile && filledSlots.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 bg-[#175e7a] rounded-tr-2xl rounded-tl-2xl shadow-lg px-4 pt-4 pb-12 z-50">
-          <div 
-            className="flex items-center justify-between cursor-pointer"
-            onClick={() => setShowMobileSlider(true)}
-          >
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <ShoppingBag size={22} className="text-white" />
-                <span className="text-xl text-white font-medium">
-                  Buy: {buySlots.filter(s => s.product).length}/{offerData.buy_count}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Gift size={22} className="text-white" />
-                <span className="text-xl text-white font-medium">
-                  Get: {getSlots.filter(s => s.product).length}/{offerData.get_count}
-                </span>
-              </div>
+  <div className="fixed bottom-0 left-0 right-0 bg-[#175e7a] rounded-tr-2xl rounded-tl-2xl shadow-lg px-4 pt-4 pb-14 z-50">
+    <div
+      className="flex items-center justify-between cursor-pointer"
+      onClick={() => setShowMobileSlider(true)}
+    >
+      <div className="flex items-center gap-6">
+        {/* Buy Section */}
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <div className="w-10 h-10 rounded-full border-2 border-white/30 flex items-center justify-center">
+              <ShoppingBag size={16} className="text-white" />
             </div>
-            <ChevronUp size={20} className="text-gray-400" />
+            <span className="absolute -top-1 -right-1 bg-white text-[#175e7a] text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+              {buySlots.filter(s => s.product).length}
+            </span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-white font-medium text-sm">Buy Items</span>
+            <span className="text-white/80 text-xs">
+              {buySlots.filter(s => s.product).length} of {offerData.buy_count} selected
+            </span>
           </div>
         </div>
-      )}
+        
+        {/* Get Section */}
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <div className="w-10 h-10 rounded-full border-2 border-white/30 flex items-center justify-center">
+              <Gift size={16} className="text-white" />
+            </div>
+            <span className="absolute -top-1 -right-1 bg-white text-[#175e7a] text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+              {getSlots.filter(s => s.product).length}
+            </span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-white font-medium text-sm">Get Items</span>
+            <span className="text-white/80 text-xs">
+              {getSlots.filter(s => s.product).length} of {offerData.get_count} selected
+            </span>
+          </div>
+        </div>
+      </div>
+      <ChevronUp size={23} className="text-white" />
+    </div>
+  </div>
+)}
 
       {isMobile && (
         <OfferMobileSlider
