@@ -98,7 +98,7 @@ export default function OfferMobileSlider({
               <div className="relative">
                 <button
                   onClick={() => onSlotClear(slot.id)}
-                  className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs hover:bg-red-600 z-10"
+                  className="absolute -top-1 -right-1 bg-red-500 cursor-pointer text-white rounded-full w-4 h-4 flex items-center justify-center text-xs hover:bg-red-600 z-10"
                 >
                   <X size={10} />
                 </button>
@@ -144,14 +144,14 @@ export default function OfferMobileSlider({
   return (
     <>
       <div 
-        className="fixed inset-0 bg-black bg-opacity-50 z-40"
+        className="fixed inset-0 bg-black/70 z-51"
         onClick={onClose}
       />
       
-      <div className="fixed bottom-0 left-0 right-0 bg-white rounded-t-xl z-50 p-4 max-h-[80vh] overflow-y-auto">
+      <div className="fixed bottom-0 left-0 right-0 bg-white rounded-t-xl z-52 p-4 max-h-[80vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">Your Selection</h3>
-          <button onClick={onClose}>
+          <button className='cursor-pointer' onClick={onClose}>
             <X size={20} />
           </button>
         </div>
@@ -171,17 +171,17 @@ export default function OfferMobileSlider({
         />
         
         {filledSlots.length > 0 && (
-          <div className="border-t pt-4 mt-4">
+          <div className="pt-4 pb-12 mt-4">
             <div className="space-y-2 text-sm mb-4">
-              <div className="flex justify-between">
+              {/* <div className="flex justify-between">
                 <span>Buy Total:</span>
                 <span className="font-medium">₹{buyTotal.toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-green-600">
                 <span>You Save:</span>
                 <span className="font-medium">₹{savings.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between font-semibold text-lg border-t pt-2">
+              </div> */}
+              <div className="flex justify-between font-semibold text-lg border-t border-gray-200 pt-2">
                 <span>Final Total:</span>
                 <span>₹{buyTotal.toLocaleString()}</span>
               </div>
@@ -190,7 +190,7 @@ export default function OfferMobileSlider({
             <button 
               className={`w-full py-3 rounded-lg font-medium transition-colors ${
                 isOfferComplete() 
-                  ? 'bg-black text-white hover:bg-gray-800' 
+                  ? 'bg-[#175e7a] cursor-pointer text-white hover:bg-[#0f4c67]' 
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
               }`}
               disabled={!isOfferComplete()}

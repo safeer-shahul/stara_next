@@ -81,7 +81,7 @@ export default function OfferCartSidebar({
               <div className="relative">
                 <button
                   onClick={() => onSlotClear(slot.id)}
-                  className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs hover:bg-red-600 z-10"
+                  className="absolute -top-1 -right-1 cursor-pointer bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs hover:bg-red-600 z-10"
                 >
                   <X size={10} />
                 </button>
@@ -141,17 +141,17 @@ export default function OfferCartSidebar({
       />
       
       {filledSlots.length > 0 && (
-        <div className="border-t pt-4">
+        <div className="pt-4">
           <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
+            {/* <div className="flex justify-between">
               <span>Buy Total:</span>
               <span className="font-medium">₹{buyTotal.toLocaleString()}</span>
             </div>
             <div className="flex justify-between text-green-600">
               <span>You Save:</span>
               <span className="font-medium">₹{savings.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between font-semibold text-lg border-t pt-2">
+            </div> */}
+            <div className="flex justify-between font-semibold text-lg border-t border-gray-300 pt-2">
               <span>Final Total:</span>
               <span>₹{buyTotal.toLocaleString()}</span>
             </div>
@@ -160,7 +160,7 @@ export default function OfferCartSidebar({
           <button 
             className={`w-full mt-4 py-3 rounded-lg font-medium transition-colors ${
               isOfferComplete() 
-                ? 'bg-black text-white hover:bg-gray-800' 
+                ? 'bg-[#175e7a] cursor-pointer text-white hover:bg-[#0f4c67]' 
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             }`}
             disabled={!isOfferComplete()}
