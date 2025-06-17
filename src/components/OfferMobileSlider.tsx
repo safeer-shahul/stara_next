@@ -1,7 +1,8 @@
 'use client';
 import { useEffect } from 'react';
 import Image from 'next/image';
-import { X, ShoppingBag, Gift, ChevronUp } from 'lucide-react';
+import { X, ShoppingBag, Info } from 'lucide-react';
+import apiService from '@/utils/api/apiService';
 
 interface ProductItem {
   id: string;
@@ -29,7 +30,6 @@ interface OfferData {
 
 interface OfferSlot {
   id: string;
-  type: 'buy' | 'get';
   product: ProductItem | null;
   slotIndex: number;
 }
@@ -62,84 +62,59 @@ export default function OfferMobileSlider({
   }, [isOpen]);
 
   const calculateTotals = () => {
-    const buySlots = slots.filter(slot => slot.type === 'buy' && slot.product);
-    const getSlots = slots.filter(slot => slot.type === 'get' && slot.product);
-    
-    const buyTotal = buySlots.reduce((sum, slot) => 
-      sum + parseFloat(slot.product!.product_price), 0
-    );
-    const getTotal = getSlots.reduce((sum, slot) => 
-      sum + parseFloat(slot.product!.product_price), 0
-    );
-    
-    return { buyTotal, getTotal, savings: getTotal };
+    const filledSlots = slots.filter(slot => slot.product);
+    // Always return freeItems as an array, even when empty
+    if (filledSlots.length === 0) {
+      return { payableTotal: 0, savings: 0, freeItems: [] };
+    }
+
+    // Sort products by price (highest first)
+    const sortedProducts = filledSlots
+      .map(slot => ({ ...slot.product!, slotId: slot.id }))
+      .sort((a, b) => parseFloat(b.product_price) - parseFloat(a.product_price));
+
+    // Calculate payable total (highest-priced buy_count items)
+    const itemsToCharge = Math.min(offerData.buy_count, sortedProducts.length);
+    const payableTotal = sortedProducts
+      .slice(0, itemsToCharge)
+      .reduce((sum, product) => sum + parseFloat(product.product_price), 0);
+
+    // Calculate savings (free items total)
+    const savings = sortedProducts
+      .slice(itemsToCharge)
+      .reduce((sum, product) => sum + parseFloat(product.product_price), 0);
+
+    return { payableTotal, savings, freeItems: sortedProducts.slice(itemsToCharge) };
   };
 
   const isOfferComplete = () => {
-    return slots.every(slot => slot.product !== null);
+    const totalRequiredItems = offerData.buy_count + offerData.get_count;
+    return slots.filter(slot => slot.product !== null).length === totalRequiredItems;
   };
 
-  const SlotDisplay = ({ slots, title, icon, bgColor }: { 
-    slots: OfferSlot[], 
-    title: string, 
-    icon: React.ReactNode,
-    bgColor: string 
-  }) => (
-    <div className={`p-4 rounded-lg ${bgColor} mb-4`}>
-      <div className="flex items-center gap-2 mb-3">
-        {icon}
-        <h4 className="font-medium">{title}</h4>
-      </div>
-      
-      <div className="grid grid-cols-2 gap-2">
-        {slots.map((slot) => (
-          <div key={slot.id} className="bg-white rounded-lg p-2 min-h-[65px] border-2 border-dashed border-gray-300">
-            {slot.product ? (
-              <div className="relative">
-                <button
-                  onClick={() => onSlotClear(slot.id)}
-                  className="absolute -top-1 -right-1 bg-red-500 cursor-pointer text-white rounded-full w-4 h-4 flex items-center justify-center text-xs hover:bg-red-600 z-10"
-                >
-                  <X size={10} />
-                </button>
-                <div className="flex items-center gap-2">
-                  <div className="relative w-12 h-12 flex-shrink-0 rounded overflow-hidden">
-                    <Image
-                      src={slot.product.images?.[0]?.product_image ? 
-                        `${process.env.NEXT_PUBLIC_API_BASE_URL}${slot.product.images[0].product_image}` : 
-                        '/images/placeholder.png'
-                      }
-                      alt={slot.product.product_name}
-                      fill
-                      className="object-cover"
-                      sizes="48px"
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium line-clamp-2">{slot.product.product_name}</p>
-                    {slot.type === 'buy' && (
-                      <p className="text-xs text-gray-600">₹{parseFloat(slot.product.product_price).toLocaleString()}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="h-full flex items-center justify-center text-gray-400 text-xs text-center">
-                Empty Slot {slot.slotIndex + 1}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+  const handleBuyNow = async () => {
+  if (isOfferComplete()) {
+    try {
+      const product_ids = slots
+        .filter(slot => slot.product)
+        .map(slot => slot.product!.id.replace(/-/g, ''));
+      await apiService.addToCartOffer({
+        product_ids,
+        offer_id: offerData.id.replace(/-/g, ''),
+      });
+      // Add any additional logic here (e.g., redirect, show success message)
+    } catch (error) {
+      console.error('Failed to add to cart:', error);
+      // Optionally handle error (e.g., show error message to user)
+    }
+  }
+};
 
   if (!isOpen) return null;
 
-  const buySlots = slots.filter(slot => slot.type === 'buy');
-  const getSlots = slots.filter(slot => slot.type === 'get');
   const filledSlots = slots.filter(slot => slot.product !== null);
-  const { buyTotal, getTotal, savings } = calculateTotals();
+  const totalRequiredItems = offerData.buy_count + offerData.get_count;
+  const { payableTotal, savings, freeItems } = calculateTotals();
 
   return (
     <>
@@ -156,47 +131,85 @@ export default function OfferMobileSlider({
           </button>
         </div>
         
-        <SlotDisplay 
-          slots={buySlots}
-          title={`Buy (${buySlots.filter(s => s.product).length}/${offerData.buy_count})`}
-          icon={<ShoppingBag size={16} className="text-blue-600" />}
-          bgColor="bg-blue-50"
-        />
-        
-        <SlotDisplay 
-          slots={getSlots}
-          title={`Get Free (${getSlots.filter(s => s.product).length}/${offerData.get_count})`}
-          icon={<Gift size={16} className="text-green-600" />}
-          bgColor="bg-green-50"
-        />
+        <div className="p-4 rounded-lg bg-gray-50 mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <ShoppingBag size={16} className="text-gray-700" />
+            <h4 className="font-medium">Selected Items ({filledSlots.length}/{totalRequiredItems})</h4>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-2">
+            {slots.map((slot) => (
+              <div key={slot.id} className="bg-white rounded-lg p-2 min-h-[65px] border-2 border-dashed border-gray-300">
+                {slot.product ? (
+                  <div className="relative">
+                    <button
+                      onClick={() => onSlotClear(slot.id)}
+                      className="absolute -top-1 -right-1 bg-red-500 cursor-pointer text-white rounded-full w-4 h-4 flex items-center justify-center text-xs hover:bg-red-600 z-10"
+                    >
+                      <X size={10} />
+                    </button>
+                    <div className="flex items-center gap-2">
+                      <div className="relative w-12 h-12 flex-shrink-0 rounded overflow-hidden">
+                        <Image
+                          src={slot.product.images?.[0]?.product_image ? 
+                            `${process.env.NEXT_PUBLIC_API_BASE_URL}${slot.product.images[0].product_image}` : 
+                            '/images/placeholder.png'
+                          }
+                          alt={slot.product.product_name}
+                          fill
+                          className="object-cover"
+                          sizes="48px"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium line-clamp-2">{slot.product.product_name}</p>
+                        {freeItems.some(item => item.slotId === slot.id) ? (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-500 line-through">₹{parseFloat(slot.product.product_price).toLocaleString()}</span>
+                            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-medium">FREE</span>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-gray-600">₹{parseFloat(slot.product.product_price).toLocaleString()}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-gray-400 text-xs text-center">
+                    Empty Slot {slot.slotIndex + 1}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
         
         {filledSlots.length > 0 && (
           <div className="pt-4 pb-12 mt-4">
             <div className="space-y-2 text-sm mb-4">
-              {/* <div className="flex justify-between">
-                <span>Buy Total:</span>
-                <span className="font-medium">₹{buyTotal.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between text-green-600">
-                <span>You Save:</span>
-                <span className="font-medium">₹{savings.toLocaleString()}</span>
-              </div> */}
+              {savings > 0 && (
+                <div className="flex justify-between text-green-600">
+                  <span>You Save ({freeItems.length} free item{freeItems.length > 1 ? 's' : ''}):</span>
+                  <span className="font-medium">₹{savings.toLocaleString()}</span>
+                </div>
+              )}
               <div className="flex justify-between font-semibold text-lg border-t border-gray-200 pt-2">
                 <span>Final Total:</span>
-                <span>₹{buyTotal.toLocaleString()}</span>
+                <span>₹{payableTotal.toLocaleString()}</span>
               </div>
             </div>
             
             <button 
-              className={`w-full py-3 rounded-lg font-medium transition-colors ${
-                isOfferComplete() 
-                  ? 'bg-[#175e7a] cursor-pointer text-white hover:bg-[#0f4c67]' 
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              }`}
-              disabled={!isOfferComplete()}
-            >
-              {isOfferComplete() ? 'Buy Now' : 'Complete Your Selection'}
-            </button>
+                className={`w-full py-3 rounded-lg font-medium transition-colors ${
+                  isOfferComplete() 
+                    ? 'bg-[#175e7a] cursor-pointer text-white hover:bg-[#0f4c67]' 
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }`}
+                disabled={!isOfferComplete()}
+                onClick={handleBuyNow}
+              >
+                {isOfferComplete() ? 'Buy Now' : `Select ${totalRequiredItems - filledSlots.length} More Item${totalRequiredItems - filledSlots.length > 1 ? 's' : ''}`}
+              </button>
           </div>
         )}
       </div>
