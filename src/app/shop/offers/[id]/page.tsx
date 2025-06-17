@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { Loader2, Home, ChevronUp, ShoppingBag, Gift } from 'lucide-react';
+import { Loader2, Home, ChevronUp, ShoppingBag, Info } from 'lucide-react';
 import apiService from '@/utils/api/apiService';
 import Link from 'next/link';
 import OfferMobileSlider from '@/components/OfferMobileSlider';
@@ -37,7 +37,6 @@ interface OfferData {
 
 interface OfferSlot {
   id: string;
-  type: 'buy' | 'get';
   product: ProductItem | null;
   slotIndex: number;
 }
@@ -68,19 +67,11 @@ export default function OfferProductsPage() {
 
   useEffect(() => {
     if (offerData) {
+      const totalSlots = offerData.buy_count + offerData.get_count;
       const slots: OfferSlot[] = [];
-      for (let i = 0; i < offerData.buy_count; i++) {
+      for (let i = 0; i < totalSlots; i++) {
         slots.push({
-          id: `buy-${i}`,
-          type: 'buy',
-          product: null,
-          slotIndex: i
-        });
-      }
-      for (let i = 0; i < offerData.get_count; i++) {
-        slots.push({
-          id: `get-${i}`,
-          type: 'get',
+          id: `slot-${i}`,
           product: null,
           slotIndex: i
         });
@@ -107,24 +98,17 @@ export default function OfferProductsPage() {
     fetchOfferData();
   }, [offerId]);
 
-  const getProductCountInType = useCallback((productId: string, type: 'buy' | 'get') => {
-    return offerSlots.filter(slot => 
-      slot.type === type && slot.product?.id === productId
-    ).length;
-  }, [offerSlots]);
-
   const getTotalProductCount = useCallback((productId: string) => {
     return offerSlots.filter(slot => slot.product?.id === productId).length;
   }, [offerSlots]);
 
-  // Fixed: Only check for empty slots of the specific type, regardless of what's in other types
-  const canAddProduct = useCallback((productId: string, type: 'buy' | 'get') => {
-    const emptySlots = offerSlots.filter(slot => slot.type === type && !slot.product);
+  const canAddProduct = useCallback(() => {
+    const emptySlots = offerSlots.filter(slot => !slot.product);
     return emptySlots.length > 0;
   }, [offerSlots]);
 
-  const handleProductAdd = useCallback((product: ProductItem, type: 'buy' | 'get') => {
-    const emptySlot = offerSlots.find(slot => slot.type === type && !slot.product);
+  const handleProductAdd = useCallback((product: ProductItem) => {
+    const emptySlot = offerSlots.find(slot => !slot.product);
     if (!emptySlot) return;
     setOfferSlots(prev => 
       prev.map(slot => 
@@ -144,14 +128,6 @@ export default function OfferProductsPage() {
       )
     );
   }, []);
-
-  const getBuySlots = useCallback(() => {
-    return offerSlots.filter(slot => slot.type === 'buy');
-  }, [offerSlots]);
-
-  const getGetSlots = useCallback(() => {
-    return offerSlots.filter(slot => slot.type === 'get');
-  }, [offerSlots]);
 
   const getFilledSlots = useCallback(() => {
     return offerSlots.filter(slot => slot.product !== null);
@@ -182,37 +158,22 @@ export default function OfferProductsPage() {
     router.prefetch(`/shop/products/${productId}`);
   }, [router]);
 
-  const ProductSelectionButtons = ({ product }: { product: ProductItem }) => {
-    const buyCount = getProductCountInType(product.id, 'buy');
-    const getCount = getProductCountInType(product.id, 'get');
-    const canAddToBuy = canAddProduct(product.id, 'buy');
-    const canAddToGet = canAddProduct(product.id, 'get');
+  const ProductSelectionButton = ({ product }: { product: ProductItem }) => {
+    const selectedCount = getTotalProductCount(product.id);
+    const canAdd = canAddProduct();
 
     return (
-      <div className="mt-2 flex gap-1">
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            handleProductAdd(product, 'buy');
-          }}
-          disabled={!canAddToBuy}
-          className="flex-1 flex items-center cursor-pointer justify-center gap-1 py-1.5 px-2 bg-blue-50 text-blue-600 border border-blue-200 rounded-md hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium"
-        >
-          <ShoppingBag size={12} />
-          Buy {buyCount > 0 && `(${buyCount})`}
-        </button>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            handleProductAdd(product, 'get');
-          }}
-          disabled={!canAddToGet}
-          className="flex-1 flex items-center cursor-pointer justify-center gap-1 py-1.5 px-2 bg-green-50 text-green-600 border border-green-200 rounded-md hover:bg-green-100 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium"
-        >
-          <Gift size={12} />
-          Get {getCount > 0 && `(${getCount})`}
-        </button>
-      </div>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          handleProductAdd(product);
+        }}
+        disabled={!canAdd}
+        className="w-full flex items-center cursor-pointer justify-center gap-2 py-2 px-3 bg-[#175e7a] text-white rounded-md hover:bg-[#0f4c67] disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
+      >
+        <ShoppingBag size={14} />
+        Add {selectedCount > 0 && `(${selectedCount})`}
+      </button>
     );
   };
 
@@ -236,9 +197,8 @@ export default function OfferProductsPage() {
     );
   }
 
-  const buySlots = getBuySlots();
-  const getSlots = getGetSlots();
   const filledSlots = getFilledSlots();
+  const totalRequiredItems = offerData.buy_count + offerData.get_count;
 
   return (
     <div className="container mx-auto p-2 md:p-6">
@@ -263,7 +223,18 @@ export default function OfferProductsPage() {
 
       <div className={`${isMobile ? 'block' : 'flex gap-8'}`}>
         <div className={`${isMobile ? 'w-full mb-6' : 'w-2/3'}`}>
-          <h2 className="text-xl font-semibold mb-4">Select Products for Your Offer</h2>
+               {/* Pricing Info Disclaimer */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+          <div className="flex items-start gap-2">
+            <Info size={16} className="text-blue-600 mt-0.5 flex-shrink-0" />
+            <div className="text-xs text-blue-800">
+              <p className="font-medium mb-1">How pricing works:</p>
+              <p>Select {totalRequiredItems} items total. You'll only pay for the {offerData.buy_count} most expensive items. The remaining {offerData.get_count} item{offerData.get_count > 1 ? 's' : ''} will be free!</p>
+            </div>
+          </div>
+        </div>
+
+          <h2 className="text-xl font-semibold mb-4">Select {totalRequiredItems} Products for Your Offer</h2>
           
           <div className={`grid ${isMobile ? 'grid-cols-2' : 'grid-cols-3'} gap-2`}>
             {offerData.products.map((product) => {
@@ -326,6 +297,12 @@ export default function OfferProductsPage() {
                         {discount}
                       </div>
                     )}
+
+                    {totalSelected > 0 && (
+                      <div className="absolute top-2 right-2 bg-[#175e7a] text-white text-xs px-2 py-1 rounded-full z-10 font-medium">
+                        {totalSelected}
+                      </div>
+                    )}
                   </div>
                   
                   <div>
@@ -340,7 +317,7 @@ export default function OfferProductsPage() {
                         <span className="ml-2 text-xs text-gray-400">Loading...</span>
                       )}
                     </h3>
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 mb-2">
                       <span className="font-semibold text-sm">₹{parseFloat(product.product_price).toLocaleString()}</span>
                       {parseFloat(product.strike_price) > 0 && (
                         <>
@@ -348,7 +325,7 @@ export default function OfferProductsPage() {
                         </>
                       )}
                     </div>
-                    {product.product_status && <ProductSelectionButtons product={product} />}
+                    {product.product_status && <ProductSelectionButton product={product} />}
                   </div>
                 </div>
               );
@@ -366,52 +343,31 @@ export default function OfferProductsPage() {
       </div>
 
       {isMobile && filledSlots.length > 0 && (
-  <div className="fixed bottom-0 left-0 right-0 bg-[#175e7a] rounded-tr-2xl rounded-tl-2xl shadow-lg px-4 pt-4 pb-14 z-50">
-    <div
-      className="flex items-center justify-between cursor-pointer"
-      onClick={() => setShowMobileSlider(true)}
-    >
-      <div className="flex items-center gap-6">
-        {/* Buy Section */}
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <div className="w-10 h-10 rounded-full border-2 border-white/30 flex items-center justify-center">
-              <ShoppingBag size={16} className="text-white" />
+        <div className="fixed bottom-0 left-0 right-0 bg-[#175e7a] rounded-tr-2xl rounded-tl-2xl shadow-lg px-4 pt-4 pb-14 z-50">
+          <div
+            className="flex items-center justify-between cursor-pointer"
+            onClick={() => setShowMobileSlider(true)}
+          >
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <div className="w-12 h-12 rounded-full border-2 border-white/30 flex items-center justify-center">
+                  <ShoppingBag size={20} className="text-white" />
+                </div>
+                <span className="absolute -top-1 -right-1 bg-white text-[#175e7a] text-sm font-bold rounded-full w-6 h-6 flex items-center justify-center">
+                  {filledSlots.length}
+                </span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-white font-medium text-lg">Selected Items</span>
+                <span className="text-white/80 text-sm">
+                  {filledSlots.length} of {totalRequiredItems} selected
+                </span>
+              </div>
             </div>
-            <span className="absolute -top-1 -right-1 bg-white text-[#175e7a] text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-              {buySlots.filter(s => s.product).length}
-            </span>
-          </div>
-          <div className="flex flex-col">
-            <span className="text-white font-medium text-sm">Buy Items</span>
-            <span className="text-white/80 text-xs">
-              {buySlots.filter(s => s.product).length} of {offerData.buy_count} selected
-            </span>
+            <ChevronUp size={24} className="text-white" />
           </div>
         </div>
-        
-        {/* Get Section */}
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <div className="w-10 h-10 rounded-full border-2 border-white/30 flex items-center justify-center">
-              <Gift size={16} className="text-white" />
-            </div>
-            <span className="absolute -top-1 -right-1 bg-white text-[#175e7a] text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-              {getSlots.filter(s => s.product).length}
-            </span>
-          </div>
-          <div className="flex flex-col">
-            <span className="text-white font-medium text-sm">Get Items</span>
-            <span className="text-white/80 text-xs">
-              {getSlots.filter(s => s.product).length} of {offerData.get_count} selected
-            </span>
-          </div>
-        </div>
-      </div>
-      <ChevronUp size={23} className="text-white" />
-    </div>
-  </div>
-)}
+      )}
 
       {isMobile && (
         <OfferMobileSlider

@@ -708,6 +708,15 @@ class ApiService {
     }
   }
 
+  public async addToCartOffer(data:any): Promise<any> {
+    try {
+      const response = await this.post<any>('/cart/add_to_cart_by_offer', data);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
+
 }
 
 const apiService = ApiService.getInstance();
