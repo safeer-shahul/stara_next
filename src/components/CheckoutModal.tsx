@@ -10,12 +10,13 @@ import ProductSummary from './ProductSummary';
 import BillSummary from './BillSummary';
 import RazorpayPayment from './RazorpayPayment';
 import OrderConfirmation from './OrderConfirmation';
+import OfferCartItem from './OfferCartItem';
 
 enum CheckoutStep {
   ADDRESS_SELECTION,
   BILL_SUMMARY,
   PAYMENT_PROCESSING,
-  ORDER_CONFIRMATION
+  ORDER_CONFIRMATION,
 }
 
 interface Address {
@@ -33,19 +34,24 @@ interface CheckoutModalProps {
   isOpen: boolean;
   onClose: () => void;
   onProceed: (addressId: string) => void;
-  orderItems?: Array<{
-    product_id: string;
-    quantity: number;
-  }>;
+  orderItems?: Array<{ product_id: string; quantity: number }>;
   coupon_code_id?: string;
+  offer_sets?: Array<{
+    id: string;
+    offer_id: string;
+    offer_products: string[];
+    buy_count: number;
+    get_count: number;
+  }>;
 }
 
-const CheckoutModal: React.FC<CheckoutModalProps> = ({ 
-  isOpen, 
-  onClose, 
-  onProceed, 
-  orderItems = [], 
-  coupon_code_id 
+const CheckoutModal: React.FC<CheckoutModalProps> = ({
+  isOpen,
+  onClose,
+  onProceed,
+  orderItems = [],
+  coupon_code_id,
+  offer_sets = [],
 }) => {
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,6 +69,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [paymentId, setPaymentId] = useState<string | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<'success' | 'failed' | 'canceled'>('success');
   const [cartCleared, setCartCleared] = useState(false);
+  const [offerSetsData, setOfferSetsData] = useState<any[]>([]);
 
   const resetCheckoutState = useCallback(() => {
     setCurrentStep(CheckoutStep.ADDRESS_SELECTION);
@@ -88,14 +95,12 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const fetchAddresses = useCallback(async () => {
     if (!isAuthenticated) return;
-    
     setLoading(true);
     try {
       const response = await apiService.getAddresses();
       if (response && Array.isArray(response)) {
         setAddresses(response);
-        
-        const defaultAddress = response.find(addr => addr.is_default);
+        const defaultAddress = response.find((addr) => addr.is_default);
         if (defaultAddress) {
           setSelectedAddressId(defaultAddress.id);
           setSelectedAddress(defaultAddress);
@@ -114,49 +119,79 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
   }, [isAuthenticated]);
 
-  // Clear cart function
+  const fetchOfferSetsData = useCallback(async () => {
+    if (offer_sets.length === 0) {
+      setOfferSetsData([]);
+      return;
+    }
+    try {
+      const allOfferProductIds = offer_sets.flatMap((set) => set.offer_products);
+      const response = await apiService.getPaginatedProducts(1, 30, allOfferProductIds);
+      if (response && response.products && Array.isArray(response.products)) {
+        const formattedOfferSets = offer_sets.map((set) => ({
+          id: set.id,
+          offer_id: set.offer_id,
+          buy_count: set.buy_count,
+          get_count: set.get_count,
+          offer_products: set.offer_products
+            .map((productId) => {
+              const product = response.products.find(
+                (p: any) => p.id.replace(/-/g, '') === productId
+              );
+              if (product) {
+                return {
+                  id: product.id,
+                  product_name: product.product_name,
+                  product_price: product.product_price,
+                  images: product.images,
+                };
+              }
+              return null;
+            })
+            .filter((p: any) => p !== null),
+        }));
+        setOfferSetsData(formattedOfferSets);
+      }
+    } catch (error) {
+      console.error('Error fetching offer sets data:', error);
+      setOfferSetsData([]);
+    }
+  }, [offer_sets]);
+
   const clearCart = useCallback(async () => {
     try {
-      // Call the API with the "delete_cart" mode to clear the entire cart
       await apiService.addToCart({
-        mode: 'delete_cart'
+        mode: 'delete_cart',
       });
-      
-      // Update local storage cart as well
       localStorage.setItem('cartItems', JSON.stringify([]));
       setCartCleared(true);
-      console.log('Cart cleared successfully');
     } catch (error) {
       console.error('Error clearing cart:', error);
     }
   }, []);
 
-  // Initialize modal when opened
+  // Fixed: Remove dependencies to prevent infinite re-renders
   useEffect(() => {
     if (isOpen) {
       resetCheckoutState();
-      
       const isLoggedIn = checkAuthentication();
       if (isLoggedIn) {
         fetchAddresses();
+        fetchOfferSetsData();
       }
     }
-  }, [isOpen, checkAuthentication, fetchAddresses, resetCheckoutState]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]); // Only depend on isOpen
 
-  // Handle body overflow when modal is open
+  // Separate useEffect for authentication changes
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'auto';
+    if (isAuthenticated && isOpen) {
+      fetchAddresses();
+      fetchOfferSetsData();
     }
-    
-    return () => {
-      document.body.style.overflow = 'auto';
-    };
-  }, [isOpen]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, isOpen]);
 
-  // Close modal if authentication is closed without logging in
   useEffect(() => {
     if (authModalClosed && !isAuthenticated) {
       onClose();
@@ -168,42 +203,39 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       setCurrentStep(CheckoutStep.BILL_SUMMARY);
     }
   };
-  
-  const handleOrderCreated = (paymentMethod: 'Cod' | 'Razorpay', razorpayOrderId: string, staraOrderID: any) => {
+
+  const handleOrderCreated = (
+    paymentMethod: 'Cod' | 'Razorpay',
+    razorpayOrderId: string,
+    staraOrderID: any
+  ) => {
     setOrderId(razorpayOrderId);
     setStaraOrderId(staraOrderID);
     setPaymentMethod(paymentMethod);
-    console.log("Order created:", paymentMethod, razorpayOrderId);
-    
     if (paymentMethod === 'Razorpay') {
       setCurrentStep(CheckoutStep.PAYMENT_PROCESSING);
     } else {
-      // For COD orders, clear cart immediately on successful order placement
       clearCart();
       setPaymentStatus('success');
       setCurrentStep(CheckoutStep.ORDER_CONFIRMATION);
     }
   };
-  
+
   const handlePaymentSuccess = async (paymentId?: string) => {
     if (paymentId) {
       setPaymentId(paymentId);
     }
     setPaymentStatus('success');
-    
-    // Clear the cart on successful payment
     await clearCart();
-    
     setCurrentStep(CheckoutStep.ORDER_CONFIRMATION);
-    console.log('Payment success:', orderId, paymentId);
   };
-  
+
   const handlePaymentError = (errorMessage?: string) => {
     setError(errorMessage || 'Payment failed. Please try again.');
     setPaymentStatus('failed');
     setCurrentStep(CheckoutStep.ORDER_CONFIRMATION);
   };
-  
+
   const handlePaymentCancel = () => {
     setPaymentStatus('canceled');
     setCurrentStep(CheckoutStep.ORDER_CONFIRMATION);
@@ -216,7 +248,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const handleBackToAddresses = () => {
     setCurrentStep(CheckoutStep.ADDRESS_SELECTION);
   };
-  
+
   const handleBackToBillSummary = () => {
     setCurrentStep(CheckoutStep.BILL_SUMMARY);
   };
@@ -231,22 +263,21 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const handleAuthSuccess = () => {
     setIsAuthenticated(true);
     setShowAuthModal(false);
-    fetchAddresses();
+    // fetchAddresses and fetchOfferSetsData will be called by the useEffect above
   };
 
   const handleAuthModalClose = () => {
     setShowAuthModal(false);
     setAuthModalClosed(true);
-    
     const accessToken = localStorage.getItem('accessToken');
     if (accessToken) {
       handleAuthSuccess();
     }
   };
-  
+
   const handleAddressSelection = (addressId: string) => {
     setSelectedAddressId(addressId);
-    const address = addresses.find(addr => addr.id === addressId);
+    const address = addresses.find((addr) => addr.id === addressId);
     if (address) {
       setSelectedAddress(address);
     }
@@ -260,20 +291,37 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     onClose();
   };
 
+  const handleRemoveOfferSet = async (setId: string) => {
+    setOfferSetsData((prev) => prev.filter((set) => set.id !== setId));
+    const cartItems = JSON.parse(localStorage.getItem('cartItems') || '[]').filter(
+      (item: any) => item.id !== setId || item.type !== 'offer'
+    );
+    localStorage.setItem('cartItems', JSON.stringify(cartItems));
+  };
+
+  const handleAddressFormSuccess = async (newAddressId: string) => {
+    await fetchAddresses();
+    setSelectedAddressId(newAddressId);
+    setShowAddressForm(false);
+  };
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden flex items-center justify-center">
       <div className="absolute inset-0 bg-black/80" onClick={handleClose}></div>
-      
       <div className="relative w-full max-w-md bg-[#e1e1e1] rounded-lg shadow-xl flex flex-col max-h-[90vh]">
         <div className="flex justify-between items-center p-4 bg-[#175E7A] rounded-t-lg z-10">
           <div className="flex items-center">
             {currentStep !== CheckoutStep.ADDRESS_SELECTION && (
-              <button 
-                onClick={currentStep === CheckoutStep.BILL_SUMMARY ? handleBackToAddresses : 
-                         currentStep === CheckoutStep.PAYMENT_PROCESSING ? handleBackToBillSummary : 
-                         undefined}
+              <button
+                onClick={
+                  currentStep === CheckoutStep.BILL_SUMMARY
+                    ? handleBackToAddresses
+                    : currentStep === CheckoutStep.PAYMENT_PROCESSING
+                    ? handleBackToBillSummary
+                    : undefined
+                }
                 className={`mr-3 text-white hover:text-gray-200 transition-colors ${
                   currentStep === CheckoutStep.ORDER_CONFIRMATION ? 'hidden' : ''
                 }`}
@@ -288,67 +336,58 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
               {currentStep === CheckoutStep.ORDER_CONFIRMATION && 'Order Confirmation'}
             </h3>
           </div>
-          <button 
-            onClick={handleClose} 
+          <button
+            onClick={handleClose}
             className="text-white hover:text-gray-200 transition-colors cursor-pointer"
             disabled={currentStep === CheckoutStep.PAYMENT_PROCESSING && !error}
           >
             <X size={20} />
           </button>
         </div>
-
         <div className="overflow-y-auto flex-1">
           {showAuthModal && !isAuthenticated ? (
-            <AuthModal 
-              isOpen={true} 
-              onClose={handleAuthModalClose} 
-            />
+            <AuthModal isOpen={true} onClose={handleAuthModalClose} />
           ) : (
             <div className="p-5">
-
               {currentStep === CheckoutStep.ADDRESS_SELECTION && (
                 <>
-                  {orderItems.length > 0 && (
+                  {(orderItems.length > 0 || offerSetsData.length > 0) && (
                     <div className="mb-6">
-                      <ProductSummary 
+                      <ProductSummary
                         items={orderItems}
                         coupon_code_id={coupon_code_id}
+                        offer_sets={offerSetsData}
                       />
                     </div>
                   )}
-                  
                   {loading ? (
                     <div className="flex justify-center items-center h-40">
                       <div className="w-8 h-8 border-4 border-gray-200 border-t-[#175e7a] rounded-full animate-spin mr-2"></div>
                       <p>Loading addresses...</p>
                     </div>
                   ) : showAddressForm ? (
-                    <AddressForm 
-                      onSuccess={(newAddressId) => {
-                        fetchAddresses().then(() => {
-                          setSelectedAddressId(newAddressId);
-                          setShowAddressForm(false);
-                        });
-                      }} 
-                      onCancel={() => setShowAddressForm(false)} 
+                    <AddressForm
+                      onSuccess={handleAddressFormSuccess}
+                      onCancel={() => setShowAddressForm(false)}
                     />
                   ) : (
                     <>
                       <div className="mb-6 bg-white p-4 rounded-[12px]">
                         <div className="flex justify-between items-center mb-4">
-                          <h4 className="font-medium text-[15px] text-[#494949]">Select Delivery Address</h4>
-                          <button 
+                          <h4 className="font-medium text-[15px] text-[#494949]">
+                            Select Delivery Address
+                          </h4>
+                          <button
                             onClick={() => setShowAddressForm(true)}
                             className="text-[13px] text-[#175e7a] cursor-pointer hover:text-blue-800 font-medium transition-colors"
                           >
                             Add New Address
                           </button>
                         </div>
-
                         {addresses.length === 0 ? (
                           <div className="text-center py-4">
                             <p className="text-gray-500">No addresses found. Please add a new address.</p>
-                            <button 
+                            <button
                               onClick={() => setShowAddressForm(true)}
                               className="mt-2 text-[13px] text-[#175e7a] cursor-pointer hover:text-blue-800 font-medium transition-colors"
                             >
@@ -357,29 +396,37 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                           </div>
                         ) : (
                           <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
-                            {addresses.map(address => (
-                              <div 
+                            {addresses.map((address) => (
+                              <div
                                 key={address.id}
                                 className={`p-4 border rounded-lg cursor-pointer transition-all ${
-                                  selectedAddressId === address.id 
-                                    ? 'border-[#175e7a] bg-blue-50' 
+                                  selectedAddressId === address.id
+                                    ? 'border-[#175e7a] bg-blue-50'
                                     : 'border-gray-200 hover:border-gray-300'
                                 }`}
                                 onClick={() => handleAddressSelection(address.id)}
                               >
                                 <div className="flex items-start">
-                                  <div className={`w-5 h-5 mt-1 mr-3 rounded-full border flex items-center justify-center ${
-                                    selectedAddressId === address.id ? 'border-[#175e7a]' : 'border-gray-300'
-                                  }`}>
+                                  <div
+                                    className={`w-5 h-5 mt-1 mr-3 rounded-full border flex items-center justify-center ${
+                                      selectedAddressId === address.id
+                                        ? 'border-[#175e7a]'
+                                        : 'border-gray-300'
+                                    }`}
+                                  >
                                     {selectedAddressId === address.id && (
                                       <div className="w-3 h-3 rounded-full bg-[#175e7a]"></div>
                                     )}
                                   </div>
-                                  <div className='mt-[-5px] text-[14px]'>
+                                  <div className="mt-[-5px] text-[14px]">
                                     <p className="text-gray-800">{address.address}</p>
-                                    <p className="text-gray-600">{address.town}, {INDIAN_STATES[address.state]} - {address.pincode}</p>
+                                    <p className="text-gray-600">
+                                      {address.town}, {INDIAN_STATES[address.state]} - {address.pincode}
+                                    </p>
                                     <p className="text-gray-600">Phone: {address.phone_number_1}</p>
-                                    {address.phone_number_2 && <p className="text-gray-600">Alt Phone: {address.phone_number_2}</p>}
+                                    {address.phone_number_2 && (
+                                      <p className="text-gray-600">Alt Phone: {address.phone_number_2}</p>
+                                    )}
                                     {address.is_default && (
                                       <span className="inline-block mt-1 px-2 py-0.5 bg-green-100 text-green-800 text-xs rounded-full">
                                         Default Address
@@ -392,22 +439,32 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                           </div>
                         )}
                       </div>
+                      {(orderItems.length > 0 || offerSetsData.length > 0) && (
+                        <div className="mb-6">
+                          {offerSetsData.map((offerSet) => (
+                            <OfferCartItem
+                              key={offerSet.id}
+                              offerSet={offerSet}
+                              onRemove={handleRemoveOfferSet}
+                            />
+                          ))}
+                        </div>
+                      )}
                     </>
                   )}
                 </>
               )}
-
               {currentStep === CheckoutStep.BILL_SUMMARY && selectedAddress && (
                 <BillSummary
                   orderItems={orderItems}
                   couponCode={coupon_code_id}
                   destinationPincode={selectedAddress.pincode}
-                  onPlaceOrder={handleOrderCreated} 
+                  onPlaceOrder={handleOrderCreated}
                   onError={handleBillSummaryError}
                   addressID={selectedAddressId}
+                  offer_sets={offerSetsData}
                 />
               )}
-
               {currentStep === CheckoutStep.PAYMENT_PROCESSING && orderId && selectedAddress && (
                 <RazorpayPayment
                   orderId={orderId}
@@ -417,7 +474,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   onCancel={handlePaymentCancel}
                 />
               )}
-
               {currentStep === CheckoutStep.ORDER_CONFIRMATION && (
                 <OrderConfirmation
                   orderId={staraOrderId}
@@ -433,10 +489,9 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
             </div>
           )}
         </div>
-
         {currentStep === CheckoutStep.ADDRESS_SELECTION && addresses.length > 0 && !showAddressForm && (
           <div className="p-4 border-t border-gray-200 bg-gray-50 rounded-b-lg">
-            <button 
+            <button
               className="w-full bg-[#175e7a] text-[14px] text-white font-medium py-3 rounded-md hover:bg-[#0f4c67] cursor-pointer transition-colors shadow-sm"
               onClick={handleProceedToPayment}
               disabled={!selectedAddressId}

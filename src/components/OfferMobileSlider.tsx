@@ -1,8 +1,10 @@
 'use client';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { X, ShoppingBag, Info } from 'lucide-react';
 import apiService from '@/utils/api/apiService';
+import { v4 as uuidv4 } from 'uuid';
+import { useCart } from '@/context/cartContext';
 
 interface ProductItem {
   id: string;
@@ -40,6 +42,8 @@ interface OfferMobileSliderProps {
   offerData: OfferData;
   slots: OfferSlot[];
   onSlotClear: (slotId: string) => void;
+  onOpenCartDrawer: () => void;
+  isAuthenticated?: boolean;
 }
 
 export default function OfferMobileSlider({ 
@@ -47,7 +51,9 @@ export default function OfferMobileSlider({
   onClose, 
   offerData, 
   slots,
-  onSlotClear
+  onSlotClear,
+  onOpenCartDrawer,
+  isAuthenticated = false
 }: OfferMobileSliderProps) {
   useEffect(() => {
     if (isOpen) {
@@ -55,31 +61,29 @@ export default function OfferMobileSlider({
     } else {
       document.body.style.overflow = 'unset';
     }
-    
     return () => {
       document.body.style.overflow = 'unset';
     };
   }, [isOpen]);
 
+  const { dispatchCart } = useCart();
+  const [loading, setLoading] = useState(false);
+
   const calculateTotals = () => {
     const filledSlots = slots.filter(slot => slot.product);
-    // Always return freeItems as an array, even when empty
     if (filledSlots.length === 0) {
       return { payableTotal: 0, savings: 0, freeItems: [] };
     }
 
-    // Sort products by price (highest first)
     const sortedProducts = filledSlots
       .map(slot => ({ ...slot.product!, slotId: slot.id }))
       .sort((a, b) => parseFloat(b.product_price) - parseFloat(a.product_price));
 
-    // Calculate payable total (highest-priced buy_count items)
     const itemsToCharge = Math.min(offerData.buy_count, sortedProducts.length);
     const payableTotal = sortedProducts
       .slice(0, itemsToCharge)
       .reduce((sum, product) => sum + parseFloat(product.product_price), 0);
 
-    // Calculate savings (free items total)
     const savings = sortedProducts
       .slice(itemsToCharge)
       .reduce((sum, product) => sum + parseFloat(product.product_price), 0);
@@ -93,22 +97,51 @@ export default function OfferMobileSlider({
   };
 
   const handleBuyNow = async () => {
-  if (isOfferComplete()) {
-    try {
-      const product_ids = slots
-        .filter(slot => slot.product)
-        .map(slot => slot.product!.id.replace(/-/g, ''));
-      await apiService.addToCartOffer({
-        product_ids,
-        offer_id: offerData.id.replace(/-/g, ''),
+    if (!isOfferComplete()) return;
+
+    setLoading(true);
+    const offerProductsMap = new Map<string, { product: string; quantity: number }>();
+    slots
+      .filter(slot => slot.product)
+      .forEach((slot) => {
+        const productId = slot.product!.id;
+        if (offerProductsMap.has(productId)) {
+          const existing = offerProductsMap.get(productId)!;
+          offerProductsMap.set(productId, { product: productId, quantity: existing.quantity + 1 });
+        } else {
+          offerProductsMap.set(productId, { product: productId, quantity: 1 });
+        }
       });
-      // Add any additional logic here (e.g., redirect, show success message)
+    const offerProducts = Array.from(offerProductsMap.values());
+
+    const offerSet = {
+      id: isAuthenticated ? null : uuidv4(),
+      offer_id: offerData.id,
+      offer_products: offerProducts,
+      buy_count: offerData.buy_count,
+      get_count: offerData.get_count,
+      isSynced: isAuthenticated,
+      type: 'offer',
+    };
+
+    try {
+      if (isAuthenticated) {
+        const response = await apiService.addToCartOffer({
+          offer_id: offerData.id.replace(/-/g, ''),
+          offer_products: offerProducts.map(p => ({ product_id: p.product, quantity: p.quantity })),
+        });
+        offerSet.id = response.id;
+        offerSet.isSynced = true;
+      }
+      dispatchCart({ type: 'ADD_OFFER_SET', payload: offerSet });
+      onOpenCartDrawer();
     } catch (error) {
       console.error('Failed to add to cart:', error);
-      // Optionally handle error (e.g., show error message to user)
+      alert('Failed to add offer. Please try again.');
+    } finally {
+      setLoading(false);
     }
-  }
-};
+  };
 
   if (!isOpen) return null;
 
@@ -122,7 +155,6 @@ export default function OfferMobileSlider({
         className="fixed inset-0 bg-black/70 z-51"
         onClick={onClose}
       />
-      
       <div className="fixed bottom-0 left-0 right-0 bg-white rounded-t-xl z-52 p-4 max-h-[80vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">Your Selection</h3>
@@ -130,13 +162,11 @@ export default function OfferMobileSlider({
             <X size={20} />
           </button>
         </div>
-        
         <div className="p-4 rounded-lg bg-gray-50 mb-4">
           <div className="flex items-center gap-2 mb-3">
             <ShoppingBag size={16} className="text-gray-700" />
             <h4 className="font-medium">Selected Items ({filledSlots.length}/{totalRequiredItems})</h4>
           </div>
-          
           <div className="grid grid-cols-2 gap-2">
             {slots.map((slot) => (
               <div key={slot.id} className="bg-white rounded-lg p-2 min-h-[65px] border-2 border-dashed border-gray-300">
@@ -183,7 +213,6 @@ export default function OfferMobileSlider({
             ))}
           </div>
         </div>
-        
         {filledSlots.length > 0 && (
           <div className="pt-4 pb-12 mt-4">
             <div className="space-y-2 text-sm mb-4">
@@ -198,18 +227,17 @@ export default function OfferMobileSlider({
                 <span>₹{payableTotal.toLocaleString()}</span>
               </div>
             </div>
-            
             <button 
-                className={`w-full py-3 rounded-lg font-medium transition-colors ${
-                  isOfferComplete() 
-                    ? 'bg-[#175e7a] cursor-pointer text-white hover:bg-[#0f4c67]' 
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                }`}
-                disabled={!isOfferComplete()}
-                onClick={handleBuyNow}
-              >
-                {isOfferComplete() ? 'Buy Now' : `Select ${totalRequiredItems - filledSlots.length} More Item${totalRequiredItems - filledSlots.length > 1 ? 's' : ''}`}
-              </button>
+              className={`w-full py-3 rounded-lg font-medium transition-colors ${
+                isOfferComplete() 
+                  ? 'bg-[#175e7a] cursor-pointer text-white hover:bg-[#0f4c67]' 
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
+              disabled={!isOfferComplete()}
+              onClick={handleBuyNow}
+            >
+              {isOfferComplete() ? 'Buy Now' : `Select ${totalRequiredItems - filledSlots.length} More Item${totalRequiredItems - filledSlots.length > 1 ? 's' : ''}`}
+            </button>
           </div>
         )}
       </div>

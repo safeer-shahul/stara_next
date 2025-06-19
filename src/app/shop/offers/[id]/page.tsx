@@ -7,6 +7,7 @@ import apiService from '@/utils/api/apiService';
 import Link from 'next/link';
 import OfferMobileSlider from '@/components/OfferMobileSlider';
 import OfferCartSidebar from '@/components/OfferCartSidebar';
+import CartDrawer from '@/components/CartDrawer';
 
 interface ProductItem {
   id: string;
@@ -45,15 +46,28 @@ export default function OfferProductsPage() {
   const params = useParams();
   const router = useRouter();
   const offerId = params?.id as string;
-  
+
   const [loading, setLoading] = useState(true);
   const [offerData, setOfferData] = useState<OfferData | null>(null);
   const [offerSlots, setOfferSlots] = useState<OfferSlot[]>([]);
   const [isMobile, setIsMobile] = useState(false);
   const [showMobileSlider, setShowMobileSlider] = useState(false);
+  const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hoveredProduct, setHoveredProduct] = useState<string | null>(null);
   const [isNavigating, setIsNavigating] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  const checkAuthentication = useCallback(() => {
+    const accessToken = localStorage.getItem('accessToken');
+    if (accessToken) {
+      setIsAuthenticated(true);
+      return true;
+    } else {
+      setIsAuthenticated(false);
+      return false;
+    }
+  }, []);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -96,7 +110,8 @@ export default function OfferProductsPage() {
       }
     };
     fetchOfferData();
-  }, [offerId]);
+    checkAuthentication(); // Check authentication on mount
+  }, [offerId, checkAuthentication]);
 
   const getTotalProductCount = useCallback((productId: string) => {
     return offerSlots.filter(slot => slot.product?.id === productId).length;
@@ -119,12 +134,15 @@ export default function OfferProductsPage() {
     );
   }, [offerSlots]);
 
+  const handleOpenCartDrawer = useCallback(() => {
+    setShowMobileSlider(false); 
+    setIsCartDrawerOpen(true); 
+  }, []);
+
   const handleSlotClear = useCallback((slotId: string) => {
-    setOfferSlots(prev => 
-      prev.map(slot => 
-        slot.id === slotId 
-          ? { ...slot, product: null }
-          : slot
+    setOfferSlots((prev) =>
+      prev.map((slot) =>
+        slot.id === slotId ? { ...slot, product: null } : slot
       )
     );
   }, []);
@@ -223,16 +241,15 @@ export default function OfferProductsPage() {
 
       <div className={`${isMobile ? 'block' : 'flex gap-8'}`}>
         <div className={`${isMobile ? 'w-full mb-6' : 'w-2/3'}`}>
-               {/* Pricing Info Disclaimer */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-          <div className="flex items-start gap-2">
-            <Info size={16} className="text-blue-600 mt-0.5 flex-shrink-0" />
-            <div className="text-xs text-blue-800">
-              <p className="font-medium mb-1">How pricing works:</p>
-              <p>Select {totalRequiredItems} items total. You'll only pay for the {offerData.buy_count} most expensive items. The remaining {offerData.get_count} item{offerData.get_count > 1 ? 's' : ''} will be free!</p>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+            <div className="flex items-start gap-2">
+              <Info size={16} className="text-blue-600 mt-0.5 flex-shrink-0" />
+              <div className="text-xs text-blue-800">
+                <p className="font-medium mb-1">How pricing works:</p>
+                <p>Select {totalRequiredItems} items total. You'll only pay for the {offerData.buy_count} most expensive items. The remaining {offerData.get_count} item{offerData.get_count > 1 ? 's' : ''} will be free!</p>
+              </div>
             </div>
           </div>
-        </div>
 
           <h2 className="text-xl font-semibold mb-4">Select {totalRequiredItems} Products for Your Offer</h2>
           
@@ -338,6 +355,8 @@ export default function OfferProductsPage() {
             offerData={offerData}
             slots={offerSlots}
             onSlotClear={handleSlotClear}
+            onOpenCartDrawer={handleOpenCartDrawer}
+            isAuthenticated={isAuthenticated}
           />
         )}
       </div>
@@ -376,8 +395,15 @@ export default function OfferProductsPage() {
           offerData={offerData}
           slots={offerSlots}
           onSlotClear={handleSlotClear}
+          onOpenCartDrawer={handleOpenCartDrawer}
+          isAuthenticated={isAuthenticated}
         />
       )}
+
+      <CartDrawer
+        isOpen={isCartDrawerOpen}
+        onClose={() => setIsCartDrawerOpen(false)}
+      />
     </div>
   );
 }
