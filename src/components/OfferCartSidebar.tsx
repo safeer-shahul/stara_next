@@ -85,24 +85,14 @@ export default function OfferCartSidebar({
     if (!isOfferComplete()) return;
 
     setLoading(true);
-    const offerProductsMap = new Map<string, { product: string; quantity: number }>();
-    slots
+    const offerProducts = slots
       .filter(slot => slot.product)
-      .forEach((slot) => {
-        const productId = slot.product!.id;
-        if (offerProductsMap.has(productId)) {
-          const existing = offerProductsMap.get(productId)!;
-          offerProductsMap.set(productId, { product: productId, quantity: existing.quantity + 1 });
-        } else {
-          offerProductsMap.set(productId, { product: productId, quantity: 1 });
-        }
-      });
-    const offerProducts = Array.from(offerProductsMap.values());
+      .map(slot => slot.product!.id.replace(/-/g, '')); // List of product UUIDs without hyphens
 
     const offerSet = {
       id: isAuthenticated ? null : uuidv4(),
       offer_id: offerData.id,
-      offer_products: offerProducts,
+      offer_products: offerProducts.map(id => ({ product: id, quantity: 1 })), // Local storage format
       buy_count: offerData.buy_count,
       get_count: offerData.get_count,
       isSynced: isAuthenticated,
@@ -113,7 +103,7 @@ export default function OfferCartSidebar({
       if (isAuthenticated) {
         const response = await apiService.addToCartOffer({
           offer_id: offerData.id.replace(/-/g, ''),
-          offer_products: offerProducts.map(p => ({ product_id: p.product, quantity: p.quantity })),
+          product_ids: offerProducts, // Send only UUIDs
         });
         offerSet.id = response.id;
         offerSet.isSynced = true;

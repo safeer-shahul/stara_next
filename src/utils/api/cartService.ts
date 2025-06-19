@@ -38,7 +38,7 @@ export const cartService = {
           return {
             ...item,
             offer_products: item.offer_products.map((p: any) => {
-              const productData:any = productsMap.get(p.product.replace(/-/g, '')) || {};
+              const productData: any = productsMap.get(p.product.replace(/-/g, '')) || {};
               return {
                 ...p,
                 ...productData,
@@ -63,15 +63,25 @@ export const cartService = {
     const updatedItems = [...unsyncedItems];
     for (const item of unsyncedItems) {
       try {
-        const response = await apiService.addToCartOffer({
-          offer_id: item.offer_id,
-          offer_products: item.offer_products,
-        });
-        const index = updatedItems.findIndex((i: any) => i.id === item.id);
-        updatedItems[index] = { ...response, isSynced: true };
+        if (item.type === 'offer') {
+          const response = await apiService.addToCartOffer({
+            offer_id: item.offer_id.replace(/-/g, ''),
+            product_ids: item.offer_products.map((p: any) => p.product.replace(/-/g, '')), // Use product_ids
+          });
+          const index = updatedItems.findIndex((i: any) => i.id === item.id);
+          updatedItems[index] = { ...response, isSynced: true, type: 'offer' };
+        } else if (item.type === 'normal') {
+          await apiService.addToCart({ product_id: item.id.replace(/-/g, ''), mode: '+' });
+          const index = updatedItems.findIndex((i: any) => i.id === item.id);
+          updatedItems[index] = { ...item, isSynced: true };
+        }
       } catch (error) {
-        console.error(`Error syncing offer set ${item.id}:`, error);
+        console.error(`Error syncing item ${item.id}:`, error);
       }
+    }
+    // Update localStorage after sync
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('cartItems', JSON.stringify(updatedItems));
     }
     return updatedItems;
   },

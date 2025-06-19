@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 
 interface OfferCartItemProps {
   offerSet: {
+    offer: any;
     id: string;
     offer_id: string;
     offer_products: Array<{
@@ -28,7 +29,9 @@ export default function OfferCartItem({ offerSet, onRemove }: OfferCartItemProps
       try {
         const response = await apiService.getValidOffers();
         if (response && response.data) {
-          const offer = response.data.find((o: any) => o.id.replace(/-/g, '') === offerSet.offer_id);
+          console.log('response offer cartofferitem',response)
+          console.log('offerSetofferSetofferSet',offerSet)
+          const offer = response.data.find((o: any) => o.id.replace(/-/g, '') === offerSet.offer.replace(/-/g, ''));
           setOfferName(offer ? offer.offer_name : 'Offer');
         }
       } catch (err) {
@@ -42,10 +45,15 @@ export default function OfferCartItem({ offerSet, onRemove }: OfferCartItemProps
   console.log('offerSet in OfferCartItem:', offerSet);
 
   const calculateOfferTotals = () => {
+    // Guard against undefined or non-array offer_products
+    if (!Array.isArray(offerSet.offer_products) || offerSet.offer_products.length === 0) {
+      return { payableTotal: 0, savings: 0, freeItems: [] };
+    }
+
     const sortedProducts = offerSet.offer_products.sort(
       (a, b) => parseFloat(b.product_price) - parseFloat(a.product_price)
     );
-    // Assume the first product is paid, and the rest are free as a fallback (adjust logic if needed)
+    // Assume the first product is paid, and the rest are free as a fallback
     const itemsToCharge = Math.min(1, sortedProducts.length); // Default to 1 paid item
     const payableTotal = sortedProducts
       .slice(0, itemsToCharge)
@@ -60,13 +68,8 @@ export default function OfferCartItem({ offerSet, onRemove }: OfferCartItemProps
 
   const { payableTotal, savings, freeItems } = calculateOfferTotals();
 
-  const handleRemoveOfferSet = async () => {
-    try {
-      await apiService.removeOfferSetFromCart(offerSet.id, offerSet.offer_id.replace(/-/g, ''));
-      onRemove(offerSet.id);
-    } catch (error) {
-      console.error('Error removing offer set:', error);
-    }
+  const handleRemove = () => {
+    onRemove(offerSet.id); 
   };
 
   return (
@@ -74,7 +77,7 @@ export default function OfferCartItem({ offerSet, onRemove }: OfferCartItemProps
       <div className="flex justify-between items-center mb-2">
         <h4 className="font-medium text-sm">{offerName}</h4>
         <button
-          onClick={handleRemoveOfferSet}
+          onClick={handleRemove}
           className="bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
         >
           <X size={12} />
@@ -84,7 +87,7 @@ export default function OfferCartItem({ offerSet, onRemove }: OfferCartItemProps
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => setIsCollapsed(!isCollapsed)}>
           <div className="relative w-12 h-12 flex-shrink-0 rounded overflow-hidden">
             <Image
-              src={offerSet.offer_products[0].images?.[0]?.product_image
+              src={offerSet.offer_products[0].images[0]?.product_image
                 ? `${process.env.NEXT_PUBLIC_API_BASE_URL}${offerSet.offer_products[0].images[0].product_image}`
                 : '/images/placeholder.png'}
               alt={offerSet.offer_products[0].product_name}
@@ -118,9 +121,9 @@ export default function OfferCartItem({ offerSet, onRemove }: OfferCartItemProps
               <div key={product.id} className="flex items-center gap-2">
                 <div className="relative w-12 h-12 flex-shrink-0 rounded overflow-hidden">
                   <Image
-                    src={product.images?.[0]?.product_image
+                    src={product.images[0]?.product_image
                       ? `${process.env.NEXT_PUBLIC_API_BASE_URL}${product.images[0].product_image}`
-                      : '/images/placeholder.png'}
+                      : '/images/placeholderddd.png'}
                     alt={product.product_name}
                     fill
                     className="object-cover"

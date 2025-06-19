@@ -31,12 +31,14 @@ const CartItem = ({ product, onRemove, onQuantityChange, maxQuantity }: CartItem
       onQuantityChange(product.id, -1);
     }
   };
+
+  console.log('product',product)
   
   return (
     <div className="flex rounded-md border border-gray-200 p-2 bg-white">
       <div className="w-20 h-20 relative mr-3 bg-gray-100 rounded">
         <Image
-          src={`${process.env.NEXT_PUBLIC_API_BASE_URL}${product.image}`}
+          src={product.images[0]?.product_image ? `${process.env.NEXT_PUBLIC_API_BASE_URL}${product.images[0].product_image}` : '/placeholder.jpg'}
           alt={product.name}
           fill
           className="object-contain p-2"

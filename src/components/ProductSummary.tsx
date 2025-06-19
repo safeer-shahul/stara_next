@@ -207,7 +207,7 @@ const ProductSummary: React.FC<ProductSummaryProps> = ({ items, coupon_code_id, 
     try {
       const offerSet = offer_sets.find((set) => set.id === setId);
       if (offerSet) {
-        await apiService.removeOfferSetFromCart(setId, offerSet.offer_id.replace(/-/g, ''));
+        await apiService.addToCart({ item_id: setId.replace(/-/g, ''), mode: 'delete' }); 
       }
       // Update local storage
       const cartItems = JSON.parse(localStorage.getItem('cartItems') || '[]').filter(

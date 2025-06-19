@@ -82,25 +82,14 @@ export default function ProductDetailPage() {
       setSelectedProductId(product.id);
       setIsCartOpen(true);
 
-      const storedCartItems = JSON.parse(localStorage.getItem('cartItems') || '[]');
-      const productIdWithoutHyphens = product.id.replace(/-/g, '');
+      if (typeof window !== 'undefined') {
+        const storedCartItems = JSON.parse(localStorage.getItem('cartItems') || '[]');
+        const productIdWithoutHyphens = product.id.replace(/-/g, '');
 
-      if (storedCartItems.length > 0 && typeof storedCartItems[0] === 'string') {
-        const formattedCartIds = storedCartItems.map((id: any) => id.replace(/-/g, ''));
-        const updatedCart = [...formattedCartIds, productIdWithoutHyphens];
-        const productCounts: any = {};
-        updatedCart.forEach((id) => {
-          productCounts[id] = (productCounts[id] || 0) + 1;
-        });
-        const newFormatCart = Object.keys(productCounts).map((id) => ({
-          id,
-          quantity: productCounts[id],
-        }));
-        localStorage.setItem('cartItems', JSON.stringify(newFormatCart));
-      } else {
         const existingItemIndex = storedCartItems.findIndex(
           (item: any) => item.id === productIdWithoutHyphens
         );
+
         let updatedCartItems;
         if (existingItemIndex >= 0) {
           updatedCartItems = [...storedCartItems];
@@ -111,9 +100,10 @@ export default function ProductDetailPage() {
         } else {
           updatedCartItems = [
             ...storedCartItems,
-            { id: productIdWithoutHyphens, quantity: 1 },
+            { id: productIdWithoutHyphens, quantity: 1, type: 'normal' },
           ];
         }
+
         localStorage.setItem('cartItems', JSON.stringify(updatedCartItems));
       }
     }

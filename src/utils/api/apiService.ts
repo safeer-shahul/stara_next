@@ -717,19 +717,6 @@ class ApiService {
     }
   }
 
-  public async removeOfferSetFromCart(offerset_id:any,offer_id:any): Promise<any> {
-    try {
-      let data = {
-        offerset_id:offerset_id,
-        offer_id:offer_id
-      }
-      const response = await this.post<any>('/cart/remove_from_cart_by_offer', data);
-      return response;
-    } catch (error) {
-      throw error;
-    }
-  }
-
 }
 
 const apiService = ApiService.getInstance();

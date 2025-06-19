@@ -1,14 +1,13 @@
-// src/context/CartContext.tsx
 'use client';
 
-import { createContext, useContext, useReducer, useEffect } from 'react';
+import { createContext, useContext, useReducer, useEffect, useState } from 'react';
 import apiService from '@/utils/api/apiService';
 import { cartService } from '@/utils/api/cartService';
 
 const CartContext = createContext<any>(null);
 
 const initialState = {
-  cartItems: JSON.parse(localStorage.getItem('cartItems') || '[]'),
+  cartItems: [],
   loading: false,
   appliedCoupon: null,
   checkoutData: { items: [], offer_sets: [] },
@@ -40,20 +39,46 @@ const cartReducer = (state: any, action: any) => {
 
 export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   const [state, dispatch] = useReducer(cartReducer, initialState);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+
+  // Load initial cart and detect authentication status
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedCartItems = localStorage.getItem('cartItems');
+      if (storedCartItems) {
+        const parsedItems = JSON.parse(storedCartItems);
+        // Only dispatch if different to avoid unnecessary updates
+        if (JSON.stringify(parsedItems) !== JSON.stringify(state.cartItems)) {
+          dispatch({ type: 'SET_CART_ITEMS', payload: parsedItems });
+        }
+      }
+      // Update accessToken state
+      const token = localStorage.getItem('accessToken');
+      setAccessToken(token);
+    }
+  }, []);
 
   useEffect(() => {
-    const syncGuestCart = async () => {
-      const unsyncedItems = state.cartItems.filter((item: any) => item.type === 'offer' && !item.isSynced);
-      if (unsyncedItems.length > 0 && isAuthenticated) {
-        dispatch({ type: 'SET_LOADING', payload: true });
-        const updatedItems = await cartService.syncGuestCart(unsyncedItems);
-        dispatch({ type: 'SET_CART_ITEMS', payload: updatedItems });
-        dispatch({ type: 'SET_LOADING', payload: false });
-      }
-    };
-    let isAuthenticated = false; // Replace with authContext or prop
-    syncGuestCart();
-  }, [state.cartItems]); // Trigger on login (simulated here)
+    if (typeof window !== 'undefined' && accessToken) {
+      const syncGuestCart = async () => {
+        const unsyncedItems = state.cartItems.filter(
+          (item: any) => item.type === 'offer' && !item.isSynced
+        );
+        if (unsyncedItems.length > 0) {
+          dispatch({ type: 'SET_LOADING', payload: true });
+          try {
+            const updatedItems = await cartService.syncGuestCart(unsyncedItems);
+            dispatch({ type: 'SET_CART_ITEMS', payload: updatedItems });
+          } catch (error) {
+            console.error('Error syncing guest cart:', error);
+          } finally {
+            dispatch({ type: 'SET_LOADING', payload: false });
+          }
+        }
+      };
+      syncGuestCart();
+    }
+  }, [accessToken]);
 
   const value = {
     cartItems: state.cartItems,

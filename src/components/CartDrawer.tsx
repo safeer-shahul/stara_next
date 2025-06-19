@@ -8,19 +8,21 @@ import OfferCartItem from './OfferCartItem';
 import CouponSection from './CouponSection';
 import CouponsList from './CouponsList';
 import CheckoutModal from './CheckoutModal';
-import { cartService } from '@/utils/api/cartService';
 import { useCart } from '@/context/cartContext';
-import { cartUtils } from '@/utils/cartUtils';
+import { cartService } from '@/utils/api/cartService';
 import apiService from '@/utils/api/apiService';
+import { cartUtils } from '@/utils/cartUtils';
 
 interface CartDrawerProps {
   isOpen: boolean;
   onClose: () => void;
-  productId?: string;
+  productId?: string | null | undefined; 
 }
 
 const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, productId }) => {
   const { cartItems, dispatchCart, loading: contextLoading } = useCart();
+  console.log(cartItems,'this is me')
+
   const [localLoading, setLocalLoading] = useState<boolean>(false);
   const [showCoupons, setShowCoupons] = useState<boolean>(false);
   const [couponCode, setCouponCode] = useState<string>('');
@@ -51,25 +53,31 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, productId }) =
   }, [dispatchCart]);
 
   useEffect(() => {
-    const handleProductIdAddToCart = async () => {
-      if (isOpen && productId) {
-        try {
-          const cleanProductId = productId.replace(/-/g, '');
-          await cartService.addToCart(cleanProductId, '+');
-          await fetchCartFromBackend();
-        } catch (error) {
-          console.error('Error adding product to cart:', error);
-        }
+  const handleProductIdAddToCart = async () => {
+    if (isOpen && productId) { 
+      try {
+        const cleanProductId = productId.replace(/-/g, '');
+        await cartService.addToCart(cleanProductId, '+');
+        await fetchCartFromBackend();
+      } catch (error) {
+        console.error('Error adding product to cart:', error);
       }
-    };
-    handleProductIdAddToCart();
-  }, [isOpen, productId, fetchCartFromBackend]);
+    }
+  };
+  handleProductIdAddToCart();
+}, [isOpen, productId, fetchCartFromBackend]);
 
   useEffect(() => {
-    if (isOpen) {
-      fetchCartFromBackend();
+    if (isOpen && typeof window !== 'undefined') {
+      const accessToken = localStorage.getItem('accessToken');
+      if (accessToken) {
+        fetchCartFromBackend();
+      } else {
+        const storedCartItems = JSON.parse(localStorage.getItem('cartItems') || '[]');
+        dispatchCart({ type: 'SET_CART_ITEMS', payload: storedCartItems });
+      }
     }
-  }, [isOpen, fetchCartFromBackend]);
+  }, [isOpen, fetchCartFromBackend, dispatchCart]);
 
   useEffect(() => {
     if (!showCheckoutModal && isOpen) {
@@ -83,7 +91,6 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, productId }) =
 
   const handleRemoveItem = async (id: string): Promise<void> => {
     try {
-      // Assuming apiService or cartService needs a remove method; adjust if different
       await apiService.addToCart({ product_id: id.replace(/-/g, ''), mode: 'delete' });
       dispatchCart({ type: 'REMOVE_ITEM', payload: id });
     } catch (error) {
@@ -94,8 +101,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, productId }) =
 
   const handleRemoveOfferSet = async (setId: string): Promise<void> => {
     try {
-      // Assuming a removeOfferSet endpoint; implement in cartService if needed
-      await apiService.addToCart({ item_id: setId.replace(/-/g, ''), mode: 'delete' }); // Placeholder; adjust endpoint
+      await apiService.addToCart({ item_id: setId.replace(/-/g, ''), mode: 'delete' }); 
       dispatchCart({ type: 'REMOVE_ITEM', payload: setId });
     } catch (error) {
       console.error('Error removing offer set:', error);
@@ -116,7 +122,6 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, productId }) =
       await fetchCartFromBackend();
     } catch (error) {
       console.error('Error updating cart quantity:', error);
-      // No direct dispatch for quantity update; rely on fetch to sync
     }
   };
 
@@ -214,7 +219,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, productId }) =
 
   const clearCart = async (): Promise<void> => {
     try {
-      await apiService.addToCart({ mode: 'delete_cart' }); // Adjust if cartService has clearCart
+      await apiService.addToCart({ mode: 'delete_cart' });
       dispatchCart({ type: 'SET_CART_ITEMS', payload: [] });
     } catch (error) {
       console.error('Error clearing cart:', error);
@@ -275,7 +280,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, productId }) =
                             product={item}
                             onRemove={handleRemoveItem}
                             onQuantityChange={handleQuantityChange}
-                            maxQuantity={item.quantity} // Adjust based on your data structure
+                            maxQuantity={item.quantity} // Adjust based on your data
                           />
                         ) : (
                           <OfferCartItem

@@ -78,67 +78,34 @@ export default function WishlistPage() {
 
   // Handle adding item to cart - Updated to match ProductDetailPage logic
   const handleAddToCart = (productId: string) => {
-    // Set the selected product ID to pass to CartDrawer
-    setSelectedProductId(productId);
-    
-    // Open the cart drawer
-    setIsCartOpen(true);
-    
-    // For backward compatibility, also update localStorage
-    // Get current cart items
+  setSelectedProductId(productId);
+  setIsCartOpen(true);
+
+  if (typeof window !== 'undefined') {
     const storedCartItems = JSON.parse(localStorage.getItem('cartItems') || '[]');
-    
-    // Check if we're dealing with the old format (array of strings)
-    if (storedCartItems.length > 0 && typeof storedCartItems[0] === 'string') {
-      // Convert old format items, removing hyphens
-      const formattedCartIds = storedCartItems.map((id: any) => id.replace(/-/g, ''));
-      
-      // Add new product ID
-      const productIdWithoutHyphens = productId.replace(/-/g, '');
-      const updatedCart = [...formattedCartIds, productIdWithoutHyphens];
-      
-      // Count occurrences and convert to new format
-      const productCounts: any = {};
-      updatedCart.forEach(id => {
-        productCounts[id] = (productCounts[id] || 0) + 1;
-      });
-      
-      // Convert to new format with quantities
-      const newFormatCart = Object.keys(productCounts).map(id => ({
-        id,
-        quantity: productCounts[id]
-      }));
-      
-      localStorage.setItem('cartItems', JSON.stringify(newFormatCart));
+    const productIdWithoutHyphens = productId.replace(/-/g, '');
+
+    const existingItemIndex = storedCartItems.findIndex(
+      (item: any) => item.id === productIdWithoutHyphens
+    );
+
+    let updatedCartItems;
+    if (existingItemIndex >= 0) {
+      updatedCartItems = [...storedCartItems];
+      updatedCartItems[existingItemIndex] = {
+        ...updatedCartItems[existingItemIndex],
+        quantity: updatedCartItems[existingItemIndex].quantity + 1,
+      };
     } else {
-      // Already using new format
-      const productIdWithoutHyphens = productId.replace(/-/g, '');
-      
-      // Find if product already exists in cart
-      const existingItemIndex = storedCartItems.findIndex(
-        (item: any) => item.id === productIdWithoutHyphens
-      );
-      
-      let updatedCartItems;
-      
-      if (existingItemIndex >= 0) {
-        // Product already exists, increase quantity
-        updatedCartItems = [...storedCartItems];
-        updatedCartItems[existingItemIndex] = {
-          ...updatedCartItems[existingItemIndex],
-          quantity: updatedCartItems[existingItemIndex].quantity + 1
-        };
-      } else {
-        // Product doesn't exist in cart, add it with quantity 1
-        updatedCartItems = [
-          ...storedCartItems, 
-          { id: productIdWithoutHyphens, quantity: 1 }
-        ];
-      }
-      
-      localStorage.setItem('cartItems', JSON.stringify(updatedCartItems));
+      updatedCartItems = [
+        ...storedCartItems,
+        { id: productIdWithoutHyphens, quantity: 1, type: 'normal' },
+      ];
     }
-  };
+
+    localStorage.setItem('cartItems', JSON.stringify(updatedCartItems));
+  }
+};
 
   // Handle cart drawer close
   const handleCartClose = () => {
