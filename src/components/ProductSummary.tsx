@@ -20,13 +20,8 @@ interface ProductSummaryProps {
   coupon_code_id?: string;
   offer_sets?: Array<{
     id: string;
-    offer_id: string;
-    offer_products: Array<{
-      id: string;
-      product_name: string;
-      product_price: string;
-      images: { product_image: string }[];
-    }>;
+    offer: string;
+    offer_products: string[];
     buy_count: number;
     get_count: number;
   }>;
@@ -34,110 +29,131 @@ interface ProductSummaryProps {
 
 const ProductSummary: React.FC<ProductSummaryProps> = ({ items, coupon_code_id, offer_sets = [] }) => {
   const [products, setProducts] = useState<any[]>([]);
+  const [offerSetsWithOffer, setOfferSetsWithOffer] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [couponCode, setCouponCode] = useState<string>(coupon_code_id || '');
+  const [couponCode, setCouponCode] = useState(coupon_code_id || '');
   const [appliedCoupon, setAppliedCoupon] = useState<CouponType | null>(null);
-  const [showCoupons, setShowCoupons] = useState<boolean>(false);
+  const [showCoupons, setShowCoupons] = useState(false);
   const isMounted = useRef(true);
-  const fetchInProgress = useRef(false);
-
-  // Helper to safely update state only if component is still mounted
-  const safeSetState = (setter: any, value: any) => {
-    if (isMounted.current) {
-      setter(value);
-    }
-  };
 
   useEffect(() => {
-    isMounted.current = true;
     return () => {
       isMounted.current = false;
     };
   }, []);
 
   useEffect(() => {
-    const fetchProducts = async () => {
-      if (fetchInProgress.current) return;
-      if (items.length === 0 && offer_sets.length === 0) {
-        safeSetState(setProducts, []);
-        safeSetState(setLoading, false);
-        return;
-      }
-
-      fetchInProgress.current = true;
-      safeSetState(setLoading, true);
-
+    const fetchData = async () => {
       try {
-        const productIds = items.map((item) => item.product_id.replace(/-/g, ''));
-        let formattedProducts: any[] = [];
-
+        setLoading(true);
+        setError(null);
+        
+        console.log('Starting fetchData with items:', items, 'offer_sets:', offer_sets);
+        
+        // 1. Fetch regular products
+        const productIds = items.map(item => item.product_id);
+        console.log('Product IDs to fetch:', productIds);
+        
         if (productIds.length > 0) {
+          console.log('Fetching regular products...');
           const response = await apiService.getPaginatedProducts(1, 30, productIds);
-          if (!isMounted.current) return;
-
-          if (response && response.products && Array.isArray(response.products)) {
-            formattedProducts = response.products.map((item: any) => {
-              const itemIdWithoutHyphens = item.id.replace(/-/g, '');
-              const cartItem = items.find((i) => i.product_id.replace(/-/g, '') === itemIdWithoutHyphens);
-              const quantity = cartItem ? cartItem.quantity : 1;
-
-              return {
-                id: item.id,
-                name: item.product_name,
-                price: parseFloat(item.product_price),
-                originalPrice: item.strike_price !== '0.00' ? parseFloat(item.strike_price) : undefined,
-                discount:
-                  item.strike_price !== '0.00'
-                    ? Math.round(
-                        ((parseFloat(item.strike_price) - parseFloat(item.product_price)) /
-                          parseFloat(item.strike_price)) *
-                          100
-                      ) + '%'
-                    : undefined,
-                description: item.product_description,
-                image:
-                  item.images.length > 0
-                    ? `${process.env.NEXT_PUBLIC_API_BASE_URL}${item.images[0].product_image}`
-                    : '/placeholder.jpg',
-                quantity: quantity,
-              };
-            });
+          console.log('Products response:', response);
+          
+          if (response?.products) {
+            const mappedProducts = response.products.map((product: { id: string; product_name: any; product_price: string; strike_price: string; images: { product_image: any; }[]; }) => ({
+              id: product.id,
+              name: product.product_name,
+              price: parseFloat(product.product_price),
+              originalPrice: product.strike_price !== '0.00' ? parseFloat(product.strike_price) : undefined,
+              discount: product.strike_price !== '0.00' 
+                ? `${Math.round(((parseFloat(product.strike_price) - parseFloat(product.product_price)) / 
+                  parseFloat(product.strike_price)) * 100)}%`
+                : undefined,
+              image: product.images?.[0]?.product_image 
+                ? `${process.env.NEXT_PUBLIC_API_BASE_URL}${product.images[0].product_image}`
+                : '/placeholder.jpg',
+              quantity: items.find(i => i.product_id === product.id)?.quantity || 1
+            }));
+            console.log('Mapped products:', mappedProducts);
+            setProducts(mappedProducts);
           }
         }
 
-        safeSetState(setProducts, formattedProducts);
+        // 2. Process offer sets
+        if (offer_sets.length > 0) {
+          console.log('Processing offer sets...');
+          // Get all unique product IDs from offers
+          const offerProductIds = [...new Set(offer_sets.flatMap(set => set.offer_products))];
+          console.log('Offer product IDs:', offerProductIds);
+          
+          // Fetch all offer products
+          const productsResponse = await apiService.getPaginatedProducts(1, 30, offerProductIds);
+          const validProducts = productsResponse?.products || [];
+          console.log('Offer products response:', validProducts);
+
+          // Fetch offer details
+          const offersResponse = await apiService.getValidOffers();
+          const validOffers = offersResponse?.data || [];
+          console.log('Offers response:', validOffers);
+
+          const formattedOfferSets = offer_sets.map(set => {
+            const offer = validOffers.find((o: { id: string; }) => o.id === set.offer);
+            const offerProducts = set.offer_products
+              .map(productId => {
+                const product = validProducts.find((p: { id: string; }) => p.id === productId);
+                return product ? {
+                  id: product.id,
+                  product_name: product.product_name,
+                  product_price: product.product_price,
+                  images: product.images || []
+                } : null;
+              })
+              .filter(Boolean);
+
+            return {
+              id: set.id,
+              offer: set.offer,
+              offer_name: offer || { id: set.offer, offer_name: 'Special Offer' },
+              offer_products: offerProducts,
+              buy_count: set.buy_count,
+              get_count: set.get_count
+            };
+          });
+
+          console.log('Formatted offer sets:', formattedOfferSets);
+          setOfferSetsWithOffer(formattedOfferSets);
+        }
+        
+        console.log('fetchData completed successfully');
       } catch (error) {
-        console.error('Error fetching products:', error);
-        safeSetState(setError, 'Failed to load product details');
-        safeSetState(setProducts, []);
+        console.error('Error fetching data:', error);
+        setError('Failed to load product details');
       } finally {
-        safeSetState(setLoading, false);
-        fetchInProgress.current = false;
+        console.log('Setting loading to false');
+        setLoading(false);
       }
     };
 
-    fetchProducts();
-  }, [items]);
+    fetchData();
+  }, [items, offer_sets]);
 
   // Apply initial coupon if provided
   useEffect(() => {
-    if (coupon_code_id) {
+    if (coupon_code_id && !loading) {
       setCouponCode(coupon_code_id);
       handleApplyCoupon();
     }
-  }, [coupon_code_id]);
+  }, [coupon_code_id, loading]);
 
   const calculateSubtotal = (): number => {
-    // Subtotal for normal products
     let total = products.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
-    // Subtotal for offer sets
-    offer_sets.forEach((offerSet) => {
-      const sortedProducts = offerSet.offer_products.sort(
-        (a, b) => parseFloat(b.product_price) - parseFloat(a.product_price)
+    offerSetsWithOffer.forEach((offerSet) => {
+      const sortedProducts = [...offerSet.offer_products].sort((a, b) => 
+        parseFloat(b.product_price) - parseFloat(a.product_price)
       );
-      const itemsToCharge = Math.min(offerSet.buy_count, sortedProducts.length);
+      const itemsToCharge = Math.min(offerSet.buy_count || 1, sortedProducts.length);
       total += sortedProducts
         .slice(0, itemsToCharge)
         .reduce((sum, product) => sum + parseFloat(product.product_price), 0);
@@ -148,11 +164,11 @@ const ProductSummary: React.FC<ProductSummaryProps> = ({ items, coupon_code_id, 
 
   const calculateOfferSavings = (): number => {
     let savings = 0;
-    offer_sets.forEach((offerSet) => {
-      const sortedProducts = offerSet.offer_products.sort(
-        (a, b) => parseFloat(b.product_price) - parseFloat(a.product_price)
+    offerSetsWithOffer.forEach((offerSet) => {
+      const sortedProducts = [...offerSet.offer_products].sort((a, b) => 
+        parseFloat(b.product_price) - parseFloat(a.product_price)
       );
-      const itemsToCharge = Math.min(offerSet.buy_count, sortedProducts.length);
+      const itemsToCharge = Math.min(offerSet.buy_count || 1, sortedProducts.length);
       savings += sortedProducts
         .slice(itemsToCharge)
         .reduce((sum, product) => sum + parseFloat(product.product_price), 0);
@@ -162,13 +178,15 @@ const ProductSummary: React.FC<ProductSummaryProps> = ({ items, coupon_code_id, 
 
   const handleApplyCoupon = (): void => {
     const subtotal = calculateSubtotal();
-    if (couponCode.toUpperCase() === 'B1G1') {
+    const coupon = couponCode.toUpperCase();
+    
+    if (coupon === 'B1G1') {
       setAppliedCoupon({
         code: 'B1G1',
         description: 'Buy 1 Get 1 Free',
         discount: subtotal * 0.5,
       });
-    } else if (couponCode.toUpperCase() === 'TANK') {
+    } else if (coupon === 'TANK') {
       setAppliedCoupon({
         code: 'TANK',
         description: '10% off on all jewelry',
@@ -180,39 +198,17 @@ const ProductSummary: React.FC<ProductSummaryProps> = ({ items, coupon_code_id, 
     setShowCoupons(false);
   };
 
-  const handleViewCoupons = (): void => {
-    setShowCoupons(true);
-  };
-
-  const handleApplyCouponFromList = (code: string): void => {
-    setCouponCode(code);
-    const subtotal = calculateSubtotal();
-    if (code === 'B1G1') {
-      setAppliedCoupon({
-        code: 'B1G1',
-        description: 'Buy 1 Get 1 Free',
-        discount: subtotal * 0.5,
-      });
-    } else if (code === 'TANK') {
-      setAppliedCoupon({
-        code: 'TANK',
-        description: '10% off on all jewelry',
-        discount: subtotal * 0.1,
-      });
-    }
-    setShowCoupons(false);
-  };
-
-  const handleRemoveOfferSet = async (setId: string): Promise<void> => {
+  const handleRemoveOfferSet = async (setId: string) => {
     try {
-      const offerSet = offer_sets.find((set) => set.id === setId);
-      if (offerSet) {
-        await apiService.addToCart({ item_id: setId.replace(/-/g, ''), mode: 'delete' }); 
-      }
+      await apiService.addToCart({
+        item_id: setId.replace(/-/g, ''),
+        mode: 'delete'
+      });
+      // Update local state
+      setOfferSetsWithOffer(prev => prev.filter(set => set.id !== setId));
       // Update local storage
-      const cartItems = JSON.parse(localStorage.getItem('cartItems') || '[]').filter(
-        (item: any) => item.id !== setId || item.type !== 'offer'
-      );
+      const cartItems = JSON.parse(localStorage.getItem('cartItems') || '[]')
+        .filter((item: any) => item.id !== setId || item.type !== 'offer');
       localStorage.setItem('cartItems', JSON.stringify(cartItems));
     } catch (error) {
       console.error('Error removing offer set:', error);
@@ -224,13 +220,8 @@ const ProductSummary: React.FC<ProductSummaryProps> = ({ items, coupon_code_id, 
   const couponDiscount = appliedCoupon ? appliedCoupon.discount : 0;
   const total = subtotal - couponDiscount;
 
-  if (loading) {
-    return <div className="py-4 text-center">Loading product details...</div>;
-  }
-
-  if (error) {
-    return <div className="py-4 text-center text-red-500">{error}</div>;
-  }
+  if (loading) return <div className="py-4 text-center">Loading product details...</div>;
+  if (error) return <div className="py-4 text-center text-red-500">{error}</div>;
 
   return (
     <div className="mb-6 bg-white p-4 rounded-[12px]">
@@ -244,29 +235,21 @@ const ProductSummary: React.FC<ProductSummaryProps> = ({ items, coupon_code_id, 
               Back
             </button>
           </div>
-
           <div className="space-y-3">
-            <div
-              className="border rounded-lg p-3 cursor-pointer hover:border-blue-500"
-              onClick={() => handleApplyCouponFromList('B1G1')}
-            >
+            {/* <div className="border rounded-lg p-3 cursor-pointer hover:border-blue-500" onClick={() => handleApplyCouponFromList('B1G1')}>
               <div className="flex justify-between">
                 <div className="font-medium">B1G1</div>
                 <button className="text-blue-600 text-sm">Apply</button>
               </div>
-              <p className="text-sm text-gray-600">Buy 1 Get 1 Free</p>
-            </div>
-
-            <div
-              className="border rounded-lg p-3 cursor-pointer hover:border-blue-500"
-              onClick={() => handleApplyCouponFromList('TANK')}
-            >
+              <p className="text-sm text-gray-600">Buy 1 Get 1 Free</</p>
+            </div> */}
+            {/* <div className="border rounded-lg p-3 cursor-pointer hover:border-blue-500" onClick={() => handleApplyCouponFromList('TANK')}>
               <div className="flex justify-between">
                 <div className="font-medium">TANK</div>
                 <button className="text-blue-600 text-sm">Apply</button>
               </div>
               <p className="text-sm text-gray-600">10% off on all jewelry</p>
-            </div>
+            </div> */}
           </div>
         </div>
       ) : (
@@ -304,14 +287,15 @@ const ProductSummary: React.FC<ProductSummaryProps> = ({ items, coupon_code_id, 
                 </div>
               </div>
             ))}
-            {offer_sets.map((offerSet) => (
+            {offerSetsWithOffer.map((offerSet) => (
               <OfferCartItem
                 key={offerSet.id}
                 offerSet={offerSet}
                 onRemove={handleRemoveOfferSet}
+                fromProductSummary={true}
               />
             ))}
-            <div className="bg-gray-50 p-2 rounded-lg mt-4">
+            {/* <div className="bg-gray-50 p-2 rounded-lg mt-4">
               {appliedCoupon ? (
                 <div className="flex flex-col">
                   <div className="flex items-center justify-between border-b border-gray-200 pb-2">
@@ -345,14 +329,14 @@ const ProductSummary: React.FC<ProductSummaryProps> = ({ items, coupon_code_id, 
                   <div className="flex justify-between mt-1">
                     <button
                       className="text-[#175e7a] font-medium text-[12px] flex items-center"
-                      onClick={handleViewCoupons}
+                      onClick={() => setShowCoupons(true)}
                     >
                       View Coupons <ChevronRight size={16} />
                     </button>
                   </div>
                 </>
               )}
-            </div>
+            </div> */}
           </div>
           <div className="py-4 px-2">
             <div className="space-y-2">
@@ -372,7 +356,7 @@ const ProductSummary: React.FC<ProductSummaryProps> = ({ items, coupon_code_id, 
                   <span className="font-semibold">−₹{couponDiscount.toFixed(2)}</span>
                 </div>
               )}
-              <div className="flex justify-between text-[16px] pt-2 border-t border-gray-300">
+              <div className="flex justify-between text-[16px] pt-2 border-t border-gray-200">
                 <span className="text-gray-500">Total</span>
                 <span className="font-semibold">₹{total.toFixed(2)}</span>
               </div>

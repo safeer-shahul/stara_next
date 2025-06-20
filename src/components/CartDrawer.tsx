@@ -33,7 +33,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, productId }) =
     items: Array<{ product_id: string; quantity: number }>;
     offer_sets: Array<{
       id: string;
-      offer_id: string;
+      offer: string;
       offer_products: string[];
       buy_count: number;
       get_count: number;
@@ -101,7 +101,8 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, productId }) =
 
   const handleRemoveOfferSet = async (setId: string): Promise<void> => {
     try {
-      await apiService.addToCart({ item_id: setId.replace(/-/g, ''), mode: 'delete' }); 
+      console.log(setId,"setId")
+      await apiService.addToCart({ item_id: setId, mode: 'delete' }); 
       dispatchCart({ type: 'REMOVE_ITEM', payload: setId });
     } catch (error) {
       console.error('Error removing offer set:', error);
@@ -179,32 +180,49 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, productId }) =
     dispatchCart({ type: 'APPLY_COUPON', payload: appliedCoupon }); // Sync with context
   };
 
-  const handleProceedToCheckout = (): void => {
+  const handleProceedToCheckout = async (): Promise<void> => {
+  try {
+    // Fetch valid offers to get buy_count and get_count
+    const offerResponse = await apiService.getValidOffers();
+    const offers = offerResponse && Array.isArray(offerResponse.data) ? offerResponse.data : [];
+
     const items = cartItems
       .filter((item: any) => item.type === 'normal')
       .map((item: any) => ({
         product_id: item.id.replace(/-/g, ''),
         quantity: item.quantity,
       }));
-    
+
     const offer_sets = cartItems
       .filter((item: any) => item.type === 'offer')
-      .map((item: any) => ({
-        id: item.id,
-        offer_id: item.offer_id,
-        offer_products: item.offer_products.map((p: any) => p.id || p.product),
-        buy_count: item.buy_count,
-        get_count: item.get_count,
-      }));
-    
+      .map((item: any) => {
+        const matchingOffer = offers.find(
+          (o: any) => o.id && item.offer && o.id.replace(/-/g, '') === item.offer.replace(/-/g, '')
+        );
+        return {
+          id: item.id,
+          offer: item.offer,
+          offer_products: item.offer_products.map((p: any) => p.id || p.product),
+          buy_count: matchingOffer ? matchingOffer.buy_count : 1, // Default to 1 if not found
+          get_count: matchingOffer ? matchingOffer.get_count : 1, // Default to 1 if not found
+        };
+      });
+
+    console.log('Items:', items);
+    console.log('Offer sets:', offer_sets);
+
     setCheckoutData({
       items,
       offer_sets,
       coupon_code_id: appliedCoupon?.code,
     });
-    dispatchCart({ type: 'SET_CHECKOUT_DATA', payload: { items, offer_sets } }); // Sync checkout data
+    dispatchCart({ type: 'SET_CHECKOUT_DATA', payload: { items, offer_sets } });
+
     setShowCheckoutModal(true);
-  };
+  } catch (error) {
+    console.error('Error preparing checkout data:', error);
+  }
+};
 
   const handleCheckoutClose = (): void => {
     setShowCheckoutModal(false);

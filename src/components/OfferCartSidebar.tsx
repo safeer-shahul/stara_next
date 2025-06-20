@@ -91,7 +91,7 @@ export default function OfferCartSidebar({
 
     const offerSet = {
       id: isAuthenticated ? null : uuidv4(),
-      offer_id: offerData.id,
+      offer: offerData.id,
       offer_products: offerProducts.map(id => ({ product: id, quantity: 1 })), // Local storage format
       buy_count: offerData.buy_count,
       get_count: offerData.get_count,

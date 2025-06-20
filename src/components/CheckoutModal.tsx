@@ -38,7 +38,7 @@ interface CheckoutModalProps {
   coupon_code_id?: string;
   offer_sets?: Array<{
     id: string;
-    offer_id: string;
+    offer: string;
     offer_products: string[];
     buy_count: number;
     get_count: number;
@@ -53,15 +53,13 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   coupon_code_id,
   offer_sets = [],
 }) => {
-  const [addresses, setAddresses] = useState<Address[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
-  const [showAddressForm, setShowAddressForm] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [authModalClosed, setAuthModalClosed] = useState(false);
-  const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
+
+  console.log("offer_sets",offer_sets)
   const [currentStep, setCurrentStep] = useState<CheckoutStep>(CheckoutStep.ADDRESS_SELECTION);
+  const [addresses, setAddresses] = useState<Address[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'Cod' | 'Razorpay'>('Razorpay');
   const [orderId, setOrderId] = useState<string | null>(null);
@@ -69,28 +67,33 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [paymentId, setPaymentId] = useState<string | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<'success' | 'failed' | 'canceled'>('success');
   const [cartCleared, setCartCleared] = useState(false);
-  const [offerSetsData, setOfferSetsData] = useState<any[]>([]);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authModalClosed, setAuthModalClosed] = useState(false);
+  const [showAddressForm, setShowAddressForm] = useState(false);
 
   const resetCheckoutState = useCallback(() => {
     setCurrentStep(CheckoutStep.ADDRESS_SELECTION);
     setError(null);
     setPaymentMethod('Razorpay');
     setOrderId(null);
+    setStaraOrderId(null);
     setPaymentId(null);
     setPaymentStatus('success');
     setCartCleared(false);
+    setSelectedAddressId(null);
+    setSelectedAddress(null);
   }, []);
 
   const checkAuthentication = useCallback(() => {
-    const accessToken = localStorage.getItem('accessToken');
-    if (accessToken) {
+    const token = localStorage.getItem('accessToken');
+    if (token) {
       setIsAuthenticated(true);
       return true;
-    } else {
-      setIsAuthenticated(false);
-      setShowAuthModal(true);
-      return false;
     }
+    setShowAuthModal(true);
+    setIsAuthenticated(false);
+    return false;
   }, []);
 
   const fetchAddresses = useCallback(async () => {
@@ -113,56 +116,15 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       }
     } catch (error) {
       console.error('Error fetching addresses:', error);
-      setAddresses([]);
+      setError('Failed to load addresses');
     } finally {
       setLoading(false);
     }
   }, [isAuthenticated]);
 
-  const fetchOfferSetsData = useCallback(async () => {
-    if (offer_sets.length === 0) {
-      setOfferSetsData([]);
-      return;
-    }
-    try {
-      const allOfferProductIds = offer_sets.flatMap((set) => set.offer_products);
-      const response = await apiService.getPaginatedProducts(1, 30, allOfferProductIds);
-      if (response && response.products && Array.isArray(response.products)) {
-        const formattedOfferSets = offer_sets.map((set) => ({
-          id: set.id,
-          offer_id: set.offer_id,
-          buy_count: set.buy_count,
-          get_count: set.get_count,
-          offer_products: set.offer_products
-            .map((productId) => {
-              const product = response.products.find(
-                (p: any) => p.id.replace(/-/g, '') === productId
-              );
-              if (product) {
-                return {
-                  id: product.id,
-                  product_name: product.product_name,
-                  product_price: product.product_price,
-                  images: product.images,
-                };
-              }
-              return null;
-            })
-            .filter((p: any) => p !== null),
-        }));
-        setOfferSetsData(formattedOfferSets);
-      }
-    } catch (error) {
-      console.error('Error fetching offer sets data:', error);
-      setOfferSetsData([]);
-    }
-  }, [offer_sets]);
-
   const clearCart = useCallback(async () => {
     try {
-      await apiService.addToCart({
-        mode: 'delete_cart',
-      });
+      await apiService.addToCart({ mode: 'delete_cart' });
       localStorage.setItem('cartItems', JSON.stringify([]));
       setCartCleared(true);
     } catch (error) {
@@ -170,27 +132,13 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
   }, []);
 
-  // Fixed: Remove dependencies to prevent infinite re-renders
   useEffect(() => {
     if (isOpen) {
       resetCheckoutState();
-      const isLoggedIn = checkAuthentication();
-      if (isLoggedIn) {
-        fetchAddresses();
-        fetchOfferSetsData();
-      }
+      const isAuth = checkAuthentication();
+      if (isAuth) fetchAddresses();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]); // Only depend on isOpen
-
-  // Separate useEffect for authentication changes
-  useEffect(() => {
-    if (isAuthenticated && isOpen) {
-      fetchAddresses();
-      fetchOfferSetsData();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, isOpen]);
+  }, [isOpen, resetCheckoutState, checkAuthentication, fetchAddresses]);
 
   useEffect(() => {
     if (authModalClosed && !isAuthenticated) {
@@ -205,14 +153,14 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   };
 
   const handleOrderCreated = (
-    paymentMethod: 'Cod' | 'Razorpay',
+    method: 'Cod' | 'Razorpay',
     razorpayOrderId: string,
-    staraOrderID: any
+    staraOrderID: string
   ) => {
     setOrderId(razorpayOrderId);
     setStaraOrderId(staraOrderID);
-    setPaymentMethod(paymentMethod);
-    if (paymentMethod === 'Razorpay') {
+    setPaymentMethod(method);
+    if (method === 'Razorpay') {
       setCurrentStep(CheckoutStep.PAYMENT_PROCESSING);
     } else {
       clearCart();
@@ -221,17 +169,15 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
   };
 
-  const handlePaymentSuccess = async (paymentId?: string) => {
-    if (paymentId) {
-      setPaymentId(paymentId);
-    }
+  const handlePaymentSuccess = async (id?: string) => {
+    if (id) setPaymentId(id);
     setPaymentStatus('success');
     await clearCart();
     setCurrentStep(CheckoutStep.ORDER_CONFIRMATION);
   };
 
-  const handlePaymentError = (errorMessage?: string) => {
-    setError(errorMessage || 'Payment failed. Please try again.');
+  const handlePaymentError = (message?: string) => {
+    setError(message || 'Payment failed. Please try again.');
     setPaymentStatus('failed');
     setCurrentStep(CheckoutStep.ORDER_CONFIRMATION);
   };
@@ -263,7 +209,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const handleAuthSuccess = () => {
     setIsAuthenticated(true);
     setShowAuthModal(false);
-    // fetchAddresses and fetchOfferSetsData will be called by the useEffect above
   };
 
   const handleAuthModalClose = () => {
@@ -292,7 +237,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   };
 
   const handleRemoveOfferSet = async (setId: string) => {
-    setOfferSetsData((prev) => prev.filter((set) => set.id !== setId));
     const cartItems = JSON.parse(localStorage.getItem('cartItems') || '[]').filter(
       (item: any) => item.id !== setId || item.type !== 'offer'
     );
@@ -311,7 +255,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     <div className="fixed inset-0 z-50 overflow-hidden flex items-center justify-center">
       <div className="absolute inset-0 bg-black/80" onClick={handleClose}></div>
       <div className="relative w-full max-w-md bg-[#e1e1e1] rounded-lg shadow-xl flex flex-col max-h-[90vh]">
-        <div className="flex justify-between items-center p-4 bg-[#175E7A] rounded-t-lg z-10">
+        <div className="flex justify-between items-center p-4 bg-white rounded-t-lg z-10">
           <div className="flex items-center">
             {currentStep !== CheckoutStep.ADDRESS_SELECTION && (
               <button
@@ -329,7 +273,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 <ArrowLeft size={20} />
               </button>
             )}
-            <h3 className="text-lg text-white font-medium">
+            <h3 className="text-lg text-[#175E7A] font-medium">
               {currentStep === CheckoutStep.ADDRESS_SELECTION && 'Checkout'}
               {currentStep === CheckoutStep.BILL_SUMMARY && 'Order Summary'}
               {currentStep === CheckoutStep.PAYMENT_PROCESSING && 'Processing Payment'}
@@ -338,7 +282,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
           </div>
           <button
             onClick={handleClose}
-            className="text-white hover:text-gray-200 transition-colors cursor-pointer"
+            className="text-[#175E7A] hover:text-gray-200 transition-colors cursor-pointer"
             disabled={currentStep === CheckoutStep.PAYMENT_PROCESSING && !error}
           >
             <X size={20} />
@@ -351,12 +295,12 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
             <div className="p-5">
               {currentStep === CheckoutStep.ADDRESS_SELECTION && (
                 <>
-                  {(orderItems.length > 0 || offerSetsData.length > 0) && (
+                  {(orderItems.length > 0 || offer_sets.length > 0) && (
                     <div className="mb-6">
                       <ProductSummary
                         items={orderItems}
                         coupon_code_id={coupon_code_id}
-                        offer_sets={offerSetsData}
+                        offer_sets={offer_sets}
                       />
                     </div>
                   )}
@@ -439,17 +383,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                           </div>
                         )}
                       </div>
-                      {(orderItems.length > 0 || offerSetsData.length > 0) && (
-                        <div className="mb-6">
-                          {offerSetsData.map((offerSet) => (
-                            <OfferCartItem
-                              key={offerSet.id}
-                              offerSet={offerSet}
-                              onRemove={handleRemoveOfferSet}
-                            />
-                          ))}
-                        </div>
-                      )}
                     </>
                   )}
                 </>
@@ -462,7 +395,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   onPlaceOrder={handleOrderCreated}
                   onError={handleBillSummaryError}
                   addressID={selectedAddressId}
-                  offer_sets={offerSetsData}
+                  offer_sets={offer_sets}
                 />
               )}
               {currentStep === CheckoutStep.PAYMENT_PROCESSING && orderId && selectedAddress && (

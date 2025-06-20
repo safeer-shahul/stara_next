@@ -19,13 +19,8 @@ interface Product {
 
 interface OfferSet {
   id: string;
-  offer_id: string;
-  offer_products: Array<{
-    id: string;
-    product_name: string;
-    product_price: string;
-    images: { product_image: string }[];
-  }>;
+  offer: string;
+  offer_products: string[];
   buy_count: number;
   get_count: number;
 }
@@ -34,7 +29,7 @@ interface APIResponse {
   items: Product[];
   offer_sets?: Array<{
     id: string;
-    offer_id: string;
+    offer: string;
     offer_products: Array<{
       id: string;
       product_name: string;
@@ -100,10 +95,11 @@ const BillSummary: React.FC<BillSummaryProps> = ({
     safeSetState(setError, null);
 
     try {
+      console.log(offer_sets, "offer_sets formattedOfferSets");
       const formattedOfferSets = offer_sets.map((set) => ({
         id: set.id.replace(/-/g, ''),
-        offer_id: set.offer_id.replace(/-/g, ''),
-        offer_products: set.offer_products.map((product) => product.id.replace(/-/g, '')),
+        offer: set.offer.replace(/-/g, ''),
+        offer_products: set.offer_products.map((product) => product.replace(/-/g, '')), // Fix here
         buy_count: set.buy_count,
         get_count: set.get_count,
       }));
@@ -157,8 +153,8 @@ const BillSummary: React.FC<BillSummaryProps> = ({
     try {
       const formattedOfferSets = offer_sets.map((set) => ({
         id: set.id.replace(/-/g, ''),
-        offer_id: set.offer_id.replace(/-/g, ''),
-        offer_products: set.offer_products.map((product) => product.id.replace(/-/g, '')),
+        offer: set.offer.replace(/-/g, ''),
+        offer_products: set.offer_products.map((product) => product.replace(/-/g, '')), // Fix here
         buy_count: set.buy_count,
         get_count: set.get_count,
       }));

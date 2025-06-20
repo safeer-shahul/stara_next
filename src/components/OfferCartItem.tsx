@@ -17,21 +17,28 @@ interface OfferCartItemProps {
       images: { product_image: string }[];
     }>;
   };
-  onRemove: (setId: string) => void;
+  onRemove?: (setId: string) => void;
+  fromProductSummary?: boolean;
 }
 
-export default function OfferCartItem({ offerSet, onRemove }: OfferCartItemProps) {
+export default function OfferCartItem({ offerSet, onRemove, fromProductSummary = false }: OfferCartItemProps) {
   const [offerName, setOfferName] = useState<string>('Loading offer...');
   const [isCollapsed, setIsCollapsed] = useState(true);
 
   useEffect(() => {
     const fetchOffers = async () => {
       try {
+        if (!offerSet.offer) {
+          setOfferName('Offer');
+          return;
+        }
         const response = await apiService.getValidOffers();
+        console.log(offerSet, 'offerSet offercaritem valid');
+        console.log(response, 'response offercaritem valid');
         if (response && response.data) {
-          console.log('response offer cartofferitem',response)
-          console.log('offerSetofferSetofferSet',offerSet)
-          const offer = response.data.find((o: any) => o.id.replace(/-/g, '') === offerSet.offer.replace(/-/g, ''));
+          const offer = response.data.find(
+            (o: any) => o?.id.replace(/-/g, '') === offerSet?.offer.replace(/-/g, '')
+          );
           setOfferName(offer ? offer.offer_name : 'Offer');
         }
       } catch (err) {
@@ -40,12 +47,11 @@ export default function OfferCartItem({ offerSet, onRemove }: OfferCartItemProps
       }
     };
     fetchOffers();
-  }, [offerSet.offer_id]);
+  }, [offerSet.offer]);
 
   console.log('offerSet in OfferCartItem:', offerSet);
 
   const calculateOfferTotals = () => {
-    // Guard against undefined or non-array offer_products
     if (!Array.isArray(offerSet.offer_products) || offerSet.offer_products.length === 0) {
       return { payableTotal: 0, savings: 0, freeItems: [] };
     }
@@ -53,8 +59,7 @@ export default function OfferCartItem({ offerSet, onRemove }: OfferCartItemProps
     const sortedProducts = offerSet.offer_products.sort(
       (a, b) => parseFloat(b.product_price) - parseFloat(a.product_price)
     );
-    // Assume the first product is paid, and the rest are free as a fallback
-    const itemsToCharge = Math.min(1, sortedProducts.length); // Default to 1 paid item
+    const itemsToCharge = Math.min(1, sortedProducts.length);
     const payableTotal = sortedProducts
       .slice(0, itemsToCharge)
       .reduce((sum, product) => sum + parseFloat(product.product_price), 0);
@@ -69,19 +74,23 @@ export default function OfferCartItem({ offerSet, onRemove }: OfferCartItemProps
   const { payableTotal, savings, freeItems } = calculateOfferTotals();
 
   const handleRemove = () => {
-    onRemove(offerSet.id); 
+    if (onRemove) {
+      onRemove(offerSet.id);
+    }
   };
 
   return (
     <div className="bg-white rounded-lg p-4 mb-4 border border-gray-200">
       <div className="flex justify-between items-center mb-2">
         <h4 className="font-medium text-sm">{offerName}</h4>
-        <button
-          onClick={handleRemove}
-          className="bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
-        >
-          <X size={12} />
-        </button>
+        {!fromProductSummary && onRemove && (
+          <button
+            onClick={handleRemove}
+            className="bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
+          >
+            <X size={12} />
+          </button>
+        )}
       </div>
       <div className="space-y-2">
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => setIsCollapsed(!isCollapsed)}>
@@ -98,7 +107,7 @@ export default function OfferCartItem({ offerSet, onRemove }: OfferCartItemProps
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium line-clamp-2">{offerSet.offer_products[0].product_name}</p>
-            {freeItems.some((item) => item.id === offerSet.offer_products[0].id) ? (
+            {!fromProductSummary && freeItems.some((item) => item.id === offerSet.offer_products[0].id) ? (
               <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-500 line-through">
                   ₹{parseFloat(offerSet.offer_products[0].product_price).toLocaleString()}
@@ -132,7 +141,7 @@ export default function OfferCartItem({ offerSet, onRemove }: OfferCartItemProps
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium line-clamp-2">{product.product_name}</p>
-                  {freeItems.some((item) => item.id === product.id) ? (
+                  {!fromProductSummary && freeItems.some((item) => item.id === product.id) ? (
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-gray-500 line-through">
                         ₹{parseFloat(product.product_price).toLocaleString()}
@@ -152,18 +161,20 @@ export default function OfferCartItem({ offerSet, onRemove }: OfferCartItemProps
           </div>
         )}
       </div>
-      <div className="mt-2 text-sm">
-        {savings > 0 && (
-          <div className="flex justify-between text-green-600">
-            <span>You Save ({freeItems.length} free item{freeItems.length > 1 ? 's' : ''}):</span>
-            <span className="font-medium">₹{savings.toLocaleString()}</span>
+      {!fromProductSummary && (
+        <div className="mt-2 text-sm">
+          {savings > 0 && (
+            <div className="flex justify-between text-green-600">
+              <span>You Save ({freeItems.length} free item{freeItems.length > 1 ? 's' : ''}):</span>
+              <span className="font-medium">₹{savings.toLocaleString()}</span>
+            </div>
+          )}
+          <div className="flex justify-between font-semibold text-base">
+            <span>Offer Total:</span>
+            <span>₹{payableTotal.toLocaleString()}</span>
           </div>
-        )}
-        <div className="flex justify-between font-semibold text-base">
-          <span>Offer Total:</span>
-          <span>₹{payableTotal.toLocaleString()}</span>
         </div>
-      </div>
+      )}
     </div>
   );
 }
