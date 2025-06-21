@@ -1,68 +1,56 @@
+// src/components/OfferCartItem.tsx
 'use client';
 
 import Image from 'next/image';
 import { X, ChevronDown, ChevronUp } from 'lucide-react';
-import apiService from '@/utils/api/apiService';
+// apiService is kept here, but the getValidOffers call inside useEffect is removed
+import apiService from '@/utils/api/apiService'; 
 import { useState, useEffect } from 'react';
+// Import the specific CartOfferItem and ProductItemDetails types
+import { CartOfferItem, ProductItemDetails } from '@/context/cartContext'; 
 
 interface OfferCartItemProps {
-  offerSet: {
-    offer: any;
-    id: string;
-    offer_id: string;
-    offer_products: Array<{
-      id: string;
-      product_name: string;
-      product_price: string;
-      images: { product_image: string }[];
-    }>;
-  };
+  offerSet: CartOfferItem; // FIX: Now expects the structured CartOfferItem
   onRemove?: (setId: string) => void;
-  fromProductSummary?: boolean;
+  fromProductSummary?: boolean; // Indicates if it's rendered in ProductSummary
 }
 
 export default function OfferCartItem({ offerSet, onRemove, fromProductSummary = false }: OfferCartItemProps) {
-  const [offerName, setOfferName] = useState<string>('Loading offer...');
+  // FIX: Offer name is now directly available on offerSet.offer_name
+  const offerName = offerSet.offer_name?.offer_name || 'Special Offer';
   const [isCollapsed, setIsCollapsed] = useState(true);
 
-  useEffect(() => {
-    const fetchOffers = async () => {
-      try {
-        if (!offerSet.offer) {
-          setOfferName('Offer');
-          return;
-        }
-        const response = await apiService.getValidOffers();
-        console.log(offerSet, 'offerSet offercaritem valid');
-        console.log(response, 'response offercaritem valid');
-        if (response && response.data) {
-          const offer = response.data.find(
-            (o: any) => o?.id.replace(/-/g, '') === offerSet?.offer.replace(/-/g, '')
-          );
-          setOfferName(offer ? offer.offer_name : 'Offer');
-        }
-      } catch (err) {
-        console.error('Failed to fetch offers:', err);
-        setOfferName('Offer');
-      }
-    };
-    fetchOffers();
-  }, [offerSet.offer]);
+  // FIX: Removed useEffect for fetching offer name as it's now part of the offerSet prop
+  // The offerSet should already be fully enriched from cartService.fetchCartFromBackend
+  // No need for additional API calls here.
 
-  console.log('offerSet in OfferCartItem:', offerSet);
+  console.log('OfferCartItem: offerSet:', offerSet);
 
   const calculateOfferTotals = () => {
-    if (!Array.isArray(offerSet.offer_products) || offerSet.offer_products.length === 0) {
+    // FIX: Flatten main_product and offer_products_extra for calculation
+    const allProducts: ProductItemDetails[] = [];
+    if (offerSet.main_product) {
+      allProducts.push(offerSet.main_product);
+    }
+    if (offerSet.offer_products_extra) {
+      allProducts.push(...offerSet.offer_products_extra);
+    }
+
+    if (allProducts.length === 0) {
       return { payableTotal: 0, savings: 0, freeItems: [] };
     }
 
-    const sortedProducts = offerSet.offer_products.sort(
+    const sortedProducts = [...allProducts].sort(
       (a, b) => parseFloat(b.product_price) - parseFloat(a.product_price)
     );
-    const itemsToCharge = Math.min(1, sortedProducts.length);
+    
+    // Assuming offerSet.buy_count applies to the highest priced items
+    const itemsToCharge = Math.min(offerSet.buy_count || 1, sortedProducts.length);
     const payableTotal = sortedProducts
       .slice(0, itemsToCharge)
       .reduce((sum, product) => sum + parseFloat(product.product_price), 0);
+    
+    // Savings are the sum of the remaining items' prices (the free items)
     const savings = sortedProducts
       .slice(itemsToCharge)
       .reduce((sum, product) => sum + parseFloat(product.product_price), 0);
@@ -75,9 +63,15 @@ export default function OfferCartItem({ offerSet, onRemove, fromProductSummary =
 
   const handleRemove = () => {
     if (onRemove) {
-      onRemove(offerSet.id);
+      onRemove(offerSet.id); // Pass the cart item ID of the offer set
     }
   };
+
+  // Ensure main_product exists before rendering to prevent errors
+  if (!offerSet.main_product) {
+      console.warn('OfferCartItem: main_product is missing for offerSet:', offerSet);
+      return null; // Or render a placeholder/error message for a malformed offer
+  }
 
   return (
     <div className="bg-white rounded-lg p-4 mb-4 border border-gray-200">
@@ -93,24 +87,25 @@ export default function OfferCartItem({ offerSet, onRemove, fromProductSummary =
         )}
       </div>
       <div className="space-y-2">
+        {/* FIX: Render main_product separately */}
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => setIsCollapsed(!isCollapsed)}>
           <div className="relative w-12 h-12 flex-shrink-0 rounded overflow-hidden">
             <Image
-              src={offerSet.offer_products[0].images[0]?.product_image
-                ? `${process.env.NEXT_PUBLIC_API_BASE_URL}${offerSet.offer_products[0].images[0].product_image}`
+              src={offerSet.main_product.images[0]?.product_image
+                ? `${process.env.NEXT_PUBLIC_API_BASE_URL}${offerSet.main_product.images[0].product_image}`
                 : '/images/placeholder.png'}
-              alt={offerSet.offer_products[0].product_name}
+              alt={offerSet.main_product.product_name}
               fill
               className="object-cover"
               sizes="48px"
             />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium line-clamp-2">{offerSet.offer_products[0].product_name}</p>
-            {!fromProductSummary && freeItems.some((item) => item.id === offerSet.offer_products[0].id) ? (
+            <p className="text-xs font-medium line-clamp-2">{offerSet.main_product.product_name}</p>
+            {!fromProductSummary && freeItems.some((item) => item.id === offerSet.main_product.id) ? (
               <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-500 line-through">
-                  ₹{parseFloat(offerSet.offer_products[0].product_price).toLocaleString()}
+                  ₹{parseFloat(offerSet.main_product.product_price).toLocaleString()}
                 </span>
                 <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-medium">
                   FREE
@@ -118,21 +113,23 @@ export default function OfferCartItem({ offerSet, onRemove, fromProductSummary =
               </div>
             ) : (
               <p className="text-xs text-gray-600">
-                ₹{parseFloat(offerSet.offer_products[0].product_price).toLocaleString()}
+                ₹{parseFloat(offerSet.main_product.product_price).toLocaleString()}
               </p>
             )}
           </div>
-          {offerSet.offer_products.length > 1 && (isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />)}
+          {/* Only show collapse/expand icon if there are additional products */}
+          {offerSet.offer_products_extra.length > 0 && (isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />)}
         </div>
-        {!isCollapsed && offerSet.offer_products.length > 1 && (
-          <div className="space-y-2">
-            {offerSet.offer_products.slice(1).map((product) => (
+        {/* FIX: Render offer_products_extra only when expanded */}
+        {!isCollapsed && offerSet.offer_products_extra.length > 0 && (
+          <div className="space-y-2 pl-4 border-l border-gray-200 ml-4 pt-2"> {/* Added some styling for indentation */}
+            {offerSet.offer_products_extra.map((product) => (
               <div key={product.id} className="flex items-center gap-2">
                 <div className="relative w-12 h-12 flex-shrink-0 rounded overflow-hidden">
                   <Image
                     src={product.images[0]?.product_image
                       ? `${process.env.NEXT_PUBLIC_API_BASE_URL}${product.images[0].product_image}`
-                      : '/images/placeholderddd.png'}
+                      : '/images/placeholder.png'}
                     alt={product.product_name}
                     fill
                     className="object-cover"

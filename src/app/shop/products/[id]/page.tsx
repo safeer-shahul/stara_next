@@ -1,9 +1,10 @@
+// src/app/product/[id]/page.tsx
 'use client';
 
 import { CheckCircle2, Star, Tag } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { useParams, useSearchParams } from 'next/navigation'; // Import useSearchParams
+import { useParams, useSearchParams } from 'next/navigation';
 import ProductImageSlider from '@/components/ProductImageSlider';
 import AddToCartButton from '@/components/AddToCartButton';
 import DeliveryPincodeChecker from '@/components/DeliveryPincodeChecker';
@@ -11,8 +12,12 @@ import PolicyIcons from '@/components/PolicyIcons';
 import CartDrawer from '@/components/CartDrawer';
 import CheckoutModal from '@/components/CheckoutModal';
 import apiService from '@/utils/api/apiService';
+import { useCart } from '@/context/cartContext';
+import { v4 as uuidv4 } from 'uuid';
+import { ProductItemDetails } from '@/context/cartContext';
 
-// Static product data
+
+// Static product data (kept as is)
 const staticProductData = {
   discount: '38%',
   offer: 'Buy 1 Get 1 Free Use Code: BIG1 at checkout',
@@ -33,31 +38,27 @@ const staticProductData = {
 
 export default function ProductDetailPage() {
   const params = useParams();
-  const searchParams = useSearchParams(); // Get query parameters
+  const searchParams = useSearchParams();
   const productId = params.id as string;
-  const fromOffer = searchParams.get('from') === 'offer'; // Check if from offer page
+  const fromOffer = searchParams.get('from') === 'offer';
+
+  const { dispatchCart, cartItems } = useCart();
 
   const [isGift, setIsGift] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState<boolean>(false);
-  const [product, setProduct] = useState<any>(null);
+  const [product, setProduct] = useState<ProductItemDetails | null>(null); // Use ProductItemDetails type
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
-  const [checkoutData, setCheckoutData] = useState<{
-    items: Array<{
-      product_id: string;
-      quantity: number;
-    }>;
-  }>({ items: [] });
 
   useEffect(() => {
     const fetchProduct = async () => {
       try {
         if (productId) {
           setIsLoading(true);
-          const fetchedProduct = await apiService.getProductByID(productId);
+          const fetchedProduct: ProductItemDetails = await apiService.getProductByID(productId);
           setProduct(fetchedProduct);
         }
       } catch (err) {
@@ -77,48 +78,46 @@ export default function ProductDetailPage() {
     setIsModalOpen(true);
   };
 
-  const handleAddToBag = () => {
+  const handleAddToBag = async () => {
     if (product) {
       setSelectedProductId(product.id);
+      dispatchCart({
+        type: 'ADD_NORMAL_ITEM',
+        payload: {
+          id: uuidv4(), // Generate temporary local ID
+          product_id: product.id,
+          quantity: 1, // Quantity in cart is 1 for a new add
+          type: 'normal',
+          isSynced: false, // Mark as not synced yet
+          product_name: product.product_name,
+          product_price: product.product_price,
+          strike_price: product.strike_price,
+          images: product.images,
+          isInStock: product.product_status && product.quantity > 0, // Derive from product.quantity (stock)
+          stock_quantity: product.quantity, // Populate with the actual stock quantity from fetched product
+        },
+      });
       setIsCartOpen(true);
-
-      if (typeof window !== 'undefined') {
-        const storedCartItems = JSON.parse(localStorage.getItem('cartItems') || '[]');
-        const productIdWithoutHyphens = product.id.replace(/-/g, '');
-
-        const existingItemIndex = storedCartItems.findIndex(
-          (item: any) => item.id === productIdWithoutHyphens
-        );
-
-        let updatedCartItems;
-        if (existingItemIndex >= 0) {
-          updatedCartItems = [...storedCartItems];
-          updatedCartItems[existingItemIndex] = {
-            ...updatedCartItems[existingItemIndex],
-            quantity: updatedCartItems[existingItemIndex].quantity + 1,
-          };
-        } else {
-          updatedCartItems = [
-            ...storedCartItems,
-            { id: productIdWithoutHyphens, quantity: 1, type: 'normal' },
-          ];
-        }
-
-        localStorage.setItem('cartItems', JSON.stringify(updatedCartItems));
-      }
     }
   };
 
-  const handleBuyNow = () => {
+  const handleBuyNow = async () => {
     if (product) {
-      const productIdWithoutHyphens = product.id.replace(/-/g, '');
-      setCheckoutData({
-        items: [
-          {
-            product_id: productIdWithoutHyphens,
-            quantity: 1,
-          },
-        ],
+      dispatchCart({
+        type: 'ADD_NORMAL_ITEM',
+        payload: {
+          id: uuidv4(),
+          product_id: product.id,
+          quantity: 1, // Quantity in cart is 1 for a new add
+          type: 'normal',
+          isSynced: false,
+          product_name: product.product_name,
+          product_price: product.product_price,
+          strike_price: product.strike_price,
+          images: product.images,
+          isInStock: product.product_status && product.quantity > 0, // Derive from product.quantity (stock)
+          stock_quantity: product.quantity, // Populate with the actual stock quantity from fetched product
+        },
       });
       setIsCheckoutOpen(true);
     }
@@ -160,9 +159,10 @@ export default function ProductDetailPage() {
     return <div className="min-h-screen flex items-center justify-center text-red-500">{error || 'Product not found'}</div>;
   }
 
-  const productImages = product.images.map((img: any) => {
+  const productImages = product.images ? product.images.map((img) => {
     return `${process.env.NEXT_PUBLIC_API_BASE_URL}${img.product_image}`;
-  });
+  }) : [];
+
 
   const formattedPrice = `₹${parseFloat(product.product_price).toLocaleString('en-IN')}`;
   const formattedStrikePrice = product.strike_price && parseFloat(product.strike_price) > 0
@@ -294,14 +294,13 @@ export default function ProductDetailPage() {
       <CartDrawer
         isOpen={isCartOpen}
         onClose={handleCartClose}
-        productId={selectedProductId}
       />
 
       <CheckoutModal
         isOpen={isCheckoutOpen}
         onClose={handleCheckoutClose}
         onProceed={handleAddressSelected}
-        orderItems={checkoutData.items}
+        cartItems={cartItems}
       />
     </div>
   );

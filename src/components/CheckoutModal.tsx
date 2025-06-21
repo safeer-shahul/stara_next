@@ -1,3 +1,4 @@
+// src/components/CheckoutModal.tsx
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -10,7 +11,9 @@ import ProductSummary from './ProductSummary';
 import BillSummary from './BillSummary';
 import RazorpayPayment from './RazorpayPayment';
 import OrderConfirmation from './OrderConfirmation';
-import OfferCartItem from './OfferCartItem';
+
+// FIX: Import the specific CartItem types from your context
+import { CartOfferItem, CartNormalItem, CartItemType } from '@/context/cartContext'; 
 
 enum CheckoutStep {
   ADDRESS_SELECTION,
@@ -34,27 +37,25 @@ interface CheckoutModalProps {
   isOpen: boolean;
   onClose: () => void;
   onProceed: (addressId: string) => void;
-  orderItems?: Array<{ product_id: string; quantity: number }>;
+  // FIX: Replace orderItems and offer_sets with a single cartItems prop
+  cartItems: CartItemType[]; 
   coupon_code_id?: string;
-  offer_sets?: Array<{
-    id: string;
-    offer: string;
-    offer_products: string[];
-    buy_count: number;
-    get_count: number;
-  }>;
 }
 
 const CheckoutModal: React.FC<CheckoutModalProps> = ({
   isOpen,
   onClose,
   onProceed,
-  orderItems = [],
+  cartItems = [], // Now receiving all cart items
   coupon_code_id,
-  offer_sets = [],
 }) => {
+  // FIX: Filter normal and offer items from the unified cartItems prop
+  const normalItems = cartItems.filter((item): item is CartNormalItem => item.type === 'normal');
+  const offerSets = cartItems.filter((item): item is CartOfferItem => item.type === 'offer');
 
-  console.log("offer_sets",offer_sets)
+  console.log("CheckoutModal: normalItems for display", normalItems);
+  console.log("CheckoutModal: offerSets for display", offerSets);
+
   const [currentStep, setCurrentStep] = useState<CheckoutStep>(CheckoutStep.ADDRESS_SELECTION);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
@@ -125,7 +126,8 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const clearCart = useCallback(async () => {
     try {
       await apiService.addToCart({ mode: 'delete_cart' });
-      localStorage.setItem('cartItems', JSON.stringify([]));
+      // FIX: CartDrawer is now responsible for updating its own state via context after clearing
+      // This modal should not directly manipulate localStorage cartItems
       setCartCleared(true);
     } catch (error) {
       console.error('Error clearing cart:', error);
@@ -163,7 +165,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     if (method === 'Razorpay') {
       setCurrentStep(CheckoutStep.PAYMENT_PROCESSING);
     } else {
-      clearCart();
+      clearCart(); // Clear cart for COD
       setPaymentStatus('success');
       setCurrentStep(CheckoutStep.ORDER_CONFIRMATION);
     }
@@ -172,7 +174,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const handlePaymentSuccess = async (id?: string) => {
     if (id) setPaymentId(id);
     setPaymentStatus('success');
-    await clearCart();
+    await clearCart(); // Clear cart after successful payment
     setCurrentStep(CheckoutStep.ORDER_CONFIRMATION);
   };
 
@@ -201,7 +203,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const handleContinueShopping = () => {
     if (selectedAddressId) {
-      onProceed(selectedAddressId);
+      onProceed(selectedAddressId); // This triggers cart refresh in CartDrawer after checkout completion
     }
     onClose();
   };
@@ -209,6 +211,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const handleAuthSuccess = () => {
     setIsAuthenticated(true);
     setShowAuthModal(false);
+    fetchAddresses(); // Fetch addresses after successful auth
   };
 
   const handleAuthModalClose = () => {
@@ -236,12 +239,8 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     onClose();
   };
 
-  const handleRemoveOfferSet = async (setId: string) => {
-    const cartItems = JSON.parse(localStorage.getItem('cartItems') || '[]').filter(
-      (item: any) => item.id !== setId || item.type !== 'offer'
-    );
-    localStorage.setItem('cartItems', JSON.stringify(cartItems));
-  };
+  // FIX: Removed handleRemoveOfferSet logic here, as CartDrawer handles all cart manipulations
+  // and will trigger a re-render/re-fetch as needed.
 
   const handleAddressFormSuccess = async (newAddressId: string) => {
     await fetchAddresses();
@@ -266,7 +265,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     ? handleBackToBillSummary
                     : undefined
                 }
-                className={`mr-3 text-white hover:text-gray-200 transition-colors ${
+                className={`mr-3 text-[#175E7A] hover:text-gray-200 transition-colors ${
                   currentStep === CheckoutStep.ORDER_CONFIRMATION ? 'hidden' : ''
                 }`}
               >
@@ -295,12 +294,13 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
             <div className="p-5">
               {currentStep === CheckoutStep.ADDRESS_SELECTION && (
                 <>
-                  {(orderItems.length > 0 || offer_sets.length > 0) && (
+                  {/* FIX: Pass normalItems and offerSets derived from cartItems */}
+                  {(normalItems.length > 0 || offerSets.length > 0) && (
                     <div className="mb-6">
                       <ProductSummary
-                        items={orderItems}
+                        normalItems={normalItems}
+                        offerSets={offerSets}
                         coupon_code_id={coupon_code_id}
-                        offer_sets={offer_sets}
                       />
                     </div>
                   )}
@@ -389,13 +389,13 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
               )}
               {currentStep === CheckoutStep.BILL_SUMMARY && selectedAddress && (
                 <BillSummary
-                  orderItems={orderItems}
+                  normalItems={normalItems} // Pass CartNormalItem[]
+                  offerSets={offerSets} // Pass CartOfferItem[]
                   couponCode={coupon_code_id}
                   destinationPincode={selectedAddress.pincode}
                   onPlaceOrder={handleOrderCreated}
                   onError={handleBillSummaryError}
                   addressID={selectedAddressId}
-                  offer_sets={offer_sets}
                 />
               )}
               {currentStep === CheckoutStep.PAYMENT_PROCESSING && orderId && selectedAddress && (
