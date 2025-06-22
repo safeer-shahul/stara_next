@@ -1,3 +1,4 @@
+// components/CartItem.tsx
 'use client';
 
 import { Plus, Minus, X, AlertCircle } from 'lucide-react';
@@ -9,19 +10,32 @@ type CartItemProps = {
   onRemove: (id: string) => void;
   onQuantityChange: (id: string, change: number) => void;
   fromProductSummary?: boolean; // New prop
+  // NEW PROP: The calculated effective maximum quantity for this specific item in the cart
+  maxAllowedQuantity?: number;
 };
 
-const CartItem = ({ product, onRemove, onQuantityChange, fromProductSummary = false }: CartItemProps) => {
-  const actualAvailableStock = product.stock_quantity;
-  const isOutOfStock = actualAvailableStock <= 0 || !product.isInStock;
+const CartItem = ({ product, onRemove, onQuantityChange, fromProductSummary = false, maxAllowedQuantity }: CartItemProps) => {
+  // `product.stock_quantity` is the total stock from the API.
+  // `maxAllowedQuantity` is the refined limit considering other items in the cart.
+  const currentMaxLimit = typeof maxAllowedQuantity === 'number' ? maxAllowedQuantity : product.stock_quantity;
+
+  // `isOutOfStockOverall` checks if the product is fundamentally unavailable (e.g., API says 0 stock).
+  // This is separate from whether *this specific cart item* can be incremented further.
+  const isOutOfStockOverall = product.stock_quantity <= 0 || !product.isInStock;
 
   const handleIncrement = () => {
-    if (product.quantity < actualAvailableStock && !isOutOfStock) {
+    // Only allow increment if the current quantity is less than the calculated effective limit
+    // AND the product is not completely out of stock overall.
+    if (product.quantity < currentMaxLimit && !isOutOfStockOverall) {
       onQuantityChange(product.id, 1);
+    } else if (product.quantity >= currentMaxLimit) {
+      // Optional: Add a toast/notification here if you want to explicitly tell the user why it's blocked.
+      console.log(`Cannot add more of ${product.product_name}. Max available for your cart: ${currentMaxLimit}`);
     }
   };
 
   const handleDecrement = () => {
+    // Always allow decrement if quantity is greater than 1, regardless of stock
     if (product.quantity > 1) {
       onQuantityChange(product.id, -1);
     }
@@ -78,14 +92,16 @@ const CartItem = ({ product, onRemove, onQuantityChange, fromProductSummary = fa
           )}
         </div>
 
-        {isOutOfStock ? (
+        {isOutOfStockOverall ? (
           <div className="flex items-center mt-2 text-red-500 text-xs">
             <AlertCircle size={14} className="mr-1" />
             Out of Stock
           </div>
         ) : (
           <div className="flex items-center mt-2 text-xs text-gray-600">
-            Available Stock: {actualAvailableStock}
+            {/* --- MODIFIED LINE HERE --- */}
+            {/* Display the maxAllowedQuantity as the "Available Stock" to the user */}
+            Available Stock: {currentMaxLimit}
           </div>
         )}
 
@@ -93,10 +109,10 @@ const CartItem = ({ product, onRemove, onQuantityChange, fromProductSummary = fa
           <div className="flex items-center mt-2">
             <button
               className={`w-6 h-6 rounded-full border flex items-center justify-center ${
-                product.quantity <= 1 || isOutOfStock ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                product.quantity <= 1 || isOutOfStockOverall ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
               }`}
               onClick={handleDecrement}
-              disabled={product.quantity <= 1 || isOutOfStock}
+              disabled={product.quantity <= 1 || isOutOfStockOverall}
             >
               <Minus size={12} />
             </button>
@@ -104,11 +120,13 @@ const CartItem = ({ product, onRemove, onQuantityChange, fromProductSummary = fa
             <span className="mx-2 text-sm font-medium">{product.quantity}</span>
 
             <button
+              // Disable if current quantity is at or above the calculated effective limit (currentMaxLimit)
+              // or if the product is fundamentally out of stock.
               className={`w-6 h-6 rounded-full border flex items-center justify-center ${
-                product.quantity >= actualAvailableStock || isOutOfStock ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                product.quantity >= currentMaxLimit || isOutOfStockOverall ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
               }`}
               onClick={handleIncrement}
-              disabled={product.quantity >= actualAvailableStock || isOutOfStock}
+              disabled={product.quantity >= currentMaxLimit || isOutOfStockOverall}
             >
               <Plus size={12} />
             </button>
