@@ -65,7 +65,7 @@ export type CartAction =
   | { type: 'SET_CART_ITEMS'; payload: CartItemType[] }
   | { type: 'ADD_OFFER_SET'; payload: CartOfferItem }
   | { type: 'ADD_NORMAL_ITEM'; payload: CartNormalItem }
-  | { type: 'REMOVE_ITEM'; payload: string }
+  | { type: 'REMOVE_ITEM'; payload: string } // Payload is the cart item's unique ID
   | { type: 'UPDATE_ITEM_QUANTITY'; payload: { id: string; quantity: number } }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_CHECKOUT_DATA'; payload: {
@@ -79,7 +79,7 @@ export type CartAction =
         }>;
     }
   }
-  | { type: 'TRIGGER_SYNC' }; // New action to explicitly signal a need for sync
+  | { type: 'TRIGGER_SYNC' }; // Action to explicitly signal a need for sync
 
 // --- Cart State and Context Definitions ---
 
@@ -181,6 +181,11 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
         // For guest users, these actions MUST update localStorage immediately for persistence.
         if (!localStorage.getItem('accessToken')) {
             localStorage.setItem('cartItems', JSON.stringify(filteredItems));
+            console.log('Reducer: REMOVE_ITEM: localStorage updated for guest user.');
+        } else {
+            // For authenticated users, local state updates immediately.
+            // Backend sync will reconcile localStorage later.
+            console.log('Reducer: REMOVE_ITEM: Optimistically removed item locally for authenticated user.');
         }
         return { ...state, cartItems: filteredItems };
       }
@@ -222,7 +227,6 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
 
 export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   const [state, dispatch] = useReducer(cartReducer, initialState);
-  // We'll read accessToken directly in the useEffect and use a ref for previous value
   const prevAccessTokenRef = useRef<string | null>(null);
 
   const isInitialLoadComplete = useRef(false);
@@ -230,17 +234,29 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [syncRequested, setSyncRequested] = useState(false);
+  const [lastRemovedItemId, setLastRemovedItemId] = useState<string | null>(null); // New state to track removal
 
   const customDispatch: React.Dispatch<CartAction> = useCallback((action) => {
     console.log(`Custom Dispatch: Processing action type: ${action.type}`);
-    dispatch(action); // Apply the action immediately
+
+    // Special handling for REMOVE_ITEM to queue backend operation
+    if (action.type === 'REMOVE_ITEM') {
+      const currentTokenAtDispatch = localStorage.getItem('accessToken');
+      if (currentTokenAtDispatch) {
+        console.log(`Custom Dispatch: Authenticated REMOVE_ITEM - Storing ID for backend sync: ${action.payload}`);
+        setLastRemovedItemId(action.payload); // Store the ID for backend removal
+      } else {
+        console.log(`Custom Dispatch: Guest REMOVE_ITEM - Reducer handles localStorage.`);
+      }
+    }
+
+    dispatch(action); // Apply the action immediately (optimistic UI update for REMOVE_ITEM)
 
     const currentTokenAtDispatch = localStorage.getItem('accessToken');
 
     if (
       (action.type === 'ADD_OFFER_SET' ||
         action.type === 'ADD_NORMAL_ITEM' ||
-        action.type === 'REMOVE_ITEM' ||
         action.type === 'UPDATE_ITEM_QUANTITY' ||
         action.type === 'TRIGGER_SYNC') &&
       currentTokenAtDispatch // Only trigger backend sync if authenticated
@@ -251,7 +267,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
         // This is handled by the reducer's SET_CART_ITEMS which writes to localStorage for guests.
         // No explicit sync trigger needed here for guests.
     }
-  }, []);
+  }, [state.cartItems]); // Added state.cartItems to dependencies of customDispatch for type lookup
 
   // Effect 1: Initial load of cart from localStorage on component mount
   useEffect(() => {
@@ -284,7 +300,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Effect 2: Handle cart synchronization with backend/localStorage
   useEffect(() => {
-    
+
     if (typeof window === 'undefined') return;
     if (!isInitialLoadComplete.current) {
         console.log("CartProvider Sync Effect: Initial load not complete, skipping sync.");
@@ -310,12 +326,55 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
         let updatedCartFromSource: CartItemType[];
 
         if (currentAccessToken) {
+          // --- Backend Removal Logic for Authenticated Users ---
+          // This block runs *before* general sync logic if a removal is pending
+          if (lastRemovedItemId) {
+            console.log(`CartProvider: Detected pending removal for item ID: ${lastRemovedItemId}. Attempting backend removal.`);
+            // Find the item in the current (optimistically updated) state to get its type
+            // Note: If the item was *already* removed locally, it won't be in state.cartItems
+            // This is a subtle point: if the user removes an item, then immediately navigates away
+            // before sync, the item won't be in state.cartItems. We rely on lastRemovedItemId
+            // to indicate a *desire* to remove from backend.
+            const itemToConfirmRemoved = state.cartItems.find(item => item.id === lastRemovedItemId);
+            // If itemToConfirmRemoved is null, it means it was already removed locally.
+            // We'll still send the backend call to ensure removal, using its type if known.
+
+            try {
+              // We need the original type (normal/offer) to send the correct payload to backend.
+              // If the item is no longer in `state.cartItems` (because it was optimistically removed),
+              // we can make a best guess based on the ID format or assume normal.
+              // A more robust solution might pass the item's type along with the ID in `setLastRemovedItemId`
+              // For simplicity, we'll try to deduce it or assume a general removal if ID maps to a cart item ID.
+
+              // You might need to refine this based on your backend's API for deletion.
+              // Assuming your backend can differentiate 'product_id' vs 'item_id' for delete mode.
+              // For a `REMOVE_ITEM` action, `action.payload` IS the `item.id` (cart item ID).
+              // So, we use `item_id` for backend call as per your old code's note.
+
+              await cartService.addToCart({
+                item_id: lastRemovedItemId.replace(/-/g, ''), // Send the cart item's UUID
+                mode: 'delete'
+              });
+              console.log(`CartProvider: Successfully sent removal to backend for cart item ID: ${lastRemovedItemId}`);
+
+            } catch (removalError) {
+              console.error(`CartProvider: Error sending removal to backend for ID ${lastRemovedItemId}:`, removalError);
+              // Do not rethrow; proceed with fetching canonical state which will reconcile
+            } finally {
+              setLastRemovedItemId(null); // Clear the pending removal flag regardless of success/failure
+            }
+          }
+          // --- End Backend Removal Logic ---
+
+
           // Authenticated user: Prioritize pushing unsynced items
           const unsyncedLocalItems = state.cartItems.filter(item => !item.isSynced);
           console.log(`CartProvider: Authenticated flow. ${unsyncedLocalItems.length} unsynced local items found.`);
 
           // PUSHING LOGIC: If there are unsynced items OR the token just changed (login scenario)
           // we need to push local state and then fetch the canonical backend state.
+          // Note: `lastRemovedItemId` being set will also trigger this sync,
+          // and we've handled the removal API call above it.
           if (unsyncedLocalItems.length > 0 || tokenChanged) {
             console.log("CartProvider: Syncing unsynced local items to backend OR token changed. Calling pushLocalCartToBackend.");
             updatedCartFromSource = await cartService.pushLocalCartToBackend(unsyncedLocalItems);
@@ -369,14 +428,16 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     // Determine if a sync is needed based on conditions
-    const shouldTriggerSync = syncRequested || tokenChanged ||
-                              (currentAccessToken && state.cartItems.length === 0) || // Auth user, empty cart (initial or cleared)
-                              (!currentAccessToken && JSON.stringify(state.cartItems) !== localStorage.getItem('cartItems')); // Guest, in-memory state differs from localStorage
+    // lastRemovedItemId !== null is now a direct trigger for sync
+    const shouldTriggerSync = syncRequested || tokenChanged || lastRemovedItemId !== null ||
+                                  (currentAccessToken && state.cartItems.length === 0 && isInitialLoadComplete.current) || // Only trigger empty cart sync if initial load is done
+                                  (!currentAccessToken && JSON.stringify(state.cartItems) !== localStorage.getItem('cartItems'));
 
 
     console.log(`CartProvider Debug: Sync Conditions for scheduling:
       syncRequested: ${syncRequested}
       tokenChanged: ${tokenChanged} (from ${prevAccessTokenRef.current} to ${currentAccessToken})
+      lastRemovedItemId: ${lastRemovedItemId}
       auth && emptyCart: ${currentAccessToken && state.cartItems.length === 0}
       guest && localStateMismatch: ${!currentAccessToken && JSON.stringify(state.cartItems) !== localStorage.getItem('cartItems')}
       -> SHOULD TRIGGER SYNC: ${shouldTriggerSync}
@@ -384,7 +445,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
 
 
     if (shouldTriggerSync) {
-        console.log(`CartProvider: Scheduling sync. Triggering factors: syncRequested=${syncRequested}, tokenChanged=${tokenChanged}, isAuthenticatedAndEmpty=${currentAccessToken && state.cartItems.length === 0}, guestLocalStateMismatch=${!currentAccessToken && JSON.stringify(state.cartItems) !== localStorage.getItem('cartItems')}`);
+        console.log(`CartProvider: Scheduling sync. Triggering factors: syncRequested=${syncRequested}, tokenChanged=${tokenChanged}, lastRemovedItemId=${lastRemovedItemId}, isAuthenticatedAndEmpty=${currentAccessToken && state.cartItems.length === 0}, guestLocalStateMismatch=${!currentAccessToken && JSON.stringify(state.cartItems) !== localStorage.getItem('cartItems')}`);
         syncTimeoutRef.current = setTimeout(syncCartWithBackend, 300); // Debounce by 300ms
     } else {
       console.log('CartProvider: No sync needed based on current conditions.');
@@ -397,7 +458,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
         }
     };
 
-  }, [state.cartItems, syncRequested]); // Dependencies: state.cartItems and syncRequested. accessToken is read inside.
+  }, [state.cartItems, syncRequested, lastRemovedItemId]); // Add lastRemovedItemId to dependencies
 
   const value = {
     cartItems: state.cartItems,

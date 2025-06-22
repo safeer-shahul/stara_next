@@ -7,33 +7,35 @@ import OfferCartItem from './OfferCartItem';
 import CheckoutModal from './CheckoutModal';
 import { useCart, CartItemType, CartNormalItem, CartOfferItem, ProductItemDetails } from '@/context/cartContext';
 import { cartService } from '@/utils/api/cartService';
-import apiService from '@/utils/api/apiService'; // Keep apiService for clearCart (if it's a specific endpoint)
+import apiService from '@/utils/api/apiService';
 import { cartUtils } from '@/utils/cartUtils';
 import { v4 as uuidv4 } from 'uuid';
 
 interface CartDrawerProps {
   isOpen: boolean;
   onClose: () => void;
+  // productId: string; // Removed this prop as it seems related to your old code's addToCart on open
 }
 
-const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
+const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => { // Removed productId from props
   const { cartItems, dispatchCart, loading: contextLoading } = useCart();
-  const [localLoading, setLocalLoading] = useState<boolean>(false);
+  const [localLoading, setLocalLoading] = useState<boolean>(false); // Can likely remove this and rely on contextLoading
   const [showCheckoutModal, setShowCheckoutModal] = useState<boolean>(false);
 
   // This function is for explicitly forcing a refresh of the cart state
   // from the backend/local storage. It's called after actions that *definitely*
   // need to reflect the server's current state (e.g., successful backend mutation
   // that was NOT initiated by the CartProvider's sync cycle, like checkout).
+  // This is now less critical as CartProvider's sync is robust, but kept for checkout.
   const getAndSetCartItems = useCallback(async () => {
-    setLocalLoading(true);
+    setLocalLoading(true); // Consider using contextLoading instead if this isn't for external actions
     try {
       const items = await cartService.fetchCartFromBackend();
       dispatchCart({ type: 'SET_CART_ITEMS', payload: items });
     } catch (error) {
       console.error('CartDrawer: Error fetching/enriching cart:', error);
     } finally {
-      setLocalLoading(false);
+      setLocalLoading(false); // Consider using contextLoading instead
     }
   }, [dispatchCart]);
 
@@ -50,35 +52,20 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
   }, [isOpen]);
 
   const handleRemoveItem = async (id: string): Promise<void> => {
-    const itemToRemove = cartItems.find(item => item.id === id);
-
-    if (!itemToRemove) {
-      console.warn(`CartDrawer: Attempted to remove item with ID: ${id}, but it was not found in current cart state.`);
-      return;
-    }
-
-    try {
-      // Optimistically remove from UI
-      dispatchCart({ type: 'REMOVE_ITEM', payload: id });
-
-      // Trigger sync in CartProvider for authenticated users.
-      // The CartProvider will detect the REMOVE_ITEM (isSynced: false implicitly for local removals)
-      // and handle the backend call.
-      if (localStorage.getItem('accessToken')) {
-        console.log(`CartDrawer: Item removed locally. Triggering sync for authenticated user.`);
-        dispatchCart({ type: 'TRIGGER_SYNC' });
-      } else {
-        console.log(`CartDrawer: Item removed locally for guest user.`);
-        // For guest users, the reducer already updated localStorage.
-      }
-
-    } catch (error) {
-      console.error(`CartDrawer: Error handling local remove dispatch for item (ID: ${id}):`, error);
+    console.log(`CartDrawer: Attempting to remove item locally and trigger sync for ID: ${id}`);
+    dispatchCart({ type: 'REMOVE_ITEM', payload: id });
+    // The CartProvider's useEffect will now pick up the lastRemovedItemId and handle the backend call.
+    // No explicit TRIGGER_SYNC needed here if REMOVE_ITEM itself triggers sync via lastRemovedItemId.
+    // However, including TRIGGER_SYNC can provide an immediate signal if you want to be explicit,
+    // though the `customDispatch` already sets `setSyncRequested(true)` for REMOVE_ITEM.
+    // For clarity and to ensure sync if REMOVE_ITEM isn't directly configured to set syncRequested:
+    if (localStorage.getItem('accessToken')) {
+      dispatchCart({ type: 'TRIGGER_SYNC' });
     }
   };
 
   const handleQuantityChange = async (id: string, change: number): Promise<void> => {
-    console.log('CartDrawer: handleQuantityChange called for item ID:', id);
+    console.log('CartDrawer: handleQuantityChange called for item ID:', id, 'change:', change);
     const itemToUpdate = cartItems.find(item => item.id === id);
 
     if (!itemToUpdate || itemToUpdate.type !== 'normal') {
@@ -95,42 +82,61 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
 
     if (newQuantity > itemToUpdate.stock_quantity) {
       console.warn(`CartDrawer: Cannot increase quantity for item ${id} beyond available stock (${itemToUpdate.stock_quantity}).`);
+      // Optionally show a toast notification here
       return;
     }
 
-    try {
-        // Optimistically update quantity locally
-        dispatchCart({ type: 'UPDATE_ITEM_QUANTITY', payload: { id, quantity: newQuantity } });
-        console.log(`CartDrawer: Item quantity updated locally to ${newQuantity}.`);
+    console.log(`CartDrawer: Dispatching UPDATE_ITEM_QUANTITY for item ${id} to ${newQuantity}.`);
+    dispatchCart({ type: 'UPDATE_ITEM_QUANTITY', payload: { id, quantity: newQuantity } });
 
-        // Trigger sync in CartProvider for authenticated users
-        if (localStorage.getItem('accessToken')) {
-            console.log(`CartDrawer: Quantity updated locally. Triggering sync for authenticated user.`);
-            dispatchCart({ type: 'TRIGGER_SYNC' });
-        } else {
-            console.log(`CartDrawer: Quantity updated locally for guest user.`);
-        }
-    } catch (error) {
-        console.error(`CartDrawer: Error handling local quantity update dispatch for item (ID: ${id}):`, error);
+    // The CartProvider's useEffect will now pick up the isSynced: false change and handle the backend call.
+    // An explicit TRIGGER_SYNC here helps ensure the sync is initiated right after the local update.
+    if (localStorage.getItem('accessToken')) {
+        dispatchCart({ type: 'TRIGGER_SYNC' });
     }
   };
 
   const handleProceedToCheckout = (): void => {
+    // Prepare checkout data before opening modal
+    const items = cartItems.filter(item => item.type === 'normal').map(item => ({
+      product_id: (item as CartNormalItem).product_id.replace(/-/g, ''),
+      quantity: item.quantity
+    }));
+
+    const offer_sets = cartItems.filter(item => item.type === 'offer').map(item => ({
+      id: item.id.replace(/-/g, ''), // Cart item ID for the offer set
+      offer: (item as CartOfferItem).offer.replace(/-/g, ''),
+      buy_count: (item as CartOfferItem).buy_count,
+      get_count: (item as CartOfferItem).get_count,
+      offer_products: (item as CartOfferItem).offer_items.map(p => ({
+        product: p.id.replace(/-/g, ''),
+        quantity: p.quantity // This quantity is for individual products within the offer set
+      }))
+    }));
+
+    dispatchCart({
+      type: 'SET_CHECKOUT_DATA',
+      payload: {
+        items,
+        offer_sets
+      }
+    });
+
     setShowCheckoutModal(true);
   };
 
   const handleCheckoutClose = (): void => {
     setShowCheckoutModal(false);
     // After the checkout modal closes (e.g., order placed or cancelled),
-    // it's a good idea to re-fetch the definitive cart state.
-    getAndSetCartItems();
+    // it's a good idea to re-fetch the definitive cart state using CartProvider's sync.
+    dispatchCart({ type: 'TRIGGER_SYNC' }); // Trigger a sync
   };
 
   const handleAddressSelected = (addressId: string): void => {
     console.log(`CartDrawer: Proceeding with address ID: ${addressId}`);
     setShowCheckoutModal(false);
     // After address selection (often implies order placement), re-fetch cart.
-    getAndSetCartItems();
+    dispatchCart({ type: 'TRIGGER_SYNC' }); // Trigger a sync
   };
 
   const clearCart = async (): Promise<void> => {
@@ -143,8 +149,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
       // and then trigger a sync to confirm.
       if (localStorage.getItem('accessToken')) {
         console.log(`CartDrawer: Attempting to clear cart on backend for authenticated user.`);
-        // Assuming apiService.addToCart({ mode: 'delete_cart' }) is your specific endpoint to clear ALL cart items
-        await apiService.addToCart({ mode: 'delete_cart' });
+        await apiService.addToCart({ mode: 'delete_cart' }); // Use the correct mode for clearing all
         dispatchCart({ type: 'TRIGGER_SYNC' }); // Trigger a re-fetch to confirm backend state
       } else {
         console.log(`CartDrawer: Cart cleared locally for guest user.`);
@@ -152,7 +157,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
       }
     } catch (error) {
       console.error('CartDrawer: Error clearing cart:', error);
-      getAndSetCartItems(); // Re-fetch on error to reconcile
+      dispatchCart({ type: 'TRIGGER_SYNC' }); // Re-fetch on error to reconcile
     }
   };
 
@@ -177,7 +182,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
   const subtotal = cartUtils.calculateSubtotal(cartItems);
   const offerSavings = cartUtils.calculateTotalOfferSavings(cartItems);
 
-  const finalTotal = subtotal;
+  const finalTotal = subtotal; // Assuming finalTotal calculation is handled in cartUtils for full discounts etc.
 
   return (
     <>
@@ -228,7 +233,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                             <OfferCartItem
                               key={item.id ?? uuidv4()}
                               offerSet={item}
-                              onRemove={handleRemoveItem}
+                              onRemove={handleRemoveItem} // Use the same handler, it will dispatch to context
                             />
                           );
                         }
@@ -296,7 +301,8 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
             isOpen={showCheckoutModal}
             onClose={handleCheckoutClose}
             onProceed={handleAddressSelected}
-            cartItems={cartItems}
+            cartItems={cartItems} // Still pass cartItems for display in modal if needed
+            orderItems={cartItems.filter(item => item.type === 'normal').map(item => ({ product_id: (item as CartNormalItem).product_id.replace(/-/g, ''), quantity: item.quantity }))} // Pass prepared items for backend
           />
         )}
       </div>

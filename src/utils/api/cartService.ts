@@ -1,19 +1,19 @@
 // utils/api/cartService.ts
 'use client';
 import { v4 as uuidv4, validate } from 'uuid';
-import apiService from './apiService'; // Ensure this path is correct relative to your project structure
-import { CartItemType, CartNormalItem, CartOfferItem, ProductItemDetails } from '@/context/cartContext'; // Ensure this path is correct relative to your project structure
+import apiService from './apiService';
+import { CartItemType, CartNormalItem, CartOfferItem, ProductItemDetails } from '@/context/cartContext';
 
 interface BackendRawCartItem {
     id: string | null;
-    quantity: number; // Quantity of the main product in the cart item
-    product: string; // UUID of the main product
-    offer: string | null; // UUID of the offer, if applicable
-    offer_products: Array<{ // Products included in the offer, usually the 'get' items or additional 'buy' items
-        id: number; // This 'id' is likely a database ID for the offer_product entry, not a UUID
-        product: string; // UUID of the product in the offer_products list
+    quantity: number;
+    product: string;
+    offer: string | null;
+    offer_products: Array<{
+        id: number;
+        product: string;
         quantity: number;
-        cart_item: string; // UUID of the parent cart_item
+        cart_item: string;
     }>;
     created_at: string;
     updated_at: string;
@@ -21,7 +21,7 @@ interface BackendRawCartItem {
 
 interface OfferDetailsFromBackend {
     id: string;
-    products: string[]; // List of product UUIDs that are part of this offer
+    products: string[];
     created_at: string;
     updated_at: string;
     offer_name: string;
@@ -93,7 +93,6 @@ export const cartService = {
 
             const allProductIds = new Set<string>();
             rawCartDataFromSource.forEach((item: BackendRawCartItem) => {
-                // Ensure product IDs are UUIDs before validation and cleaning
                 if (item.product && validate(item.product)) {
                     allProductIds.add(item.product.replace(/-/g, ''));
                 }
@@ -115,7 +114,7 @@ export const cartService = {
                 console.log("cartService: Fetching product details for IDs:", productIdsArray);
                 const productsResponse = await apiService.getPaginatedProducts(1, 100, productIdsArray);
                 productsResponse.products.forEach((p: any) => {
-                    productsMap.set(p.id.replace(/-/g, ''), { // Store using cleaned UUID as key
+                    productsMap.set(p.id.replace(/-/g, ''), {
                         id: p.id, images: p.images || [], product_code: p.product_code, product_name: p.product_name,
                         product_description: p.product_description, product_price: p.product_price, strike_price: p.strike_price,
                         quantity: p.quantity, product_weight: p.product_weight, product_box_weight: p.product_box_weight,
@@ -137,21 +136,19 @@ export const cartService = {
 
                 if (isOfferItem) {
                     console.log("cartService: Processing offer item based on offer_products and offer ID:", item);
-                    const currentOfferId = item.offer!; // Assert non-null after check
-                    const currentItemId = item.id || uuidv4(); // Use backend ID or generate temp for new local offer
-                    // isSynced is true if authenticated AND it has a backend ID (meaning it was fetched from backend)
+                    const currentOfferId = item.offer!;
+                    const currentItemId = item.id || uuidv4();
                     const currentIsSynced = accessToken !== null && item.id !== null && validate(item.id);
 
                     const offerDetails = validOffersMap.get(currentOfferId);
 
                     if (!offerDetails) {
                         console.warn(`cartService: Offer details not found for offer ID: ${currentOfferId}. Skipping offer item:`, item);
-                        return null; // Skip if offer details can't be found
+                        return null;
                     }
 
                     let productsForAggregation: ProductItemDetails[] = [];
 
-                    // 1. Add the main product linked to the cart_item (the 'buy' product)
                     const mainProductDetail = productsMap.get(item.product.replace(/-/g, ''));
                     if (mainProductDetail) {
                         productsForAggregation.push({ ...mainProductDetail, quantity: item.quantity });
@@ -159,7 +156,6 @@ export const cartService = {
                         console.warn(`cartService: Product detail not found for main product ID: ${item.product} in offer item.`);
                     }
 
-                    // 2. Add products from the nested 'offer_products' array (the 'get' products)
                     item.offer_products.forEach(op => {
                         const offerProductDetail = productsMap.get(op.product.replace(/-/g, ''));
                         if (offerProductDetail) {
@@ -192,7 +188,7 @@ export const cartService = {
 
                 } else { // It's a normal product
                     console.log("cartService: Processing normal item:", item);
-                    const currentItemId = item.id || uuidv4(); // Use backend ID or generate temp for new local item
+                    const currentItemId = item.id || uuidv4();
                     const currentIsSynced = accessToken !== null && item.id !== null && validate(item.id);
 
                     const productDetail = productsMap.get(item.product.replace(/-/g, ''));
@@ -216,7 +212,7 @@ export const cartService = {
                     console.warn(`cartService: Product details missing or invalid for normal item ${item.product}. Skipping.`, item);
                     return null;
                 }
-            }).filter(Boolean) as CartItemType[]; // Filter out any nulls
+            }).filter(Boolean) as CartItemType[];
 
             if (!accessToken) {
                 console.log("cartService: Saving fetched guest cart items to localStorage: (Handled by CartProvider SET_CART_ITEMS)");
@@ -253,13 +249,11 @@ export const cartService = {
         let success = true;
 
         for (const item of localUnsyncedItems) {
-            // Only push items that are NOT synced (isSynced === false)
             if (item.isSynced === false) {
                 try {
                     if (item.type === 'normal') {
                         const normalItem = item as CartNormalItem;
                         console.log(`cartService: Attempting to push normal item to backend: Product ID: ${normalItem.product_id}, Quantity: ${normalItem.quantity}`);
-                        // When pushing a locally added item, send its full quantity.
                         for (let q = 0; q < normalItem.quantity; q++) {
                             console.log(`cartService: Sending API call to add product ${normalItem.product_id} (unit ${q + 1}/${normalItem.quantity})`);
                             await apiService.addToCart({ product_id: normalItem.product_id.replace(/-/g, ''), mode: '+' });
@@ -293,14 +287,15 @@ export const cartService = {
         }
         console.log("cartService: Finished iterating through unsynced local items to push to backend. Overall success:", success);
 
-        // After attempting to push all unsynced items, fetch the canonical cart state from the backend.
         console.log("cartService: Fetching canonical cart after push attempt.");
         const canonicalCart = await cartService.fetchCartFromBackend();
         return canonicalCart;
     },
 
+    // Modified addToCart payload to accept item_id for deletion
     addToCart: async (payload: { product_id?: string; mode: string; item_id?: string }) => {
         console.log("cartService: Calling apiService.addToCart with payload:", payload);
+        // Ensure that apiService.addToCart sends either product_id or item_id based on payload
         const response = await apiService.addToCart(payload);
         console.log("cartService: apiService.addToCart response:", response);
         return response;

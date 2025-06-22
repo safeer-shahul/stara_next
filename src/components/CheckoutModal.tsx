@@ -1,3 +1,4 @@
+// components/CheckoutModal.tsx
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -5,7 +6,7 @@ import { X, ArrowLeft } from 'lucide-react';
 import apiService from '@/utils/api/apiService';
 import AddressForm from './AddressForm';
 import AuthModal from './auth/AuthModal';
-import ProductSummary from './ProductSummary'; // Ensure correct path
+import ProductSummary from './ProductSummary';
 import BillSummary from './BillSummary';
 import RazorpayPayment from './RazorpayPayment';
 import OrderConfirmation from './OrderConfirmation';
@@ -35,6 +36,8 @@ interface CheckoutModalProps {
     onClose: () => void;
     onProceed: (addressId: string) => void;
     cartItems: CartItemType[];
+    orderItems: Array<{ product_id: string; quantity: number; }>; // Still needed for BillSummary/order payload
+    // coupon_code_id: string | undefined; // REMOVED THIS LINE
 }
 
 const INDIAN_STATES: { [key: string]: string } = {
@@ -46,7 +49,7 @@ const INDIAN_STATES: { [key: string]: string } = {
     "CG": "Chandigarh",
     "CH": "Chhattisgarh",
     "DN": "Dadra and Nagar Haveli",
-    "DD": "Daman and Diu", // Corrected typo
+    "DD": "Daman and Diu",
     "DL": "Delhi",
     "GA": "Goa",
     "GJ": "Gujarat",
@@ -83,8 +86,9 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     onClose,
     onProceed,
     cartItems = [],
+    orderItems, // Still destructure as it's used for BillSummary/order payload
+    // coupon_code_id, // REMOVED THIS LINE from destructuring
 }) => {
-    // Memoize these filters to ensure stable references are passed to ProductSummary
     const memoizedNormalItems = useMemo(() => {
         const filtered = cartItems.filter((item): item is CartNormalItem => item.type === 'normal');
         console.log("CheckoutModal: normalItems for display (memoized)", filtered);
@@ -101,7 +105,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     const [addresses, setAddresses] = useState<Address[]>([]);
     const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
     const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
-    const [loading, setLoading] = useState(true); // Main loading state for addresses/auth
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [paymentMethod, setPaymentMethod] = useState<'Cod' | 'Razorpay'>('Razorpay');
     const [orderId, setOrderId] = useState<string | null>(null);
@@ -125,7 +129,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         setCartCleared(false);
         setSelectedAddressId(null);
         setSelectedAddress(null);
-        setLoading(true); // Ensure loading is true when resetting state for new fetch
+        setLoading(true);
     }, []);
 
     const checkAuthentication = useCallback(() => {
@@ -141,10 +145,10 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
     const fetchAddresses = useCallback(async () => {
         if (!isAuthenticated) {
-            setLoading(false); // If not authenticated, stop loading immediately
+            setLoading(false);
             return;
         }
-        setLoading(true); // Start loading for addresses
+        setLoading(true);
         try {
             const response = await apiService.getAddresses();
             if (response && Array.isArray(response)) {
@@ -164,7 +168,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
             console.error('Error fetching addresses:', error);
             setError('Failed to load addresses');
         } finally {
-            setLoading(false); // End loading for addresses
+            setLoading(false);
         }
     }, [isAuthenticated]);
 
@@ -183,7 +187,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
             resetCheckoutState();
             const isAuth = checkAuthentication();
             if (isAuth) fetchAddresses();
-            else setLoading(false); // If not authenticated, ensure loading state is false after auth check
+            else setLoading(false);
         }
     }, [isOpen, resetCheckoutState, checkAuthentication, fetchAddresses]);
 
@@ -210,7 +214,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         if (method === 'Razorpay') {
             setCurrentStep(CheckoutStep.PAYMENT_PROCESSING);
         } else {
-            clearCart(); // Clear cart for COD
+            clearCart();
             setPaymentStatus('success');
             setCurrentStep(CheckoutStep.ORDER_CONFIRMATION);
         }
@@ -219,7 +223,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     const handlePaymentSuccess = async (id?: string) => {
         if (id) setPaymentId(id);
         setPaymentStatus('success');
-        await clearCart(); // Clear cart after successful payment
+        await clearCart();
         setCurrentStep(CheckoutStep.ORDER_CONFIRMATION);
     };
 
@@ -336,8 +340,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                         <div className="p-5">
                             {currentStep === CheckoutStep.ADDRESS_SELECTION && (
                                 <>
-
-                                {loading ? ( // This loading is specifically for addresses
+                                {loading ? (
                                         <div className="flex justify-center items-center h-40">
                                             <div className="w-8 h-8 border-4 border-gray-200 border-t-[#175e7a] rounded-full animate-spin mr-2"></div>
                                             <p>Loading addresses...</p>
@@ -418,29 +421,24 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                                             </div>
                                         </>
                                     )}
-                                    
-                                    {/* ProductSummary is now ALWAYS rendered here, regardless of cart content. */}
-                                    {/* Its internal loading will handle the initial calculation and display */}
                                     <div className="mb-6">
                                         <ProductSummary
                                             normalItems={memoizedNormalItems}
                                             offerSets={memoizedOfferSets}
-                                            parentLoading={loading} 
+                                            parentLoading={loading}
                                         />
                                     </div>
-
-                                    
                                 </>
                             )}
                             {currentStep === CheckoutStep.BILL_SUMMARY && selectedAddress && (
                                 <BillSummary
                                     normalItems={memoizedNormalItems}
                                     offerSets={memoizedOfferSets}
-                                    // couponCode prop removed entirely, assuming BillSummary doesn't need it.
+                                    // coupon_code_id prop removed from here
                                     destinationPincode={selectedAddress.pincode}
                                     onPlaceOrder={handleOrderCreated}
                                     onError={handleBillSummaryError}
-                                    addressID={selectedAddressId}
+                                    addressID={selectedAddressId!}
                                 />
                             )}
                             {currentStep === CheckoutStep.PAYMENT_PROCESSING && orderId && selectedAddress && (
