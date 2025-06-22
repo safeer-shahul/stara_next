@@ -14,10 +14,9 @@ import { v4 as uuidv4 } from 'uuid';
 interface CartDrawerProps {
   isOpen: boolean;
   onClose: () => void;
-  // productId: string; // Removed this prop as it seems related to your old code's addToCart on open
 }
 
-const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => { // Removed productId from props
+const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
   const { cartItems, dispatchCart, loading: contextLoading } = useCart();
   const [localLoading, setLocalLoading] = useState<boolean>(false); // Can likely remove this and rely on contextLoading
   const [showCheckoutModal, setShowCheckoutModal] = useState<boolean>(false);
@@ -52,16 +51,14 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => { // Remo
   }, [isOpen]);
 
   const handleRemoveItem = async (id: string): Promise<void> => {
-    console.log(`CartDrawer: Attempting to remove item locally and trigger sync for ID: ${id}`);
+    console.log(`CartDrawer: Dispatching REMOVE_ITEM for ID: ${id}`);
+    // This will trigger the optimistic local update in reducer AND the backend call in customDispatch
     dispatchCart({ type: 'REMOVE_ITEM', payload: id });
-    // The CartProvider's useEffect will now pick up the lastRemovedItemId and handle the backend call.
-    // No explicit TRIGGER_SYNC needed here if REMOVE_ITEM itself triggers sync via lastRemovedItemId.
-    // However, including TRIGGER_SYNC can provide an immediate signal if you want to be explicit,
-    // though the `customDispatch` already sets `setSyncRequested(true)` for REMOVE_ITEM.
-    // For clarity and to ensure sync if REMOVE_ITEM isn't directly configured to set syncRequested:
-    if (localStorage.getItem('accessToken')) {
-      dispatchCart({ type: 'TRIGGER_SYNC' });
-    }
+
+    // REMOVED explicit TRIGGER_SYNC here as customDispatch will handle backend call and set syncRequested
+    // if (localStorage.getItem('accessToken')) {
+    //   dispatchCart({ type: 'TRIGGER_SYNC' });
+    // }
   };
 
   const handleQuantityChange = async (id: string, change: number): Promise<void> => {
@@ -76,7 +73,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => { // Remo
     const newQuantity = itemToUpdate.quantity + change;
 
     if (newQuantity <= 0) {
-      await handleRemoveItem(id); // Remove if quantity goes to zero or less
+      await handleRemoveItem(id); // If new quantity is 0 or less, remove the item
       return;
     }
 
@@ -86,31 +83,30 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => { // Remo
       return;
     }
 
-    console.log(`CartDrawer: Dispatching UPDATE_ITEM_QUANTITY for item ${id} to ${newQuantity}.`);
+    console.log(`CartDrawer: Dispatching UPDATE_ITEM_QUANTITY for item ${id} to new quantity: ${newQuantity}.`);
+    // This will trigger the optimistic local update in reducer AND the backend call in customDispatch
     dispatchCart({ type: 'UPDATE_ITEM_QUANTITY', payload: { id, quantity: newQuantity } });
 
-    // The CartProvider's useEffect will now pick up the isSynced: false change and handle the backend call.
-    // An explicit TRIGGER_SYNC here helps ensure the sync is initiated right after the local update.
-    if (localStorage.getItem('accessToken')) {
-        dispatchCart({ type: 'TRIGGER_SYNC' });
-    }
+    // REMOVED explicit TRIGGER_SYNC here as customDispatch will handle backend call and set syncRequested
+    // if (localStorage.getItem('accessToken')) {
+    //     dispatchCart({ type: 'TRIGGER_SYNC' });
+    // }
   };
 
   const handleProceedToCheckout = (): void => {
-    // Prepare checkout data before opening modal
     const items = cartItems.filter(item => item.type === 'normal').map(item => ({
       product_id: (item as CartNormalItem).product_id.replace(/-/g, ''),
       quantity: item.quantity
     }));
 
     const offer_sets = cartItems.filter(item => item.type === 'offer').map(item => ({
-      id: item.id.replace(/-/g, ''), // Cart item ID for the offer set
+      id: item.id.replace(/-/g, ''),
       offer: (item as CartOfferItem).offer.replace(/-/g, ''),
       buy_count: (item as CartOfferItem).buy_count,
       get_count: (item as CartOfferItem).get_count,
       offer_products: (item as CartOfferItem).offer_items.map(p => ({
         product: p.id.replace(/-/g, ''),
-        quantity: p.quantity // This quantity is for individual products within the offer set
+        quantity: p.quantity
       }))
     }));
 
@@ -127,33 +123,26 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => { // Remo
 
   const handleCheckoutClose = (): void => {
     setShowCheckoutModal(false);
-    // After the checkout modal closes (e.g., order placed or cancelled),
-    // it's a good idea to re-fetch the definitive cart state using CartProvider's sync.
-    dispatchCart({ type: 'TRIGGER_SYNC' }); // Trigger a sync
+    dispatchCart({ type: 'TRIGGER_SYNC' }); // Keep this, as it's a general post-checkout sync
   };
 
   const handleAddressSelected = (addressId: string): void => {
     console.log(`CartDrawer: Proceeding with address ID: ${addressId}`);
     setShowCheckoutModal(false);
-    // After address selection (often implies order placement), re-fetch cart.
-    dispatchCart({ type: 'TRIGGER_SYNC' }); // Trigger a sync
+    dispatchCart({ type: 'TRIGGER_SYNC' }); // Keep this, as it's a general post-checkout sync
   };
 
   const clearCart = async (): Promise<void> => {
     try {
-      // Optimistically clear local state immediately
       dispatchCart({ type: 'SET_CART_ITEMS', payload: [] });
       console.log('CartDrawer: Cart cleared locally.');
 
-      // For authenticated users, explicitly call the backend's clear cart endpoint
-      // and then trigger a sync to confirm.
       if (localStorage.getItem('accessToken')) {
         console.log(`CartDrawer: Attempting to clear cart on backend for authenticated user.`);
-        await apiService.addToCart({ mode: 'delete_cart' }); // Use the correct mode for clearing all
+        await apiService.addToCart({ mode: 'delete_cart' }); // This is a direct API call, not via customDispatch
         dispatchCart({ type: 'TRIGGER_SYNC' }); // Trigger a re-fetch to confirm backend state
       } else {
         console.log(`CartDrawer: Cart cleared locally for guest user.`);
-        // For guest users, the SET_CART_ITEMS dispatch already updated localStorage.
       }
     } catch (error) {
       console.error('CartDrawer: Error clearing cart:', error);
@@ -169,7 +158,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => { // Remo
     return cartUtils.getOutOfStockItems(cartItems);
   };
 
-  if (!isOpen) return null; // Render nothing if drawer is closed
+  if (!isOpen) return null;
 
   const totalCartUnits = cartItems.reduce((total: number, item: CartItemType) => {
     if (item.type === 'normal') {
@@ -182,15 +171,13 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => { // Remo
   const subtotal = cartUtils.calculateSubtotal(cartItems);
   const offerSavings = cartUtils.calculateTotalOfferSavings(cartItems);
 
-  const finalTotal = subtotal; // Assuming finalTotal calculation is handled in cartUtils for full discounts etc.
+  const finalTotal = subtotal;
 
   return (
     <>
       <div className="fixed inset-0 z-51 overflow-hidden">
-        {/* Overlay */}
         <div className="absolute inset-0 bg-black/80" onClick={onClose}></div>
 
-        {/* Drawer content */}
         <div className="absolute right-0 top-0 h-full w-full max-w-sm bg-[#f2f4f7] shadow-xl transform transition-transform rounded-tl-[16px] rounded-bl-[16px]">
           <div className="flex flex-col h-full">
             <div className="flex items-center justify-between py-3 pl-6 pr-2 border-b">
@@ -204,7 +191,6 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => { // Remo
                 <X size={22} />
               </button>
             </div>
-            {/* Promotional banner */}
             <div className="bg-[#175e7a] py-1 text-center">
               <p className="text-white text-[12px]">BUY 1 GET 1 FREE | USE CODE : B1G1</p>
             </div>
@@ -228,12 +214,12 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => { // Remo
                               onQuantityChange={handleQuantityChange}
                             />
                           );
-                        } else { // item.type === 'offer'
+                        } else {
                           return (
                             <OfferCartItem
                               key={item.id ?? uuidv4()}
                               offerSet={item}
-                              onRemove={handleRemoveItem} // Use the same handler, it will dispatch to context
+                              onRemove={handleRemoveItem}
                             />
                           );
                         }
@@ -295,14 +281,13 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => { // Remo
             )}
           </div>
         </div>
-        {/* Conditionally render CheckoutModal to prevent unnecessary rendering and logging */}
         {showCheckoutModal && (
           <CheckoutModal
             isOpen={showCheckoutModal}
             onClose={handleCheckoutClose}
             onProceed={handleAddressSelected}
-            cartItems={cartItems} // Still pass cartItems for display in modal if needed
-            orderItems={cartItems.filter(item => item.type === 'normal').map(item => ({ product_id: (item as CartNormalItem).product_id.replace(/-/g, ''), quantity: item.quantity }))} // Pass prepared items for backend
+            cartItems={cartItems}
+            orderItems={cartItems.filter(item => item.type === 'normal').map(item => ({ product_id: (item as CartNormalItem).product_id.replace(/-/g, ''), quantity: item.quantity }))}
           />
         )}
       </div>
