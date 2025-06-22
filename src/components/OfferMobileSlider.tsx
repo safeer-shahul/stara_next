@@ -1,10 +1,11 @@
+// components/OfferMobileSlider.tsx
 'use client';
-import { useEffect, useState, useCallback, memo } from 'react'; // FIX: Import memo
+import { useEffect, useState, useCallback, memo } from 'react';
 import Image from 'next/image';
-import { X, ShoppingBag, Info } from 'lucide-react';
-import apiService from '@/utils/api/apiService';
+import { X, ShoppingBag } from 'lucide-react';
+// import apiService from '@/utils/api/apiService'; // Removed direct apiService import
 import { v4 as uuidv4 } from 'uuid';
-import { useCart, CartOfferItem, ProductItemDetails } from '@/context/cartContext';
+import { useCart, CartOfferItem, ProductItemDetails } from '@/context/cartContext'; // Ensure correct path
 
 interface ProductItem {
     id: string;
@@ -19,7 +20,7 @@ interface ProductItem {
     product_status: boolean;
     product_code?: string;
     product_description?: string;
-    quantity?: number; 
+    quantity?: number;
     product_weight?: string;
     product_box_weight?: string;
     created_at?: string;
@@ -56,18 +57,15 @@ interface OfferMobileSliderProps {
     isAuthenticated?: boolean;
 }
 
-// FIX: Wrap the component with React.memo for performance optimization
 export default memo(function OfferMobileSlider({
     isOpen,
-    onClose, 
+    onClose,
     offerData,
     slots,
     onSlotClear,
     onOpenCartDrawer,
-    isAuthenticated = false
+    isAuthenticated = false // isAuthenticated is now largely for UI presentation/button enabling
 }: OfferMobileSliderProps) {
-    // Removed: console.log(isOpen,"isOpen from OfferMobileSlider"); // This log will fire on every render, causing noise
-
     useEffect(() => {
         if (isOpen) {
             document.body.style.overflow = 'hidden';
@@ -84,14 +82,14 @@ export default memo(function OfferMobileSlider({
     const { dispatchCart } = useCart();
     const [loading, setLoading] = useState(false);
 
-    const calculateTotals = useCallback(() => { // Wrap in useCallback
+    const calculateTotals = useCallback(() => {
         const filledSlots = slots.filter(slot => slot.product);
         if (filledSlots.length === 0) {
             return { payableTotal: 0, savings: 0, freeItems: [] };
         }
 
         const allIndividualProductsInSlots: (ProductItemDetails & { uniqueSlotId: string })[] = filledSlots.map(slot => {
-            const product = slot.product!; 
+            const product = slot.product!;
             return {
                 id: product.id,
                 images: product.images || [],
@@ -101,14 +99,14 @@ export default memo(function OfferMobileSlider({
                 product_status: product.product_status,
                 product_code: product.product_code || '',
                 product_description: product.product_description || '',
-                quantity: 1, 
+                quantity: 1,
                 product_weight: product.product_weight || '',
                 product_box_weight: product.product_box_weight || '',
                 created_at: product.created_at || new Date().toISOString(),
-                updated_at: new Date().toISOString(), // Use current date for updated_at
+                updated_at: new Date().toISOString(),
                 sub_category: product.sub_category || '',
                 isInStock: product.product_status && (product.quantity || 1) > 0,
-                uniqueSlotId: slot.id, 
+                uniqueSlotId: slot.id,
             };
         });
 
@@ -121,20 +119,20 @@ export default memo(function OfferMobileSlider({
             .reduce((sum, product) => sum + parseFloat(product.product_price), 0);
 
         const freeItemsActualCount = Math.min(offerData.get_count, sortedProductsDesc.length - itemsToCharge);
-        
+
         const freeItemsForDisplay = sortedProductsDesc.slice(itemsToCharge, itemsToCharge + freeItemsActualCount);
-        
+
         const savings = freeItemsForDisplay.reduce((sum, product) => sum + parseFloat(product.product_price), 0);
 
         return { payableTotal, savings, freeItems: freeItemsForDisplay };
-    }, [slots, offerData]); // Dependencies for useCallback
+    }, [slots, offerData]);
 
-    const isOfferComplete = useCallback(() => { // Wrap in useCallback
+    const isOfferComplete = useCallback(() => {
         const totalRequiredItems = offerData.buy_count + offerData.get_count;
         return slots.filter(slot => slot.product !== null).length === totalRequiredItems;
-    }, [slots, offerData]); // Dependencies for useCallback
+    }, [slots, offerData]);
 
-    const handleBuyNow = useCallback(async () => { // Wrap in useCallback
+    const handleBuyNow = useCallback(async () => {
         if (!isOfferComplete()) return;
 
         setLoading(true);
@@ -145,7 +143,7 @@ export default memo(function OfferMobileSlider({
 
         filledSlots.forEach(slot => {
             if (slot.product) {
-                const product = slot.product; 
+                const product = slot.product;
                 const productDetails: ProductItemDetails = {
                     id: product.id,
                     images: product.images || [],
@@ -155,20 +153,20 @@ export default memo(function OfferMobileSlider({
                     product_status: product.product_status,
                     product_code: product.product_code || '',
                     product_description: product.product_description || '',
-                    quantity: 1, 
+                    quantity: 1,
                     product_weight: product.product_weight || '',
                     product_box_weight: product.product_box_weight || '',
                     created_at: product.created_at || new Date().toISOString(),
-                    updated_at: new Date().toISOString(), // Use current date for updated_at
+                    updated_at: new Date().toISOString(),
                     sub_category: product.sub_category || '',
-                    isInStock: product.product_status && (product.quantity || 1) > 0, 
+                    isInStock: product.product_status && (product.quantity || 1) > 0,
                 };
 
                 if (aggregatedOfferItemsMap.has(productDetails.id)) {
                     const existingProduct = aggregatedOfferItemsMap.get(productDetails.id)!;
                     aggregatedOfferItemsMap.set(productDetails.id, {
                         ...existingProduct,
-                        quantity: existingProduct.quantity + 1, 
+                        quantity: existingProduct.quantity + 1,
                     });
                 } else {
                     aggregatedOfferItemsMap.set(productDetails.id, productDetails);
@@ -177,43 +175,35 @@ export default memo(function OfferMobileSlider({
         });
 
         const aggregatedOfferItems: ProductItemDetails[] = Array.from(aggregatedOfferItemsMap.values());
-
-        // FIX: Generate a temporary ID for the offer set if it's not synced yet.
-        const temporaryId = uuidv4(); 
+        const temporaryId = uuidv4();
 
         const offerSetPayload: CartOfferItem = {
-            id: temporaryId, // FIX: Assign a temporary ID here.
+            id: temporaryId,
             offer: offerData.id,
             offer_name: { id: offerData.id, offer_name: offerData.offer_name },
             buy_count: offerData.buy_count,
             get_count: offerData.get_count,
-            isSynced: isAuthenticated, 
+            isSynced: false, // Always initially false for optimistic update
             type: 'offer',
-            offer_items: aggregatedOfferItems, 
+            offer_items: aggregatedOfferItems,
         };
 
-        const productIdsForBackend = filledSlots.map(slot => slot.product!.id.replace(/-/g, ''));
-
         try {
-            dispatchCart({ type: 'ADD_OFFER_SET', payload: offerSetPayload }); 
-            if (isAuthenticated) { 
-                const response = await apiService.addToCartOffer({
-                    offer_id: offerData.id.replace(/-/g, ''),
-                    product_ids: productIdsForBackend, 
-                });
-                console.log(`Backend responded with ID: ${response.id}`);
-            }
-            onOpenCartDrawer(); 
+            // Optimistic UI update: Add the offer set locally
+            // This will also trigger the CartProvider's customDispatch, which
+            // then sets `syncRequested` for an authenticated user.
+            dispatchCart({ type: 'ADD_OFFER_SET', payload: offerSetPayload });
+            console.log("OfferMobileSlider: Dispatched ADD_OFFER_SET. CartProvider will handle backend sync.");
+
+            onOpenCartDrawer(); // Open cart drawer after processing
         } catch (error) {
-            console.error('Failed to add to cart:', error);
-            // Revert optimistic update if API call fails
-            // FIX: Pass the temporaryId for removal
-            dispatchCart({ type: 'REMOVE_ITEM', payload: temporaryId });
+            console.error('OfferMobileSlider: Failed to add to cart (local dispatch failed?):', error);
+            // If local dispatch somehow failed, show error.
             alert('Failed to add offer. Please try again.');
         } finally {
             setLoading(false);
         }
-    }, [dispatchCart, isAuthenticated, offerData, isOfferComplete, onOpenCartDrawer, slots]); // Dependencies for useCallback
+    }, [dispatchCart, offerData, isOfferComplete, onOpenCartDrawer, slots]);
 
     const filledSlots = slots.filter(slot => slot.product !== null);
     const totalRequiredItems = offerData.buy_count + offerData.get_count;
@@ -223,12 +213,12 @@ export default memo(function OfferMobileSlider({
         <div style={{ display: isOpen ? 'block' : 'none' }}>
             <div
                 className="fixed inset-0 bg-black/70 z-51"
-                onClick={onClose} 
+                onClick={onClose}
             />
             <div className="fixed bottom-0 left-0 right-0 bg-white rounded-t-xl z-52 p-4 max-h-[80vh] overflow-y-auto">
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold">Your Selection</h3>
-                    <button className='cursor-pointer' onClick={onClose}> 
+                    <button className='cursor-pointer' onClick={onClose}>
                         <X size={20} />
                     </button>
                 </div>

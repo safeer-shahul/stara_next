@@ -1,3 +1,4 @@
+// components/CartDrawer.tsx
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { X, ShoppingCart } from 'lucide-react';
@@ -6,9 +7,9 @@ import OfferCartItem from './OfferCartItem';
 import CheckoutModal from './CheckoutModal';
 import { useCart, CartItemType, CartNormalItem, CartOfferItem, ProductItemDetails } from '@/context/cartContext';
 import { cartService } from '@/utils/api/cartService';
-import apiService from '@/utils/api/apiService';
+import apiService from '@/utils/api/apiService'; // Keep apiService for clearCart (if it's a specific endpoint)
 import { cartUtils } from '@/utils/cartUtils';
-import { v4 as uuidv4 } from 'uuid'; 
+import { v4 as uuidv4 } from 'uuid';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -17,123 +18,26 @@ interface CartDrawerProps {
 
 const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
   const { cartItems, dispatchCart, loading: contextLoading } = useCart();
-  // Removed direct console.log from component body to reduce noise
-  // console.log('Current cartItems in CartDrawer:', cartItems);
-
   const [localLoading, setLocalLoading] = useState<boolean>(false);
   const [showCheckoutModal, setShowCheckoutModal] = useState<boolean>(false);
 
-  // This function is now mostly for *re-fetching* the cart state from backend/local storage
-  // and dispatching it to the context. It should be called after actions that modify cart.
+  // This function is for explicitly forcing a refresh of the cart state
+  // from the backend/local storage. It's called after actions that *definitely*
+  // need to reflect the server's current state (e.g., successful backend mutation
+  // that was NOT initiated by the CartProvider's sync cycle, like checkout).
   const getAndSetCartItems = useCallback(async () => {
     setLocalLoading(true);
     try {
-      // This will now fetch the latest state, also reconciling any changes if an access token is present
-      const items = await cartService.fetchCartFromBackend(); 
+      const items = await cartService.fetchCartFromBackend();
       dispatchCart({ type: 'SET_CART_ITEMS', payload: items });
     } catch (error) {
-      console.error('Error fetching/enriching cart:', error);
+      console.error('CartDrawer: Error fetching/enriching cart:', error);
     } finally {
       setLocalLoading(false);
     }
   }, [dispatchCart]);
 
-  // Removed useEffect hooks that call getAndSetCartItems on isOpen or showCheckoutModal changes.
-  // The CartProvider's main synchronization useEffect will handle initial fetching and
-  // authentication state changes.
-  // useEffect(() => {
-  //   if (isOpen && typeof window !== 'undefined') {
-  //     getAndSetCartItems(); // Fetch cart items when drawer opens
-  //   }
-  // }, [isOpen, getAndSetCartItems]);
-
-  useEffect(() => {
-    // Re-fetch cart items after checkout modal closes to ensure latest state
-    // This is valid as closing the modal might mean an order was placed, affecting cart state.
-    if (!showCheckoutModal && isOpen) {
-      getAndSetCartItems();
-    }
-  }, [showCheckoutModal, isOpen, getAndSetCartItems]);
-
-  // FIX: handleRemoveItem now correctly handles local-only vs. synced items
-  const handleRemoveItem = async (id: string): Promise<void> => {
-    const itemToRemove = cartItems.find(item => item.id === id);
-
-    if (!itemToRemove) {
-      console.warn(`Attempted to remove item with ID: ${id}, but it was not found in current cart state.`);
-      return;
-    }
-
-    try {
-      // Optimistically remove from UI
-      dispatchCart({ type: 'REMOVE_ITEM', payload: id });
-
-      if (itemToRemove.isSynced && itemToRemove.id !== null) {
-        // If synced with backend, call API to remove
-        if (itemToRemove.type === 'normal') {
-          await apiService.addToCart({ product_id: itemToRemove.product_id.replace(/-/g, ''), mode: 'delete' });
-          console.log(`Removed normal item with backend ID ${itemToRemove.id} from backend.`);
-        } else if (itemToRemove.type === 'offer') {
-          await apiService.addToCart({ item_id: itemToRemove.id.replace(/-/g, ''), mode: 'delete' });
-          console.log(`Removed offer set with backend ID ${itemToRemove.id} from backend.`);
-        }
-        await getAndSetCartItems(); // Re-fetch only if a backend interaction happened
-      } else {
-        // If not synced (local only), no backend call needed, local state and storage already updated by dispatch
-        console.log(`Removing unsynced item with local ID ${itemToRemove.id || 'null'} from local state.`);
-      }
-      
-    } catch (error) {
-      console.error(`Error removing item (ID: ${id}):`, error);
-      // If backend removal fails, you might want to re-add the item to the UI or show an error.
-      // For now, we'll let the next getAndSetCartItems attempt to resync if authenticated.
-    }
-  };
-
-  // FIX: handleQuantityChange now handles both synced and unsynced normal items
-  const handleQuantityChange = async (id: string, change: number): Promise<void> => {
-    console.log('handleQuantityChange called for item ID:', id);
-    const itemToUpdate = cartItems.find(item => item.id === id);
-    console.log('itemToUpdate found:', itemToUpdate);
-
-    if (!itemToUpdate || itemToUpdate.type !== 'normal') {
-      console.warn(`Attempted to change quantity of non-normal item or item not found with ID: ${id}`);
-      return;
-    }
-    
-    const newQuantity = itemToUpdate.quantity + change;
-
-    if (newQuantity <= 0) {
-      // If quantity goes to 0 or less, remove the item
-      await handleRemoveItem(id);
-      return;
-    }
-
-    // Check if the new quantity exceeds available stock
-    if (newQuantity > itemToUpdate.stock_quantity) {
-      console.warn(`Cannot increase quantity for item ${id} beyond available stock (${itemToUpdate.stock_quantity}).`);
-      // Optionally, you might want to show a user-facing message here
-      return;
-    }
-
-    // Determine if the item is synced and needs backend interaction
-    if (itemToUpdate.isSynced && itemToUpdate.id !== null) {
-      try {
-        await apiService.addToCart({ product_id: itemToUpdate.product_id.replace(/-/g, ''), mode: change > 0 ? '+' : '-' });
-        console.log(`Changed quantity for synced item ${id} by ${change}.`);
-        await getAndSetCartItems(); // Re-fetch to get updated state from backend
-      } catch (error) {
-        console.error(`Error updating synced cart quantity for item ${id}:`, error);
-      }
-    } else {
-      // If not synced (local only), dispatch update to local state directly
-      console.log(`Updating quantity for unsynced local item ${id} to ${newQuantity}.`);
-      dispatchCart({ type: 'UPDATE_ITEM_QUANTITY', payload: { id, quantity: newQuantity } });
-      // For unsynced items, the next syncCartWithBackend (e.g., on login) will push this change.
-      // No need to call getAndSetCartItems immediately here for unsynced, as the local state is updated.
-    }
-  };
-
+  // Effect for controlling body overflow when drawer is open/closed
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -145,27 +49,110 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
     };
   }, [isOpen]);
 
-  const handleProceedToCheckout = async (): Promise<void> => {
+  const handleRemoveItem = async (id: string): Promise<void> => {
+    const itemToRemove = cartItems.find(item => item.id === id);
+
+    if (!itemToRemove) {
+      console.warn(`CartDrawer: Attempted to remove item with ID: ${id}, but it was not found in current cart state.`);
+      return;
+    }
+
+    try {
+      // Optimistically remove from UI
+      dispatchCart({ type: 'REMOVE_ITEM', payload: id });
+
+      // Trigger sync in CartProvider for authenticated users.
+      // The CartProvider will detect the REMOVE_ITEM (isSynced: false implicitly for local removals)
+      // and handle the backend call.
+      if (localStorage.getItem('accessToken')) {
+        console.log(`CartDrawer: Item removed locally. Triggering sync for authenticated user.`);
+        dispatchCart({ type: 'TRIGGER_SYNC' });
+      } else {
+        console.log(`CartDrawer: Item removed locally for guest user.`);
+        // For guest users, the reducer already updated localStorage.
+      }
+
+    } catch (error) {
+      console.error(`CartDrawer: Error handling local remove dispatch for item (ID: ${id}):`, error);
+    }
+  };
+
+  const handleQuantityChange = async (id: string, change: number): Promise<void> => {
+    console.log('CartDrawer: handleQuantityChange called for item ID:', id);
+    const itemToUpdate = cartItems.find(item => item.id === id);
+
+    if (!itemToUpdate || itemToUpdate.type !== 'normal') {
+      console.warn(`CartDrawer: Attempted to change quantity of non-normal item or item not found with ID: ${id}`);
+      return;
+    }
+
+    const newQuantity = itemToUpdate.quantity + change;
+
+    if (newQuantity <= 0) {
+      await handleRemoveItem(id); // Remove if quantity goes to zero or less
+      return;
+    }
+
+    if (newQuantity > itemToUpdate.stock_quantity) {
+      console.warn(`CartDrawer: Cannot increase quantity for item ${id} beyond available stock (${itemToUpdate.stock_quantity}).`);
+      return;
+    }
+
+    try {
+        // Optimistically update quantity locally
+        dispatchCart({ type: 'UPDATE_ITEM_QUANTITY', payload: { id, quantity: newQuantity } });
+        console.log(`CartDrawer: Item quantity updated locally to ${newQuantity}.`);
+
+        // Trigger sync in CartProvider for authenticated users
+        if (localStorage.getItem('accessToken')) {
+            console.log(`CartDrawer: Quantity updated locally. Triggering sync for authenticated user.`);
+            dispatchCart({ type: 'TRIGGER_SYNC' });
+        } else {
+            console.log(`CartDrawer: Quantity updated locally for guest user.`);
+        }
+    } catch (error) {
+        console.error(`CartDrawer: Error handling local quantity update dispatch for item (ID: ${id}):`, error);
+    }
+  };
+
+  const handleProceedToCheckout = (): void => {
     setShowCheckoutModal(true);
   };
 
   const handleCheckoutClose = (): void => {
     setShowCheckoutModal(false);
-    getAndSetCartItems(); // Re-fetch cart after checkout modal closes to ensure latest state
+    // After the checkout modal closes (e.g., order placed or cancelled),
+    // it's a good idea to re-fetch the definitive cart state.
+    getAndSetCartItems();
   };
 
   const handleAddressSelected = (addressId: string): void => {
-    console.log(`Proceeding with address ID: ${addressId}`);
+    console.log(`CartDrawer: Proceeding with address ID: ${addressId}`);
     setShowCheckoutModal(false);
-    getAndSetCartItems(); // Re-fetch cart after address selection (likely for order placement)
+    // After address selection (often implies order placement), re-fetch cart.
+    getAndSetCartItems();
   };
 
   const clearCart = async (): Promise<void> => {
     try {
-      await apiService.addToCart({ mode: 'delete_cart' });
-      dispatchCart({ type: 'SET_CART_ITEMS', payload: [] }); // Clear local state immediately
+      // Optimistically clear local state immediately
+      dispatchCart({ type: 'SET_CART_ITEMS', payload: [] });
+      console.log('CartDrawer: Cart cleared locally.');
+
+      // For authenticated users, explicitly call the backend's clear cart endpoint
+      // and then trigger a sync to confirm.
+      if (localStorage.getItem('accessToken')) {
+        console.log(`CartDrawer: Attempting to clear cart on backend for authenticated user.`);
+        // Assuming apiService.addToCart({ mode: 'delete_cart' }) is your specific endpoint to clear ALL cart items
+        await apiService.addToCart({ mode: 'delete_cart' });
+        dispatchCart({ type: 'TRIGGER_SYNC' }); // Trigger a re-fetch to confirm backend state
+      } else {
+        console.log(`CartDrawer: Cart cleared locally for guest user.`);
+        // For guest users, the SET_CART_ITEMS dispatch already updated localStorage.
+      }
     } catch (error) {
-      console.error('Error clearing cart:', error);
+      console.error('CartDrawer: Error clearing cart:', error);
+      getAndSetCartItems(); // Re-fetch on error to reconcile
     }
   };
 
@@ -177,32 +164,35 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
     return cartUtils.getOutOfStockItems(cartItems);
   };
 
-  if (!isOpen) return null;
+  if (!isOpen) return null; // Render nothing if drawer is closed
 
   const totalCartUnits = cartItems.reduce((total: number, item: CartItemType) => {
     if (item.type === 'normal') {
       return total + item.quantity;
-    } else { 
+    } else {
       return total + item.offer_items.reduce((offerTotal, p) => offerTotal + p.quantity, 0);
     }
   }, 0);
 
   const subtotal = cartUtils.calculateSubtotal(cartItems);
   const offerSavings = cartUtils.calculateTotalOfferSavings(cartItems);
-  
-  const finalTotal = subtotal; 
+
+  const finalTotal = subtotal;
 
   return (
     <>
-      <div className="fixed inset-0 z-50 overflow-hidden">
+      <div className="fixed inset-0 z-51 overflow-hidden">
+        {/* Overlay */}
         <div className="absolute inset-0 bg-black/80" onClick={onClose}></div>
+
+        {/* Drawer content */}
         <div className="absolute right-0 top-0 h-full w-full max-w-sm bg-[#f2f4f7] shadow-xl transform transition-transform rounded-tl-[16px] rounded-bl-[16px]">
           <div className="flex flex-col h-full">
             <div className="flex items-center justify-between py-3 pl-6 pr-2 border-b">
               <div className="flex items-center">
                 <ShoppingCart className="mr-2 text-[#7F7F7F]" size={18} />
                 <h3 className="text-[16px] font-medium text-[#7F7F7F]">
-                  Your Cart ({totalCartUnits} items) 
+                  Your Cart ({totalCartUnits} items)
                 </h3>
               </div>
               <button onClick={onClose} className="text-black hover:text-gray-700">
@@ -227,18 +217,18 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                         if (item.type === 'normal') {
                           return (
                             <CartItem
-                              key={item.id ?? uuidv4()} 
-                              product={item} 
-                              onRemove={handleRemoveItem} 
+                              key={item.id ?? uuidv4()}
+                              product={item}
+                              onRemove={handleRemoveItem}
                               onQuantityChange={handleQuantityChange}
                             />
                           );
-                        } else { 
+                        } else { // item.type === 'offer'
                           return (
                             <OfferCartItem
-                              key={item.id ?? uuidv4()} 
-                              offerSet={item} 
-                              onRemove={handleRemoveItem} // Pass handleRemoveItem (which now handles offer sets)
+                              key={item.id ?? uuidv4()}
+                              offerSet={item}
+                              onRemove={handleRemoveItem}
                             />
                           );
                         }
@@ -258,13 +248,13 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                 <div className="mb-4">
                   {offerSavings > 0 && (
                     <div className="flex justify-between text-green-600 mb-1">
-                      <span className="text-[13px]">Offer Savings</span>
-                      <span className="font-bold">−₹{offerSavings.toFixed(2)}</span>
+                      <span className="text-sm">Offer Savings</span>
+                      <span className="text-base font-bold">₹{offerSavings.toFixed(2)}</span>
                     </div>
                   )}
                   <div className="flex items-center justify-between text-[#7F7F7F]">
-                    <span className="text-[13px]">Estimated Total</span>
-                    <span className="font-bold">₹{finalTotal.toFixed(2)}</span>
+                    <span className="text-sm">Estimated Total</span>
+                    <span className="text-base font-bold">₹{finalTotal.toFixed(2)}</span>
                   </div>
                 </div>
                 {hasOutOfStockItems() && (
@@ -300,7 +290,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
             )}
           </div>
         </div>
-        {/* FIX: Conditionally render CheckoutModal to prevent unnecessary rendering and logging */}
+        {/* Conditionally render CheckoutModal to prevent unnecessary rendering and logging */}
         {showCheckoutModal && (
           <CheckoutModal
             isOpen={showCheckoutModal}

@@ -1,10 +1,11 @@
+// components/OfferCartSidebar.tsx
 'use client';
-import { useEffect, useState } from 'react'; 
+import { useState, useCallback } from 'react';
 import Image from 'next/image';
 import { ShoppingBag, X } from 'lucide-react';
-import apiService from '@/utils/api/apiService';
+// import apiService from '@/utils/api/apiService'; // Removed direct apiService import
 import { v4 as uuidv4 } from 'uuid';
-import { useCart, CartOfferItem, ProductItemDetails } from '@/context/cartContext';
+import { useCart, CartOfferItem, ProductItemDetails } from '@/context/cartContext'; // Ensure correct path
 
 interface ProductItem {
     id: string;
@@ -19,7 +20,7 @@ interface ProductItem {
     product_status: boolean;
     product_code?: string;
     product_description?: string;
-    quantity?: number; 
+    quantity?: number;
     product_weight?: string;
     product_box_weight?: string;
     created_at?: string;
@@ -59,19 +60,19 @@ export default function OfferCartSidebar({
     slots,
     onSlotClear,
     onOpenCartDrawer,
-    isAuthenticated = false
+    isAuthenticated = false // isAuthenticated is now largely for UI presentation/button enabling
 }: OfferCartSidebarProps) {
     const { dispatchCart } = useCart();
     const [loading, setLoading] = useState(false);
 
-    const calculateTotals = () => {
+    const calculateTotals = useCallback(() => {
         const filledSlots = slots.filter(slot => slot.product);
         if (filledSlots.length === 0) {
             return { payableTotal: 0, savings: 0, freeItems: [] };
         }
 
         const allIndividualProductsInSlots: (ProductItemDetails & { uniqueSlotId: string })[] = filledSlots.map(slot => {
-            const product = slot.product!; 
+            const product = slot.product!;
             return {
                 id: product.id,
                 images: product.images || [],
@@ -81,14 +82,14 @@ export default function OfferCartSidebar({
                 product_status: product.product_status,
                 product_code: product.product_code || '',
                 product_description: product.product_description || '',
-                quantity: 1, 
+                quantity: 1,
                 product_weight: product.product_weight || '',
                 product_box_weight: product.product_box_weight || '',
                 created_at: product.created_at || new Date().toISOString(),
-                updated_at: product.updated_at || new Date().toISOString(),
+                updated_at: new Date().toISOString(),
                 sub_category: product.sub_category || '',
                 isInStock: product.product_status && (product.quantity || 1) > 0,
-                uniqueSlotId: slot.id, 
+                uniqueSlotId: slot.id,
             };
         });
 
@@ -102,20 +103,20 @@ export default function OfferCartSidebar({
             .reduce((sum, product) => sum + parseFloat(product.product_price), 0);
 
         const freeItemsActualCount = Math.min(offerData.get_count, sortedProductsDesc.length - itemsToCharge);
-        
+
         const freeItemsForDisplay = sortedProductsDesc.slice(itemsToCharge, itemsToCharge + freeItemsActualCount);
-        
+
         const savings = freeItemsForDisplay.reduce((sum, product) => sum + parseFloat(product.product_price), 0);
 
         return { payableTotal, savings, freeItems: freeItemsForDisplay };
-    };
+    }, [slots, offerData]);
 
-    const isOfferComplete = () => {
+    const isOfferComplete = useCallback(() => {
         const totalRequiredItems = offerData.buy_count + offerData.get_count;
         return slots.filter(slot => slot.product !== null).length === totalRequiredItems;
-    };
+    }, [slots, offerData]);
 
-    const handleBuyNow = async () => {
+    const handleBuyNow = useCallback(async () => {
         if (!isOfferComplete()) return;
 
         setLoading(true);
@@ -126,7 +127,7 @@ export default function OfferCartSidebar({
 
         filledSlots.forEach(slot => {
             if (slot.product) {
-                const product = slot.product; 
+                const product = slot.product;
                 const productDetails: ProductItemDetails = {
                     id: product.id,
                     images: product.images || [],
@@ -136,11 +137,11 @@ export default function OfferCartSidebar({
                     product_status: product.product_status,
                     product_code: product.product_code || '',
                     product_description: product.product_description || '',
-                    quantity: 1, 
+                    quantity: 1,
                     product_weight: product.product_weight || '',
                     product_box_weight: product.product_box_weight || '',
                     created_at: product.created_at || new Date().toISOString(),
-                    updated_at: product.updated_at || new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
                     sub_category: product.sub_category || '',
                     isInStock: product.product_status && (product.quantity || 1) > 0,
                 };
@@ -149,7 +150,7 @@ export default function OfferCartSidebar({
                     const existingProduct = aggregatedOfferItemsMap.get(productDetails.id)!;
                     aggregatedOfferItemsMap.set(productDetails.id, {
                         ...existingProduct,
-                        quantity: existingProduct.quantity + 1, 
+                        quantity: existingProduct.quantity + 1,
                     });
                 } else {
                     aggregatedOfferItemsMap.set(productDetails.id, productDetails);
@@ -158,48 +159,34 @@ export default function OfferCartSidebar({
         });
 
         const aggregatedOfferItems: ProductItemDetails[] = Array.from(aggregatedOfferItemsMap.values());
-
-        // FIX: Generate a temporary ID for the offer set if it's not synced yet.
-        // This temporary ID is crucial for the reducer to remove it locally if API call fails.
-        const temporaryId = uuidv4(); 
+        const temporaryId = uuidv4();
 
         const offerSetPayload: CartOfferItem = {
-            id: temporaryId, // FIX: Assign a temporary ID here. It will be replaced by backend ID after sync.
+            id: temporaryId,
             offer: offerData.id,
             offer_name: { id: offerData.id, offer_name: offerData.offer_name },
             buy_count: offerData.buy_count,
             get_count: offerData.get_count,
-            isSynced: isAuthenticated, // This will be true if user is logged in, false if guest
+            isSynced: false, // Always initially false for optimistic update
             type: 'offer',
-            offer_items: aggregatedOfferItems, 
+            offer_items: aggregatedOfferItems,
         };
 
-        const productIdsForBackend = filledSlots.map(slot => slot.product!.id.replace(/-/g, ''));
-
         try {
-            dispatchCart({ type: 'ADD_OFFER_SET', payload: offerSetPayload }); // Optimistic UI update
+            // Optimistic UI update: Add the offer set locally
+            // This will also trigger the CartProvider's customDispatch, which
+            // then sets `syncRequested` for an authenticated user.
+            dispatchCart({ type: 'ADD_OFFER_SET', payload: offerSetPayload });
+            console.log("OfferCartSidebar: Dispatched ADD_OFFER_SET. CartProvider will handle backend sync.");
 
-            if (isAuthenticated) {
-                const response = await apiService.addToCartOffer({
-                    offer_id: offerData.id.replace(/-/g, ''),
-                    product_ids: productIdsForBackend, 
-                });
-                console.log(`Backend responded with ID: ${response.id}`);
-                // No need to dispatch another SET_CART_ITEMS here.
-                // The CartProvider's useEffect, triggered by isSynced: false,
-                // will eventually call fetchCartFromBackend to reconcile.
-            }
-            onOpenCartDrawer(); 
+            onOpenCartDrawer();
         } catch (error) {
-            console.error('Failed to add to cart:', error);
-            // Revert optimistic update if API call fails
-            // FIX: Pass the temporaryId for removal
-            dispatchCart({ type: 'REMOVE_ITEM', payload: temporaryId }); 
+            console.error('OfferCartSidebar: Failed to add to cart (local dispatch failed?):', error);
             alert('Failed to add offer. Please try again.');
         } finally {
             setLoading(false);
         }
-    };
+    }, [dispatchCart, offerData, isOfferComplete, onOpenCartDrawer, slots]);
 
     const filledSlots = slots.filter(slot => slot.product !== null);
     const totalRequiredItems = offerData.buy_count + offerData.get_count;

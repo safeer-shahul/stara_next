@@ -1,7 +1,8 @@
+// utils/api/cartService.ts
 'use client';
 import { v4 as uuidv4, validate } from 'uuid';
-import apiService from './apiService';
-import { CartItemType, CartNormalItem, CartOfferItem, ProductItemDetails, ProductImage } from '@/context/cartContext';
+import apiService from './apiService'; // Ensure this path is correct relative to your project structure
+import { CartItemType, CartNormalItem, CartOfferItem, ProductItemDetails } from '@/context/cartContext'; // Ensure this path is correct relative to your project structure
 
 interface BackendRawCartItem {
     id: string | null;
@@ -29,34 +30,9 @@ interface OfferDetailsFromBackend {
     offer_image: string;
 }
 
-// Type guard for the raw backend item structure for a normal product
-function isBackendRawNormalItemStructure(item: any): item is BackendRawCartItem {
-    return (
-        item &&
-        typeof item === 'object' &&
-        (typeof item.id === 'string' || item.id === null) && // ID can be string or null for new local items
-        typeof item.product === 'string' &&
-        typeof item.quantity === 'number' &&
-        (!item.offer || item.offer_products.length === 0) // No offer ID OR empty offer_products list
-    );
-}
-
-// Type guard for the raw backend item structure for an offer product
-function isBackendRawOfferItemStructure(item: any): item is BackendRawCartItem {
-    return (
-        item &&
-        typeof item === 'object' &&
-        (typeof item.id === 'string' || item.id === null) &&
-        typeof item.offer === 'string' && // Has an offer ID
-        Array.isArray(item.offer_products) && item.offer_products.length > 0 // Has a non-empty offer_products list
-    );
-}
-
-
 const _aggregateOfferProducts = (productsToAggregate: ProductItemDetails[]): ProductItemDetails[] => {
     const aggregatedMap = new Map<string, ProductItemDetails>();
     productsToAggregate.forEach(product => {
-        // Use the actual product ID for aggregation, not a cleaned version if it's already a UUID
         const productId = product.id;
         if (aggregatedMap.has(productId)) {
             const existingProduct = aggregatedMap.get(productId)!;
@@ -80,20 +56,19 @@ export const cartService = {
         console.log("cartService: Entering fetchCartFromBackend.");
         try {
             const accessToken = localStorage.getItem('accessToken');
-            let rawCartDataFromSource: BackendRawCartItem[] = []; // Explicitly type this array
+            let rawCartDataFromSource: BackendRawCartItem[] = [];
 
             if (accessToken) {
                 console.log("cartService: Fetching cart from backend for authenticated user.");
                 const response = await apiService.getUserCart();
                 console.log("cartService: Backend getUserCart response:", response);
 
-                // Ensure response.items is an array before mapping
                 rawCartDataFromSource = Array.isArray(response?.items) ? response.items.map((item: any) => ({
                     id: item.id,
                     quantity: item.quantity,
                     product: item.product,
                     offer: item.offer,
-                    offer_products: item.offer_products || [], // Ensure it's an array, even if empty
+                    offer_products: item.offer_products || [],
                     created_at: item.created_at,
                     updated_at: item.updated_at,
                 })) : [];
@@ -104,7 +79,6 @@ export const cartService = {
                 if (storedItems) {
                     try {
                         const parsedItems = JSON.parse(storedItems);
-                        // Filter for items that conform to the expected CartItemType structure
                         rawCartDataFromSource = parsedItems.filter((item: any) =>
                             typeof item === 'object' && item !== null && (item.type === 'normal' || item.type === 'offer')
                         );
@@ -118,12 +92,11 @@ export const cartService = {
             }
 
             const allProductIds = new Set<string>();
-            rawCartDataFromSource.forEach((item: BackendRawCartItem) => { // Iterate over BackendRawCartItem
-                // Always add the main product ID
+            rawCartDataFromSource.forEach((item: BackendRawCartItem) => {
+                // Ensure product IDs are UUIDs before validation and cleaning
                 if (item.product && validate(item.product)) {
                     allProductIds.add(item.product.replace(/-/g, ''));
                 }
-                // Add product IDs from offer_products
                 if (Array.isArray(item.offer_products)) {
                     item.offer_products.forEach(p => {
                         if (p.product && validate(p.product)) {
@@ -161,12 +134,13 @@ export const cartService = {
 
             const enrichedCartItems: CartItemType[] = rawCartDataFromSource.map((item: BackendRawCartItem) => {
                 const isOfferItem = item.offer !== null && item.offer_products.length > 0;
-                
+
                 if (isOfferItem) {
                     console.log("cartService: Processing offer item based on offer_products and offer ID:", item);
                     const currentOfferId = item.offer!; // Assert non-null after check
                     const currentItemId = item.id || uuidv4(); // Use backend ID or generate temp for new local offer
-                    const currentIsSynced = accessToken !== null; // True if authenticated, false if guest (new local item)
+                    // isSynced is true if authenticated AND it has a backend ID (meaning it was fetched from backend)
+                    const currentIsSynced = accessToken !== null && item.id !== null && validate(item.id);
 
                     const offerDetails = validOffersMap.get(currentOfferId);
 
@@ -219,7 +193,7 @@ export const cartService = {
                 } else { // It's a normal product
                     console.log("cartService: Processing normal item:", item);
                     const currentItemId = item.id || uuidv4(); // Use backend ID or generate temp for new local item
-                    const currentIsSynced = accessToken !== null; // True if authenticated, false if guest (new local item)
+                    const currentIsSynced = accessToken !== null && item.id !== null && validate(item.id);
 
                     const productDetail = productsMap.get(item.product.replace(/-/g, ''));
 
@@ -245,8 +219,7 @@ export const cartService = {
             }).filter(Boolean) as CartItemType[]; // Filter out any nulls
 
             if (!accessToken) {
-                console.log("cartService: Saving fetched guest cart items to localStorage:", enrichedCartItems);
-                localStorage.setItem('cartItems', JSON.stringify(enrichedCartItems));
+                console.log("cartService: Saving fetched guest cart items to localStorage: (Handled by CartProvider SET_CART_ITEMS)");
             } else {
                 console.log("cartService: Not saving to localStorage immediately for authenticated fetch. CartProvider handles reconciliation.");
             }
@@ -280,19 +253,13 @@ export const cartService = {
         let success = true;
 
         for (const item of localUnsyncedItems) {
-            // Only push items that are NOT synced and have a valid (local temporary) ID
-            // Backend should handle upserting based on product_id/offer_id and user session
-            if (item.isSynced === false) { // Removed validate(item.id) because temporary IDs are always valid UUIDs
+            // Only push items that are NOT synced (isSynced === false)
+            if (item.isSynced === false) {
                 try {
                     if (item.type === 'normal') {
                         const normalItem = item as CartNormalItem;
                         console.log(`cartService: Attempting to push normal item to backend: Product ID: ${normalItem.product_id}, Quantity: ${normalItem.quantity}`);
-                        // When pushing a locally added item, we should send its full quantity.
-                        // The backend 'add' endpoint likely increments.
-                        // If it's a new item, we add. If it's an existing item with updated quantity, we might need a "set" quantity API or handle increments/decrements.
-                        // Assuming addToCart with '+' mode means increment.
-                        // For a local item with quantity N, we need to send N individual '+' calls or a single call with quantity: N.
-                        // Given your current apiService.addToCart signature, sending multiple '+' is the way if quantity is > 1
+                        // When pushing a locally added item, send its full quantity.
                         for (let q = 0; q < normalItem.quantity; q++) {
                             console.log(`cartService: Sending API call to add product ${normalItem.product_id} (unit ${q + 1}/${normalItem.quantity})`);
                             await apiService.addToCart({ product_id: normalItem.product_id.replace(/-/g, ''), mode: '+' });
@@ -303,7 +270,6 @@ export const cartService = {
                         console.log(`cartService: Attempting to push offer item to backend: Offer ID: ${offerItem.offer}`);
 
                         const productIdsForBackend: string[] = [];
-                        // Iterate through the aggregated offer_items and collect product IDs based on their quantity
                         offerItem.offer_items.forEach(p => {
                             for (let q = 0; q < p.quantity; q++) {
                                 productIdsForBackend.push(p.id.replace(/-/g, ''));
@@ -318,17 +284,16 @@ export const cartService = {
                         console.log(`cartService: Successfully pushed offer item ${offerItem.offer} to backend.`);
                     }
                 } catch (error) {
-                    console.error(`cartService: Error pushing item to backend (product_id/offer_id: ${item.type === 'normal' ? (item as CartNormalItem).product_id : (item as CartOfferItem).offer}):`, error);
+                    console.error(`cartService: Error pushing item to backend (ID: ${item.id}, Type: ${item.type}):`, error);
                     success = false;
                 }
             } else {
-                console.log(`cartService: Skipping push for item ${item.id} (already synced or invalid ID).`);
+                console.log(`cartService: Skipping push for item ${item.id} (already synced).`);
             }
         }
         console.log("cartService: Finished iterating through unsynced local items to push to backend. Overall success:", success);
 
-        // After attempting to push, fetch the canonical cart state from the backend.
-        // This will reconcile the cart, including items that were just pushed.
+        // After attempting to push all unsynced items, fetch the canonical cart state from the backend.
         console.log("cartService: Fetching canonical cart after push attempt.");
         const canonicalCart = await cartService.fetchCartFromBackend();
         return canonicalCart;

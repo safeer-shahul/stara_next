@@ -6,6 +6,7 @@ import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 // Import auth from your config file instead of initializing inside component
 import { auth } from './firebase/config'; // Adjust this path to match your project structure
 import apiService from '@/utils/api/apiService';
+import { useCart } from '@/context/cartContext'; // Add this import
 
 // Props Interface
 interface LoginProps {
@@ -16,10 +17,26 @@ interface LoginProps {
 
 const Login = ({ onClose, switchToRegister, onLoginSuccess }: LoginProps) => {
   const router = useRouter();
+  const { dispatchCart } = useCart(); // Add this hook
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const handleLoginSuccess = () => {
+    console.log('🔄 Login successful, triggering cart sync...');
+    
+    // Trigger cart sync immediately after login
+    dispatchCart({ type: 'TRIGGER_SYNC' });
+    
+    // Call the original callback
+    if (onLoginSuccess) {
+      onLoginSuccess();
+    } else {
+      onClose();
+      router.refresh();
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,15 +55,11 @@ const Login = ({ onClose, switchToRegister, onLoginSuccess }: LoginProps) => {
 
       // Store the token
       localStorage.setItem('accessToken', data.accessToken);
+      console.log('✅ Token stored in localStorage:', data.accessToken);
 
-      // Trigger the login success callback if provided
-      if (onLoginSuccess) {
-        onLoginSuccess();
-      } else {
-        // Close the modal and refresh if callback not provided
-        onClose();
-        router.refresh();
-      }
+      // Handle login success (includes cart sync)
+      handleLoginSuccess();
+      
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred during login');
     } finally {
@@ -70,17 +83,14 @@ const Login = ({ onClose, switchToRegister, onLoginSuccess }: LoginProps) => {
       // Save tokens
       localStorage.setItem('accessToken', response.access_token);
       localStorage.setItem('refreshToken', response.refresh_token);
+      console.log('✅ Google tokens stored in localStorage');
   
       // Now fetch user profile using the stored access token
       const userProfile = await apiService.getUserProfile();
       localStorage.setItem('me', JSON.stringify(userProfile));
 
-      if (onLoginSuccess) {
-        onLoginSuccess();
-      } else {
-        onClose();
-        router.refresh();
-      }      
+      // Handle login success (includes cart sync)
+      handleLoginSuccess();
       
     } catch (err) {
       console.error('Google login error:', err);
