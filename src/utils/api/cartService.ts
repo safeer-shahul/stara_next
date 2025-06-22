@@ -1,412 +1,343 @@
 'use client';
-import { v4 as uuidv4 } from 'uuid';
+import { v4 as uuidv4, validate } from 'uuid';
 import apiService from './apiService';
-// Ensure all necessary types are imported
-import { CartItemType, CartNormalItem, CartOfferItem, ProductItemDetails, ProductImage } from '@/context/cartContext'; 
+import { CartItemType, CartNormalItem, CartOfferItem, ProductItemDetails, ProductImage } from '@/context/cartContext';
 
-// --- Type Definitions (Refined) ---
-
-// Raw cart item structure as received from your backend API
 interface BackendRawCartItem {
-  id: string; // Cart Item UUID
-  quantity?: number; // Quantity in cart for normal items
-  product?: string; // Product ID for normal items
-  offer?: string; // Offer ID for offer items
-  // This is the flat list of products and their quantities from the backend's perspective for an offer
-  offer_products?: Array<{ product: string; quantity: number }>; 
-  buy_count?: number;
-  get_count?: number;
-  type?: 'normal' | 'offer'; // Backend might implicitly determine type, or send it
-  isSynced?: boolean; // Backend doesn't send this, but we add it during initial processing if from local storage
+    id: string | null;
+    quantity: number; // Quantity of the main product in the cart item
+    product: string; // UUID of the main product
+    offer: string | null; // UUID of the offer, if applicable
+    offer_products: Array<{ // Products included in the offer, usually the 'get' items or additional 'buy' items
+        id: number; // This 'id' is likely a database ID for the offer_product entry, not a UUID
+        product: string; // UUID of the product in the offer_products list
+        quantity: number;
+        cart_item: string; // UUID of the parent cart_item
+    }>;
+    created_at: string;
+    updated_at: string;
 }
 
-// Structure of offer details fetched from your /offers API
 interface OfferDetailsFromBackend {
-  id: string;
-  products: string[]; // List of product UUIDs included in the offer (from backend's offer definition)
-  created_at: string;
-  updated_at: string;
-  offer_name: string;
-  buy_count: number;
-  get_count: number;
-  start_date: string;
-  end_date: string;
-  offer_image: string;
+    id: string;
+    products: string[]; // List of product UUIDs that are part of this offer
+    created_at: string;
+    updated_at: string;
+    offer_name: string;
+    buy_count: number;
+    get_count: number;
+    offer_image: string;
 }
 
-// --- Type Guards ---
-// These help TypeScript understand the shape of an item, useful for narrowing types
-
-function isBackendRawNormalItem(item: any): item is BackendRawCartItem & { product: string; quantity: number; type?: 'normal' } {
-  return item && typeof item === 'object' && typeof item.id === 'string' && typeof item.product === 'string' && typeof item.quantity === 'number';
+// Type guard for the raw backend item structure for a normal product
+function isBackendRawNormalItemStructure(item: any): item is BackendRawCartItem {
+    return (
+        item &&
+        typeof item === 'object' &&
+        (typeof item.id === 'string' || item.id === null) && // ID can be string or null for new local items
+        typeof item.product === 'string' &&
+        typeof item.quantity === 'number' &&
+        (!item.offer || item.offer_products.length === 0) // No offer ID OR empty offer_products list
+    );
 }
 
-function isBackendRawOfferItem(item: any): item is BackendRawCartItem & { offer: string; offer_products: Array<{ product: string; quantity: number }>; buy_count: number; get_count: number; type?: 'offer' } {
-  return item && typeof item === 'object' && typeof item.id === 'string' && typeof item.offer === 'string' &&
-    Array.isArray(item.offer_products) && item.offer_products.every((p: any) => typeof p.product === 'string' && typeof p.quantity === 'number') &&
-    typeof item.buy_count === 'number' && typeof item.get_count === 'number';
+// Type guard for the raw backend item structure for an offer product
+function isBackendRawOfferItemStructure(item: any): item is BackendRawCartItem {
+    return (
+        item &&
+        typeof item === 'object' &&
+        (typeof item.id === 'string' || item.id === null) &&
+        typeof item.offer === 'string' && // Has an offer ID
+        Array.isArray(item.offer_products) && item.offer_products.length > 0 // Has a non-empty offer_products list
+    );
 }
 
-// Checks if an item is already in our desired CartOfferItem (structured) format
-function isStructuredOfferItem(item: any): item is CartOfferItem {
-  return item && typeof item === 'object' && item.type === 'offer' &&
-    (typeof item.id === 'string' || item.id === null) && // Allow null ID for unsynced local items
-    typeof item.offer === 'string' &&
-    Array.isArray(item.offer_items) &&
-    typeof item.buy_count === 'number' && typeof item.get_count === 'number';
-}
 
-/**
- * Aggregates and combines quantities of identical products within an offer set.
- * This is crucial for the new CartOfferItem.offer_items structure.
- * @param productsToAggregate An array of product details potentially with quantities > 1.
- * @returns An array of ProductItemDetails where identical products are merged and their quantities summed.
- */
 const _aggregateOfferProducts = (productsToAggregate: ProductItemDetails[]): ProductItemDetails[] => {
-  const aggregatedMap = new Map<string, ProductItemDetails>();
-
-  productsToAggregate.forEach(product => {
-    const cleanProductId = product.id.replace(/-/g, ''); // Ensure consistent key for map
-
-    if (aggregatedMap.has(cleanProductId)) {
-      // If product already in map, sum quantities
-      const existingProduct = aggregatedMap.get(cleanProductId)!;
-      aggregatedMap.set(cleanProductId, {
-        ...existingProduct,
-        quantity: existingProduct.quantity + (product.quantity || 1), // Sum quantities
-      });
-    } else {
-      // If new product, add to map (ensure quantity is at least 1)
-      aggregatedMap.set(cleanProductId, {
-        ...product,
-        quantity: product.quantity || 1, // Ensure quantity is at least 1
-      });
-    }
-  });
-
-  return Array.from(aggregatedMap.values());
+    const aggregatedMap = new Map<string, ProductItemDetails>();
+    productsToAggregate.forEach(product => {
+        // Use the actual product ID for aggregation, not a cleaned version if it's already a UUID
+        const productId = product.id;
+        if (aggregatedMap.has(productId)) {
+            const existingProduct = aggregatedMap.get(productId)!;
+            aggregatedMap.set(productId, {
+                ...existingProduct,
+                quantity: existingProduct.quantity + (product.quantity || 1),
+            });
+        } else {
+            aggregatedMap.set(productId, {
+                ...product,
+                quantity: product.quantity || 1,
+            });
+        }
+    });
+    return Array.from(aggregatedMap.values());
 };
 
 
 export const cartService = {
-  fetchCartFromBackend: async (): Promise<CartItemType[]> => {
-    console.log("cartService: Entering fetchCartFromBackend.");
-    try {
-      const accessToken = localStorage.getItem('accessToken');
-      let rawCartDataFromSource: unknown[] = []; // Raw data either from backend or local storage
-
-      if (accessToken) {
-        // Authenticated user: Fetch from backend
-        console.log("cartService: Fetching cart from backend for authenticated user.");
-        const response = await apiService.getUserCart();
-        console.log("cartService: Backend getUserCart response:", response);
-        rawCartDataFromSource = response?.items?.map((item: any) => ({
-          id: item.id,
-          quantity: item.quantity,
-          product: item.product,
-          offer: item.offer,
-          offer_products: item.offer_products,
-          buy_count: item.buy_count,
-          get_count: item.get_count,
-          type: item.offer ? 'offer' : 'normal', // Determine type based on 'offer' field
-          isSynced: true, // Items from backend are always synced
-        })) || [];
-        console.log("cartService: Raw cart data from backend for processing:", rawCartDataFromSource);
-      } else {
-        // Guest user: Load from local storage
-        console.log("cartService: Loading cart from local storage for guest user.");
-        const storedItems = localStorage.getItem('cartItems');
-        if (storedItems) {
-          try {
-            rawCartDataFromSource = JSON.parse(storedItems);
-            console.log("cartService: Raw stored items from localStorage:", rawCartDataFromSource);
-            // Filter out any non-object or malformed items from local storage
-            rawCartDataFromSource = rawCartDataFromSource.filter(item => 
-                typeof item === 'object' && item !== null && (item as any).type
-            );
-            if (!Array.isArray(rawCartDataFromSource)) {
-              console.warn('cartService: Local storage cart is not an array, resetting.');
-              rawCartDataFromSource = [];
-              localStorage.removeItem('cartItems');
-            }
-          } catch (parseError) {
-            console.error('cartService: Error parsing stored cart items from local storage:', parseError);
-            localStorage.removeItem('cartItems');
-            rawCartDataFromSource = [];
-          }
-        }
-      }
-
-      // Collect all unique product IDs from all cart items (normal and offer)
-      const allProductIds = new Set<string>();
-      rawCartDataFromSource.forEach((item: unknown) => {
-        if (typeof item !== 'object' || item === null) return;
-
-        // Extract product IDs for normal items
-        if ((item as {type?:string}).type === 'normal') {
-          if (isBackendRawNormalItem(item)) {
-            allProductIds.add(item.product.replace(/-/g, ''));
-          } else if ((item as CartNormalItem).product_id) { 
-            allProductIds.add((item as CartNormalItem).product_id.replace(/-/g, ''));
-          }
-        } 
-        // Extract product IDs for offer items (from raw backend response or existing structured local storage)
-        else if ((item as {type?:string}).type === 'offer') {
-          if (isBackendRawOfferItem(item)) {
-            // Include main product if available in raw form
-            const rawOffer = item as BackendRawCartItem & { offer: string; offer_products: Array<{ product: string; quantity: number }>; buy_count: number; get_count: number; type?: 'offer' };
-            if (rawOffer.product) { // This `product` field might come from backend's single product representation of an offer item
-              allProductIds.add(rawOffer.product.replace(/-/g, ''));
-            }
-            rawOffer.offer_products.forEach(p => p.product && allProductIds.add(p.product.replace(/-/g, '')));
-          } else if (isStructuredOfferItem(item)) {
-            item.offer_items.forEach(p => p.id && allProductIds.add(p.id.replace(/-/g, '')));
-          }
-        }
-      });
-
-      console.log("cartService: All unique product IDs collected:", Array.from(allProductIds));
-
-      // Fetch full product details for all unique product IDs
-      const productIdsArray = Array.from(allProductIds);
-      let productsMap = new Map<string, ProductItemDetails>();
-
-      if (productIdsArray.length > 0) {
-        console.log("cartService: Fetching product details for IDs:", productIdsArray);
-        const productsResponse = await apiService.getPaginatedProducts(1, 100, productIdsArray); // Assuming 100 products is sufficient
-        productsResponse.products.forEach((p: any) => {
-          productsMap.set(p.id.replace(/-/g, ''), {
-            id: p.id,
-            images: p.images || [],
-            product_code: p.product_code,
-            product_name: p.product_name,
-            product_description: p.product_description,
-            product_price: p.product_price,
-            strike_price: p.strike_price,
-            quantity: p.quantity, // This is the STOCK QUANTITY from product details
-            product_weight: p.product_weight,
-            product_box_weight: p.product_box_weight,
-            product_status: p.product_status,
-            created_at: p.created_at,
-            updated_at: p.updated_at,
-            sub_category: p.sub_category,
-            isInStock: p.product_status && p.quantity > 0,
-          });
-        });
-        console.log("cartService: Product details fetched and mapped. Map size:", productsMap.size);
-      }
-
-      // Fetch all valid offers to enrich offer item names and rules
-      console.log("cartService: Fetching valid offers.");
-      const offersResponse = await apiService.getValidOffers();
-      const validOffersMap = new Map<string, OfferDetailsFromBackend>(offersResponse.data.map((o: OfferDetailsFromBackend) => [o.id, o]));
-      console.log("cartService: Valid offers fetched. Map size:", validOffersMap.size);
-
-
-      // Enriche the raw cart items into the structured CartItemType format
-      const enrichedCartItems: CartItemType[] = rawCartDataFromSource.map((item: unknown) => {
-        if (typeof item !== 'object' || item === null) {
-          console.warn(`cartService: Skipping malformed item (not object or null):`, item);
-          return null; // Skip malformed items
-        }
-
-        // Process Normal Items
-        if ((item as {type?:string}).type === 'normal') {
-          console.log("cartService: Processing normal item:", item);
-          const normalItemAsRaw = item as BackendRawCartItem & { type: 'normal'; product: string; quantity: number; };
-          const normalItemAsStructured = item as CartNormalItem;
-
-          const productIdToUse = isBackendRawNormalItem(item) ? normalItemAsRaw.product : normalItemAsStructured.product_id;
-          const quantityInCart = isBackendRawNormalItem(item) ? normalItemAsRaw.quantity : normalItemAsStructured.quantity;
-          const isSyncedStatus = isBackendRawNormalItem(item) ? normalItemAsRaw.isSynced : normalItemAsStructured.isSynced;
-          const itemId = isBackendRawNormalItem(item) ? normalItemAsRaw.id : normalItemAsStructured.id;
-
-          const productDetail = productsMap.get(productIdToUse.replace(/-/g, ''));
-
-          if (productDetail && quantityInCart !== undefined) {
-            console.log("cartService: Normal item enriched successfully.");
-            return {
-              id: itemId,
-              product_id: productIdToUse,
-              quantity: quantityInCart, // This is the cart quantity
-              type: 'normal',
-              isSynced: isSyncedStatus,
-              product_name: productDetail.product_name,
-              product_price: productDetail.product_price,
-              strike_price: productDetail.strike_price,
-              images: productDetail.images,
-              isInStock: productDetail.isInStock,
-              stock_quantity: productDetail.quantity, // Populate with actual stock quantity from product details
-            } as CartNormalItem;
-          }
-          console.warn(`cartService: Product details missing or invalid for normal item ${productIdToUse}. Skipping.`, item);
-          return null;
-        } 
-        // Process Offer Items
-        else if ((item as {type?:string}).type === 'offer') {
-          console.log("cartService: Processing offer item:", item);
-          let currentOfferId: string | undefined | null;
-          let currentBuyCount: number | undefined;
-          let currentGetCount: number | undefined;
-          let currentIsSynced: boolean | undefined;
-          let currentItemId: string | null | undefined; 
-
-          let productsForAggregation: ProductItemDetails[] = []; 
-
-          const isRawOffer = isBackendRawOfferItem(item);
-          const isStructured = isStructuredOfferItem(item);
-
-          if (isRawOffer) {
-            const backendRawOffer = item;
-            currentOfferId = backendRawOffer.offer;
-            currentBuyCount = backendRawOffer.buy_count;
-            currentGetCount = backendRawOffer.get_count;
-            currentIsSynced = backendRawOffer.isSynced;
-            currentItemId = backendRawOffer.id; 
-
-            const rawOfferProductsCombined: Array<{ product: string; quantity: number }> = [];
-            if (backendRawOffer.product && backendRawOffer.quantity !== undefined) { 
-              rawOfferProductsCombined.push({ product: backendRawOffer.product, quantity: backendRawOffer.quantity });
-            }
-            if (backendRawOffer.offer_products) { 
-              rawOfferProductsCombined.push(...backendRawOffer.offer_products);
-            }
-
-            productsForAggregation = rawOfferProductsCombined
-              .map(p => productsMap.get(p.product?.replace(/-/g, '')) ? { ...productsMap.get(p.product?.replace(/-/g, ''))!, quantity: p.quantity } : undefined)
-              .filter(Boolean) as ProductItemDetails[];
-            console.log("cartService: Raw offer products prepared for aggregation:", productsForAggregation);
-            
-          } else if (isStructured) {
-            const structuredOffer = item;
-            currentOfferId = structuredOffer.offer;
-            currentBuyCount = structuredOffer.buy_count;
-            currentGetCount = structuredOffer.get_count;
-            currentIsSynced = structuredOffer.isSynced;
-            currentItemId = structuredOffer.id; 
-
-            productsForAggregation = (structuredOffer.offer_items || [])
-              .map(p => {
-                const productDetail = productsMap.get(p.id?.replace(/-/g, '') || ''); 
-                return productDetail ? { ...productDetail, quantity: p.quantity } : p; 
-              })
-              .filter(Boolean) as ProductItemDetails[];
-            console.log("cartService: Structured offer products prepared for aggregation:", productsForAggregation);
-            
-          } else {
-            console.warn(`cartService: Malformed offer item skipped during enrichment:`, item);
-            return null;
-          }
-
-          const offerDetails = currentOfferId ? validOffersMap.get(currentOfferId) : undefined;
-
-          const aggregatedOfferItems = _aggregateOfferProducts(productsForAggregation);
-          console.log("cartService: Aggregated offer items:", aggregatedOfferItems);
-
-
-          if (currentItemId === undefined || currentOfferId === undefined || currentBuyCount === undefined || currentGetCount === undefined || currentIsSynced === undefined) {
-            console.warn(`cartService: Essential data missing for offer item after initial parsing. Skipping:`, item);
-            return null;
-          }
-          if (aggregatedOfferItems.length === 0) {
-            console.warn(`cartService: No valid products found for offer item after aggregation. Skipping:`, item);
-            return null; 
-          }
-
-          console.log("cartService: Offer item enriched successfully.");
-          return {
-            id: currentItemId, 
-            offer: currentOfferId,
-            offer_name: offerDetails ? { id: offerDetails.id, offer_name: offerDetails.offer_name } : { id: currentOfferId, offer_name: 'Special Offer' },
-            buy_count: offerDetails ? offerDetails.buy_count : currentBuyCount, 
-            get_count: offerDetails ? offerDetails.get_count : currentGetCount, 
-            isSynced: currentIsSynced,
-            type: 'offer',
-            offer_items: aggregatedOfferItems, 
-          } as CartOfferItem;
-        }
-        console.warn(`cartService: Item with unknown or invalid type skipped:`, item);
-        return null;
-      }).filter(Boolean) as CartItemType[]; 
-
-      console.log("cartService: Final enriched cart items before saving to localStorage:", enrichedCartItems);
-      localStorage.setItem('cartItems', JSON.stringify(enrichedCartItems));
-      console.log("cartService: Enriched cart items saved to localStorage.");
-
-      return enrichedCartItems;
-    } catch (error) {
-      console.error('cartService: Critical error in fetchCartFromBackend:', error);
-      // Fallback: If fetching from backend fails, try to load existing structured data from localStorage
-      const storedItems = localStorage.getItem('cartItems');
-      if (storedItems) {
+    fetchCartFromBackend: async (): Promise<CartItemType[]> => {
+        console.log("cartService: Entering fetchCartFromBackend.");
         try {
-          console.log("cartService: Attempting fallback to localStorage due to critical error.");
-          const parsedFallbackItems: unknown[] = JSON.parse(storedItems);
-          // Return only valid CartItemType objects
-          const validFallbackItems = parsedFallbackItems.filter(item =>
-            typeof item === 'object' && item !== null &&
-            ((item as {type?:string}).type === 'normal' || isStructuredOfferItem(item))
-          ) as CartItemType[];
-          console.log("cartService: Fallback to localStorage successful. Items:", validFallbackItems);
-          return validFallbackItems;
+            const accessToken = localStorage.getItem('accessToken');
+            let rawCartDataFromSource: BackendRawCartItem[] = []; // Explicitly type this array
 
-        } catch (parseError) {
-          console.error('cartService: Error parsing stored cart items during critical fallback:', parseError);
-          localStorage.removeItem('cartItems'); 
-        }
-      }
-      console.log("cartService: Returning empty cart due to no valid data from backend or localStorage fallback.");
-      return []; 
-    }
-  },
+            if (accessToken) {
+                console.log("cartService: Fetching cart from backend for authenticated user.");
+                const response = await apiService.getUserCart();
+                console.log("cartService: Backend getUserCart response:", response);
 
-  // FIX: New function to push local unsynced cart items to the backend
-  pushLocalCartToBackend: async (localUnsyncedItems: CartItemType[]): Promise<void> => {
-    console.log("cartService: Entering pushLocalCartToBackend. Items to push:", localUnsyncedItems);
-
-    for (const item of localUnsyncedItems) {
-      if (item.isSynced === false && item.id === null) { // Only push items that are truly new locally
-        try {
-          if (item.type === 'normal') {
-            const normalItem = item as CartNormalItem;
-            console.log(`cartService: Pushing new normal item: Product ID: ${normalItem.product_id}, Quantity: ${normalItem.quantity}`);
-            // Call addToCart for each unit to simulate adding the full quantity
-            // Assuming apiService.addToCart handles adding one unit at a time with '+' mode
-            for (let q = 0; q < normalItem.quantity; q++) {
-              await apiService.addToCart({ product_id: normalItem.product_id.replace(/-/g, ''), mode: '+' });
+                // Ensure response.items is an array before mapping
+                rawCartDataFromSource = Array.isArray(response?.items) ? response.items.map((item: any) => ({
+                    id: item.id,
+                    quantity: item.quantity,
+                    product: item.product,
+                    offer: item.offer,
+                    offer_products: item.offer_products || [], // Ensure it's an array, even if empty
+                    created_at: item.created_at,
+                    updated_at: item.updated_at,
+                })) : [];
+                console.log("cartService: Raw cart data from backend for processing:", rawCartDataFromSource);
+            } else {
+                console.log("cartService: Loading cart from local storage for guest user.");
+                const storedItems = localStorage.getItem('cartItems');
+                if (storedItems) {
+                    try {
+                        const parsedItems = JSON.parse(storedItems);
+                        // Filter for items that conform to the expected CartItemType structure
+                        rawCartDataFromSource = parsedItems.filter((item: any) =>
+                            typeof item === 'object' && item !== null && (item.type === 'normal' || item.type === 'offer')
+                        );
+                        console.log("cartService: Parsed raw cart data from local storage:", rawCartDataFromSource);
+                    } catch (parseError) {
+                        console.error('cartService: Error parsing stored cart items from local storage:', parseError);
+                        localStorage.removeItem('cartItems');
+                        rawCartDataFromSource = [];
+                    }
+                }
             }
-            console.log(`cartService: Successfully pushed normal item ${normalItem.product_id} to backend.`);
-          } else if (item.type === 'offer') {
-            const offerItem = item as CartOfferItem;
-            console.log(`cartService: Pushing new offer item: Offer ID: ${offerItem.offer}`);
 
-            const productIdsForBackend: string[] = [];
-            offerItem.offer_items.forEach(p => {
-              for (let q = 0; q < p.quantity; q++) {
-                productIdsForBackend.push(p.id.replace(/-/g, ''));
-              }
+            const allProductIds = new Set<string>();
+            rawCartDataFromSource.forEach((item: BackendRawCartItem) => { // Iterate over BackendRawCartItem
+                // Always add the main product ID
+                if (item.product && validate(item.product)) {
+                    allProductIds.add(item.product.replace(/-/g, ''));
+                }
+                // Add product IDs from offer_products
+                if (Array.isArray(item.offer_products)) {
+                    item.offer_products.forEach(p => {
+                        if (p.product && validate(p.product)) {
+                            allProductIds.add(p.product.replace(/-/g, ''));
+                        }
+                    });
+                }
             });
 
-            await apiService.addToCartOffer({
-              offer_id: offerItem.offer.replace(/-/g, ''),
-              product_ids: productIdsForBackend,
-            });
-            console.log(`cartService: Successfully pushed offer item ${offerItem.offer} to backend.`);
-          }
+            console.log("cartService: All unique product IDs collected for enrichment:", Array.from(allProductIds));
+
+            const productIdsArray = Array.from(allProductIds);
+            let productsMap = new Map<string, ProductItemDetails>();
+
+            if (productIdsArray.length > 0) {
+                console.log("cartService: Fetching product details for IDs:", productIdsArray);
+                const productsResponse = await apiService.getPaginatedProducts(1, 100, productIdsArray);
+                productsResponse.products.forEach((p: any) => {
+                    productsMap.set(p.id.replace(/-/g, ''), { // Store using cleaned UUID as key
+                        id: p.id, images: p.images || [], product_code: p.product_code, product_name: p.product_name,
+                        product_description: p.product_description, product_price: p.product_price, strike_price: p.strike_price,
+                        quantity: p.quantity, product_weight: p.product_weight, product_box_weight: p.product_box_weight,
+                        product_status: p.product_status, created_at: p.created_at, updated_at: p.updated_at,
+                        sub_category: p.sub_category, isInStock: p.product_status && p.quantity > 0,
+                    });
+                });
+                console.log("cartService: Product details fetched and mapped. Map size:", productsMap.size);
+                console.log("cartService: ProductsMap content (keys):", Array.from(productsMap.keys()));
+            }
+
+            console.log("cartService: Fetching valid offers.");
+            const offersResponse = await apiService.getValidOffers();
+            const validOffersMap = new Map<string, OfferDetailsFromBackend>(offersResponse.data.map((o: OfferDetailsFromBackend) => [o.id, o]));
+            console.log("cartService: Valid offers fetched. Map size:", validOffersMap.size);
+
+            const enrichedCartItems: CartItemType[] = rawCartDataFromSource.map((item: BackendRawCartItem) => {
+                const isOfferItem = item.offer !== null && item.offer_products.length > 0;
+                
+                if (isOfferItem) {
+                    console.log("cartService: Processing offer item based on offer_products and offer ID:", item);
+                    const currentOfferId = item.offer!; // Assert non-null after check
+                    const currentItemId = item.id || uuidv4(); // Use backend ID or generate temp for new local offer
+                    const currentIsSynced = accessToken !== null; // True if authenticated, false if guest (new local item)
+
+                    const offerDetails = validOffersMap.get(currentOfferId);
+
+                    if (!offerDetails) {
+                        console.warn(`cartService: Offer details not found for offer ID: ${currentOfferId}. Skipping offer item:`, item);
+                        return null; // Skip if offer details can't be found
+                    }
+
+                    let productsForAggregation: ProductItemDetails[] = [];
+
+                    // 1. Add the main product linked to the cart_item (the 'buy' product)
+                    const mainProductDetail = productsMap.get(item.product.replace(/-/g, ''));
+                    if (mainProductDetail) {
+                        productsForAggregation.push({ ...mainProductDetail, quantity: item.quantity });
+                    } else {
+                        console.warn(`cartService: Product detail not found for main product ID: ${item.product} in offer item.`);
+                    }
+
+                    // 2. Add products from the nested 'offer_products' array (the 'get' products)
+                    item.offer_products.forEach(op => {
+                        const offerProductDetail = productsMap.get(op.product.replace(/-/g, ''));
+                        if (offerProductDetail) {
+                            productsForAggregation.push({ ...offerProductDetail, quantity: op.quantity });
+                        } else {
+                            console.warn(`cartService: Product detail not found for nested offer_product ID: ${op.product} in offer item.`);
+                        }
+                    });
+
+                    const aggregatedOfferItems = _aggregateOfferProducts(productsForAggregation);
+                    console.log("cartService: Aggregated offer items for CartOfferItem:", aggregatedOfferItems);
+
+                    if (aggregatedOfferItems.length === 0) {
+                        console.warn(`cartService: No valid products found for offer item after aggregation. Skipping:`, item);
+                        return null;
+                    }
+
+                    console.log("cartService: Offer item enriched successfully, CartItemId:", currentItemId);
+
+                    return {
+                        id: currentItemId,
+                        offer: currentOfferId,
+                        offer_name: { id: offerDetails.id, offer_name: offerDetails.offer_name },
+                        buy_count: offerDetails.buy_count,
+                        get_count: offerDetails.get_count,
+                        isSynced: currentIsSynced,
+                        type: 'offer',
+                        offer_items: aggregatedOfferItems,
+                    } as CartOfferItem;
+
+                } else { // It's a normal product
+                    console.log("cartService: Processing normal item:", item);
+                    const currentItemId = item.id || uuidv4(); // Use backend ID or generate temp for new local item
+                    const currentIsSynced = accessToken !== null; // True if authenticated, false if guest (new local item)
+
+                    const productDetail = productsMap.get(item.product.replace(/-/g, ''));
+
+                    if (productDetail && item.quantity !== undefined) {
+                        console.log("cartService: Normal item enriched successfully, CartItemId:", currentItemId);
+                        return {
+                            id: currentItemId,
+                            product_id: item.product,
+                            quantity: item.quantity,
+                            type: 'normal',
+                            isSynced: currentIsSynced,
+                            product_name: productDetail.product_name,
+                            product_price: productDetail.product_price,
+                            strike_price: productDetail.strike_price,
+                            images: productDetail.images,
+                            isInStock: productDetail.isInStock,
+                            stock_quantity: productDetail.quantity,
+                        } as CartNormalItem;
+                    }
+                    console.warn(`cartService: Product details missing or invalid for normal item ${item.product}. Skipping.`, item);
+                    return null;
+                }
+            }).filter(Boolean) as CartItemType[]; // Filter out any nulls
+
+            if (!accessToken) {
+                console.log("cartService: Saving fetched guest cart items to localStorage:", enrichedCartItems);
+                localStorage.setItem('cartItems', JSON.stringify(enrichedCartItems));
+            } else {
+                console.log("cartService: Not saving to localStorage immediately for authenticated fetch. CartProvider handles reconciliation.");
+            }
+
+            return enrichedCartItems;
         } catch (error) {
-          console.error(`cartService: Error pushing item to backend (product_id/offer_id: ${item.type === 'normal' ? (item as CartNormalItem).product_id : (item as CartOfferItem).offer}):`, error);
-          // Do not re-throw, continue with other items.
-          // The next fetchCartFromBackend will reconcile the state.
+            console.error('cartService: Critical error in fetchCartFromBackend:', error);
+            const storedItems = localStorage.getItem('cartItems');
+            if (storedItems) {
+                try {
+                    console.log("cartService: Attempting fallback to localStorage due to critical error.");
+                    const parsedFallbackItems: unknown[] = JSON.parse(storedItems);
+                    const validFallbackItems = parsedFallbackItems.filter(item =>
+                        typeof item === 'object' && item !== null &&
+                        ((item as any).type === 'normal' || (item as any).type === 'offer')
+                    ) as CartItemType[];
+                    console.log("cartService: Fallback to localStorage successful. Items:", validFallbackItems);
+                    return validFallbackItems;
+                } catch (parseError) {
+                    console.error('cartService: Error parsing stored cart items during critical fallback:', parseError);
+                    localStorage.removeItem('cartItems');
+                }
+            }
+            console.log("cartService: Returning empty cart due to no valid data from backend or localStorage fallback.");
+            return [];
         }
-      }
-    }
-    console.log("cartService: Finished pushing all unsynced local items to backend.");
-  },
+    },
 
-  addToCart: async (payload: { product_id?: string; mode: string; item_id?: string }) => {
-    console.log("cartService: Calling apiService.addToCart with payload:", payload);
-    const response = await apiService.addToCart(payload);
-    console.log("cartService: apiService.addToCart response:", response);
-    return response;
-  },
+    pushLocalCartToBackend: async (localUnsyncedItems: CartItemType[]): Promise<CartItemType[]> => {
+        console.log("cartService: Entering pushLocalCartToBackend. Items to push:", localUnsyncedItems);
+        let success = true;
+
+        for (const item of localUnsyncedItems) {
+            // Only push items that are NOT synced and have a valid (local temporary) ID
+            // Backend should handle upserting based on product_id/offer_id and user session
+            if (item.isSynced === false) { // Removed validate(item.id) because temporary IDs are always valid UUIDs
+                try {
+                    if (item.type === 'normal') {
+                        const normalItem = item as CartNormalItem;
+                        console.log(`cartService: Attempting to push normal item to backend: Product ID: ${normalItem.product_id}, Quantity: ${normalItem.quantity}`);
+                        // When pushing a locally added item, we should send its full quantity.
+                        // The backend 'add' endpoint likely increments.
+                        // If it's a new item, we add. If it's an existing item with updated quantity, we might need a "set" quantity API or handle increments/decrements.
+                        // Assuming addToCart with '+' mode means increment.
+                        // For a local item with quantity N, we need to send N individual '+' calls or a single call with quantity: N.
+                        // Given your current apiService.addToCart signature, sending multiple '+' is the way if quantity is > 1
+                        for (let q = 0; q < normalItem.quantity; q++) {
+                            console.log(`cartService: Sending API call to add product ${normalItem.product_id} (unit ${q + 1}/${normalItem.quantity})`);
+                            await apiService.addToCart({ product_id: normalItem.product_id.replace(/-/g, ''), mode: '+' });
+                        }
+                        console.log(`cartService: Successfully pushed normal item ${normalItem.product_id} to backend.`);
+                    } else if (item.type === 'offer') {
+                        const offerItem = item as CartOfferItem;
+                        console.log(`cartService: Attempting to push offer item to backend: Offer ID: ${offerItem.offer}`);
+
+                        const productIdsForBackend: string[] = [];
+                        // Iterate through the aggregated offer_items and collect product IDs based on their quantity
+                        offerItem.offer_items.forEach(p => {
+                            for (let q = 0; q < p.quantity; q++) {
+                                productIdsForBackend.push(p.id.replace(/-/g, ''));
+                            }
+                        });
+
+                        console.log(`cartService: Sending API call to add offer ${offerItem.offer} with products:`, productIdsForBackend);
+                        await apiService.addToCartOffer({
+                            offer_id: offerItem.offer.replace(/-/g, ''),
+                            product_ids: productIdsForBackend,
+                        });
+                        console.log(`cartService: Successfully pushed offer item ${offerItem.offer} to backend.`);
+                    }
+                } catch (error) {
+                    console.error(`cartService: Error pushing item to backend (product_id/offer_id: ${item.type === 'normal' ? (item as CartNormalItem).product_id : (item as CartOfferItem).offer}):`, error);
+                    success = false;
+                }
+            } else {
+                console.log(`cartService: Skipping push for item ${item.id} (already synced or invalid ID).`);
+            }
+        }
+        console.log("cartService: Finished iterating through unsynced local items to push to backend. Overall success:", success);
+
+        // After attempting to push, fetch the canonical cart state from the backend.
+        // This will reconcile the cart, including items that were just pushed.
+        console.log("cartService: Fetching canonical cart after push attempt.");
+        const canonicalCart = await cartService.fetchCartFromBackend();
+        return canonicalCart;
+    },
+
+    addToCart: async (payload: { product_id?: string; mode: string; item_id?: string }) => {
+        console.log("cartService: Calling apiService.addToCart with payload:", payload);
+        const response = await apiService.addToCart(payload);
+        console.log("cartService: apiService.addToCart response:", response);
+        return response;
+    },
 };

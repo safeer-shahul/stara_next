@@ -1,4 +1,3 @@
-// src/components/CartItem.tsx
 'use client';
 
 import { Plus, Minus, Trash2, AlertCircle, X } from 'lucide-react'; // Import X for close button
@@ -18,6 +17,7 @@ const CartItem = ({ product, onRemove, onQuantityChange }: CartItemProps) => {
   const isOutOfStock = actualAvailableStock <= 0 || !product.isInStock; 
 
   const handleIncrement = () => {
+    
     if (product.quantity < actualAvailableStock && !isOutOfStock) {
       onQuantityChange(product.id, 1);
     }

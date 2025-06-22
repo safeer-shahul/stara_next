@@ -8,7 +8,7 @@ import { useCart, CartItemType, CartNormalItem, CartOfferItem, ProductItemDetail
 import { cartService } from '@/utils/api/cartService';
 import apiService from '@/utils/api/apiService';
 import { cartUtils } from '@/utils/cartUtils';
-import { v4 as uuidv4 } from 'uuid'; // FIX: Import uuidv4
+import { v4 as uuidv4 } from 'uuid'; 
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -17,7 +17,8 @@ interface CartDrawerProps {
 
 const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
   const { cartItems, dispatchCart, loading: contextLoading } = useCart();
-  console.log('Current cartItems in CartDrawer:', cartItems);
+  // Removed direct console.log from component body to reduce noise
+  // console.log('Current cartItems in CartDrawer:', cartItems);
 
   const [localLoading, setLocalLoading] = useState<boolean>(false);
   const [showCheckoutModal, setShowCheckoutModal] = useState<boolean>(false);
@@ -37,14 +38,18 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
     }
   }, [dispatchCart]);
 
-  useEffect(() => {
-    if (isOpen && typeof window !== 'undefined') {
-      getAndSetCartItems(); // Fetch cart items when drawer opens
-    }
-  }, [isOpen, getAndSetCartItems]);
+  // Removed useEffect hooks that call getAndSetCartItems on isOpen or showCheckoutModal changes.
+  // The CartProvider's main synchronization useEffect will handle initial fetching and
+  // authentication state changes.
+  // useEffect(() => {
+  //   if (isOpen && typeof window !== 'undefined') {
+  //     getAndSetCartItems(); // Fetch cart items when drawer opens
+  //   }
+  // }, [isOpen, getAndSetCartItems]);
 
   useEffect(() => {
     // Re-fetch cart items after checkout modal closes to ensure latest state
+    // This is valid as closing the modal might mean an order was placed, affecting cart state.
     if (!showCheckoutModal && isOpen) {
       getAndSetCartItems();
     }
@@ -60,6 +65,9 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
     }
 
     try {
+      // Optimistically remove from UI
+      dispatchCart({ type: 'REMOVE_ITEM', payload: id });
+
       if (itemToRemove.isSynced && itemToRemove.id !== null) {
         // If synced with backend, call API to remove
         if (itemToRemove.type === 'normal') {
@@ -69,50 +77,60 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
           await apiService.addToCart({ item_id: itemToRemove.id.replace(/-/g, ''), mode: 'delete' });
           console.log(`Removed offer set with backend ID ${itemToRemove.id} from backend.`);
         }
+        await getAndSetCartItems(); // Re-fetch only if a backend interaction happened
       } else {
-        // If not synced (local only), directly dispatch removal from local state
+        // If not synced (local only), no backend call needed, local state and storage already updated by dispatch
         console.log(`Removing unsynced item with local ID ${itemToRemove.id || 'null'} from local state.`);
       }
       
-      // Optimistically remove from UI, then re-fetch to ensure consistency with backend
-      dispatchCart({ type: 'REMOVE_ITEM', payload: id });
-      await getAndSetCartItems(); // Re-fetch after local removal or API call
     } catch (error) {
       console.error(`Error removing item (ID: ${id}):`, error);
-      // If backend removal fails, revert local optimistic removal or show error
-      // For now, we'll let the next getAndSetCartItems attempt to resync.
+      // If backend removal fails, you might want to re-add the item to the UI or show an error.
+      // For now, we'll let the next getAndSetCartItems attempt to resync if authenticated.
     }
   };
 
-  // FIX: handleQuantityChange now only for normal items, handles backend update
+  // FIX: handleQuantityChange now handles both synced and unsynced normal items
   const handleQuantityChange = async (id: string, change: number): Promise<void> => {
+    console.log('handleQuantityChange called for item ID:', id);
     const itemToUpdate = cartItems.find(item => item.id === id);
+    console.log('itemToUpdate found:', itemToUpdate);
 
     if (!itemToUpdate || itemToUpdate.type !== 'normal') {
       console.warn(`Attempted to change quantity of non-normal item or item not found with ID: ${id}`);
       return;
     }
     
-    // Quantity changes are only supported for synced items via backend API.
-    // Unsynced items (id: null) should only be added/removed as whole units via handleAddToBag/handleRemoveItem.
-    if (!itemToUpdate.isSynced || itemToUpdate.id === null) {
-      console.warn(`Attempted to change quantity of unsynced local item. This action is not supported.`);
+    const newQuantity = itemToUpdate.quantity + change;
+
+    if (newQuantity <= 0) {
+      // If quantity goes to 0 or less, remove the item
+      await handleRemoveItem(id);
       return;
     }
 
-    try {
-      const newQuantity = itemToUpdate.quantity + change;
-      if (newQuantity <= 0) {
-        // If quantity goes to 0 or less, remove the item
-        await handleRemoveItem(id);
-        return;
-      }
+    // Check if the new quantity exceeds available stock
+    if (newQuantity > itemToUpdate.stock_quantity) {
+      console.warn(`Cannot increase quantity for item ${id} beyond available stock (${itemToUpdate.stock_quantity}).`);
+      // Optionally, you might want to show a user-facing message here
+      return;
+    }
 
-      await apiService.addToCart({ product_id: itemToUpdate.product_id.replace(/-/g, ''), mode: change > 0 ? '+' : '-' });
-      console.log(`Changed quantity for item ${id} by ${change}.`);
-      await getAndSetCartItems(); // Re-fetch to get updated state from backend
-    } catch (error) {
-      console.error(`Error updating cart quantity for item ${id}:`, error);
+    // Determine if the item is synced and needs backend interaction
+    if (itemToUpdate.isSynced && itemToUpdate.id !== null) {
+      try {
+        await apiService.addToCart({ product_id: itemToUpdate.product_id.replace(/-/g, ''), mode: change > 0 ? '+' : '-' });
+        console.log(`Changed quantity for synced item ${id} by ${change}.`);
+        await getAndSetCartItems(); // Re-fetch to get updated state from backend
+      } catch (error) {
+        console.error(`Error updating synced cart quantity for item ${id}:`, error);
+      }
+    } else {
+      // If not synced (local only), dispatch update to local state directly
+      console.log(`Updating quantity for unsynced local item ${id} to ${newQuantity}.`);
+      dispatchCart({ type: 'UPDATE_ITEM_QUANTITY', payload: { id, quantity: newQuantity } });
+      // For unsynced items, the next syncCartWithBackend (e.g., on login) will push this change.
+      // No need to call getAndSetCartItems immediately here for unsynced, as the local state is updated.
     }
   };
 
@@ -282,12 +300,15 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
             )}
           </div>
         </div>
-        <CheckoutModal
-          isOpen={showCheckoutModal}
-          onClose={handleCheckoutClose}
-          onProceed={handleAddressSelected}
-          cartItems={cartItems}
-        />
+        {/* FIX: Conditionally render CheckoutModal to prevent unnecessary rendering and logging */}
+        {showCheckoutModal && (
+          <CheckoutModal
+            isOpen={showCheckoutModal}
+            onClose={handleCheckoutClose}
+            onProceed={handleAddressSelected}
+            cartItems={cartItems}
+          />
+        )}
       </div>
     </>
   );

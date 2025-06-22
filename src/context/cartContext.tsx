@@ -2,6 +2,7 @@
 import { createContext, useContext, useReducer, useEffect, useState, useRef } from 'react';
 import apiService from '@/utils/api/apiService';
 import { cartService } from '@/utils/api/cartService';
+import { v4 as uuidv4 } from 'uuid'; // Import uuidv4
 
 // --- Type Definitions (Exported for use across components) ---
 
@@ -65,8 +66,9 @@ export type CartAction =
   | { type: 'ADD_OFFER_SET'; payload: CartOfferItem }
   | { type: 'ADD_NORMAL_ITEM'; payload: CartNormalItem }
   // FIX: REMOVE_ITEM payload now identifies the item by its unique `id` (backend ID or temporary local ID)
-  // This allows the reducer to filter correctly.
   | { type: 'REMOVE_ITEM'; payload: string } 
+  // ADDED: New action type for updating quantity of an existing item by its cart item ID
+  | { type: 'UPDATE_ITEM_QUANTITY'; payload: { id: string; quantity: number } }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_CHECKOUT_DATA'; payload: {
         items: Array<{ product_id: string; quantity: number }>;
@@ -131,7 +133,12 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
     case 'ADD_OFFER_SET':
       {
         console.log('Reducer: ADD_OFFER_SET action received. New offer set:', action.payload);
-        const newItems = [...state.cartItems, action.payload];
+        const newOfferSet: CartOfferItem = {
+          ...action.payload,
+          id: action.payload.id || uuidv4(), // Ensure ID is a string, generate if null/undefined
+          isSynced: false, // New local items are unsynced by default
+        };
+        const newItems = [...state.cartItems, newOfferSet];
         const serializedNewItems = JSON.stringify(newItems);
         console.log('Reducer: ADD_OFFER_SET: Full cart after adding, serializing to localStorage:', serializedNewItems);
         localStorage.setItem('cartItems', serializedNewItems); // Still write to local storage immediately
@@ -158,8 +165,13 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
           };
           console.log('Reducer: ADD_NORMAL_ITEM: Updated existing item quantity.');
         } else {
-          newItems = [...state.cartItems, action.payload];
-          console.log('Reducer: ADD_NORMAL_ITEM: Added new normal item.');
+          const newNormalItem: CartNormalItem = {
+            ...action.payload,
+            id: action.payload.id || uuidv4(), // Ensure ID is a string, generate if null/undefined
+            isSynced: false, // New local items are unsynced by default
+          };
+          newItems = [...state.cartItems, newNormalItem];
+          console.log('Reducer: ADD_NORMAL_ITEM: Added new normal item with guaranteed ID.');
         }
         const serializedNewItems = JSON.stringify(newItems);
         console.log('Reducer: ADD_NORMAL_ITEM: Full cart after adding, serializing to localStorage:', serializedNewItems);
@@ -178,6 +190,25 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
         localStorage.setItem('cartItems', serializedFilteredItems);
         console.log('Reducer: REMOVE_ITEM: localStorage updated.');
         return { ...state, cartItems: filteredItems };
+      }
+    case 'UPDATE_ITEM_QUANTITY':
+      {
+        console.log('Reducer: UPDATE_ITEM_QUANTITY action received. Payload:', action.payload);
+        const updatedItems = state.cartItems.map(item => {
+          if (item.type === 'normal' && item.id === action.payload.id) {
+            return {
+              ...item,
+              quantity: action.payload.quantity,
+              isSynced: false, // Mark as unsynced because it was changed locally
+            };
+          }
+          return item;
+        });
+        const serializedUpdatedItems = JSON.stringify(updatedItems);
+        console.log('Reducer: UPDATE_ITEM_QUANTITY: Full cart after updating, serializing to localStorage:', serializedUpdatedItems);
+        localStorage.setItem('cartItems', serializedUpdatedItems);
+        console.log('Reducer: UPDATE_ITEM_QUANTITY: localStorage updated.');
+        return { ...state, cartItems: updatedItems };
       }
     case 'SET_LOADING':
       console.log('Reducer: SET_LOADING action received. Loading status:', action.payload);
@@ -213,7 +244,12 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
         console.log('CartProvider: Raw stored cart items from localStorage:', storedCartItemsString);
         const parsedItems: CartItemType[] = JSON.parse(storedCartItemsString);
         console.log('CartProvider: Parsed cart items from localStorage:', parsedItems);
-        dispatch({ type: 'SET_CART_ITEMS', payload: parsedItems });
+        // Ensure IDs are strings when initially loaded from local storage
+        const itemsWithGuaranteedIds = parsedItems.map(item => ({
+          ...item,
+          id: item.id || uuidv4(),
+        }));
+        dispatch({ type: 'SET_CART_ITEMS', payload: itemsWithGuaranteedIds });
       } catch (e) {
         console.error("CartProvider: Failed to parse cart items from localStorage:", e);
         localStorage.removeItem('cartItems');
@@ -247,12 +283,36 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       console.log('CartProvider: Initiating cart synchronization with backend...');
 
       try {
+        let currentCartItemsForSync = state.cartItems;
+
+        // Defensive check: If state.cartItems is empty but there's a token change,
+        // re-load from localStorage as it might hold unsynced items not yet reflected in state.
+        if (currentAccessToken && tokenChanged && currentCartItemsForSync.length === 0) {
+          console.log("CartProvider: Token changed and current state is empty. Attempting to re-load from localStorage for sync.");
+          const storedItems = localStorage.getItem('cartItems');
+          if (storedItems) {
+            try {
+              const parsedStoredItems = JSON.parse(storedItems);
+              currentCartItemsForSync = parsedStoredItems.map((item: any) => ({
+                ...item,
+                id: item.id || uuidv4(),
+              }));
+              console.log("CartProvider: Re-loaded items from localStorage for sync:", currentCartItemsForSync);
+            } catch (parseError) {
+              console.error("CartProvider: Error parsing localStorage during re-load for sync:", parseError);
+              localStorage.removeItem('cartItems'); // Clear malformed storage
+              currentCartItemsForSync = [];
+            }
+          }
+        }
+
+
         let updatedCartFromBackend: CartItemType[];
 
         if (currentAccessToken) {
-          // FIX: Step 1: Push all unsynced local items to the backend FIRST
-          const unsyncedLocalItems = state.cartItems.filter(item => !item.isSynced);
-          console.log("CartProvider: Unsynced local items found:", unsyncedLocalItems);
+          // *** CRITICAL FIX: Push unsynced local items to backend *first* if token is present ***
+          const unsyncedLocalItems = currentCartItemsForSync.filter(item => !item.isSynced);
+          console.log("CartProvider: Unsynced local items found before push attempt:", unsyncedLocalItems);
 
           if (unsyncedLocalItems.length > 0) {
             console.log("CartProvider: Syncing unsynced local items to backend...");
@@ -263,8 +323,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
           } else {
             console.log("CartProvider: Authenticated user, no unsynced items, token not changed. Fetching latest cart from backend.");
           }
-          
-          // FIX: Step 2: Always fetch the latest, canonical state from the backend after pushing/login.
+          // After pushing (or if no unsynced items), fetch the *new* canonical state.
           updatedCartFromBackend = await cartService.fetchCartFromBackend();
           console.log("CartProvider: Final canonical cart fetched after push/fetch process:", updatedCartFromBackend);
 

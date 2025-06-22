@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, memo } from 'react'; // FIX: Import memo
 import Image from 'next/image';
 import { X, ShoppingBag, Info } from 'lucide-react';
 import apiService from '@/utils/api/apiService';
@@ -56,7 +56,8 @@ interface OfferMobileSliderProps {
     isAuthenticated?: boolean;
 }
 
-export default function OfferMobileSlider({
+// FIX: Wrap the component with React.memo for performance optimization
+export default memo(function OfferMobileSlider({
     isOpen,
     onClose, 
     offerData,
@@ -65,7 +66,7 @@ export default function OfferMobileSlider({
     onOpenCartDrawer,
     isAuthenticated = false
 }: OfferMobileSliderProps) {
-    console.log(isOpen,"isOpen from OfferMobileSlider"); 
+    // Removed: console.log(isOpen,"isOpen from OfferMobileSlider"); // This log will fire on every render, causing noise
 
     useEffect(() => {
         if (isOpen) {
@@ -83,7 +84,7 @@ export default function OfferMobileSlider({
     const { dispatchCart } = useCart();
     const [loading, setLoading] = useState(false);
 
-    const calculateTotals = () => {
+    const calculateTotals = useCallback(() => { // Wrap in useCallback
         const filledSlots = slots.filter(slot => slot.product);
         if (filledSlots.length === 0) {
             return { payableTotal: 0, savings: 0, freeItems: [] };
@@ -104,7 +105,7 @@ export default function OfferMobileSlider({
                 product_weight: product.product_weight || '',
                 product_box_weight: product.product_box_weight || '',
                 created_at: product.created_at || new Date().toISOString(),
-                updated_at: product.updated_at || new Date().toISOString(),
+                updated_at: new Date().toISOString(), // Use current date for updated_at
                 sub_category: product.sub_category || '',
                 isInStock: product.product_status && (product.quantity || 1) > 0,
                 uniqueSlotId: slot.id, 
@@ -125,16 +126,15 @@ export default function OfferMobileSlider({
         
         const savings = freeItemsForDisplay.reduce((sum, product) => sum + parseFloat(product.product_price), 0);
 
-
         return { payableTotal, savings, freeItems: freeItemsForDisplay };
-    };
+    }, [slots, offerData]); // Dependencies for useCallback
 
-    const isOfferComplete = () => {
+    const isOfferComplete = useCallback(() => { // Wrap in useCallback
         const totalRequiredItems = offerData.buy_count + offerData.get_count;
         return slots.filter(slot => slot.product !== null).length === totalRequiredItems;
-    };
+    }, [slots, offerData]); // Dependencies for useCallback
 
-    const handleBuyNow = async () => {
+    const handleBuyNow = useCallback(async () => { // Wrap in useCallback
         if (!isOfferComplete()) return;
 
         setLoading(true);
@@ -159,7 +159,7 @@ export default function OfferMobileSlider({
                     product_weight: product.product_weight || '',
                     product_box_weight: product.product_box_weight || '',
                     created_at: product.created_at || new Date().toISOString(),
-                    updated_at: product.updated_at || new Date().toISOString(),
+                    updated_at: new Date().toISOString(), // Use current date for updated_at
                     sub_category: product.sub_category || '',
                     isInStock: product.product_status && (product.quantity || 1) > 0, 
                 };
@@ -213,7 +213,7 @@ export default function OfferMobileSlider({
         } finally {
             setLoading(false);
         }
-    };
+    }, [dispatchCart, isAuthenticated, offerData, isOfferComplete, onOpenCartDrawer, slots]); // Dependencies for useCallback
 
     const filledSlots = slots.filter(slot => slot.product !== null);
     const totalRequiredItems = offerData.buy_count + offerData.get_count;
@@ -313,4 +313,4 @@ export default function OfferMobileSlider({
             </div>
         </div>
     );
-}
+});
