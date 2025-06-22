@@ -10,7 +10,8 @@ import Link from 'next/link';
 import OfferMobileSlider from '@/components/OfferMobileSlider';
 import OfferCartSidebar from '@/components/OfferCartSidebar';
 import CartDrawer from '@/components/CartDrawer';
-import { ProductItemDetails } from '@/context/cartContext'; // Import ProductItemDetails
+// Import useCart to get access to cart items and getTotalProductQuantitiesInCart
+import { useCart, ProductItemDetails } from '@/context/cartContext'; 
 
 // Re-define ProductItem here to be consistent with ProductItemDetails
 // This ensures that when a ProductItem is selected for a slot, it has all necessary fields
@@ -21,15 +22,15 @@ interface ProductItem {
     product_image: string;
     product: string;
   }[];
+  product_code: string;
   product_name: string;
+  product_description: string;
   product_price: string;
   strike_price: string;
-  product_status: boolean;
-  product_code: string;
-  product_description: string;
-  quantity: number; // This is stock quantity
+  quantity: number; // This is stock quantity from the API for this product
   product_weight: string;
   product_box_weight: string;
+  product_status: boolean;
   created_at: string;
   updated_at: string;
   sub_category: string;
@@ -57,11 +58,14 @@ export default function OfferProductsPage() {
   const router = useRouter();
   const offerId = params?.id as string;
 
+  // Use the useCart hook to access cart data and getter for product quantities
+  const { cartItems, getTotalProductQuantitiesInCart } = useCart(); 
+
   const [loading, setLoading] = useState(true);
   const [offerData, setOfferData] = useState<OfferData | null>(null);
   const [offerSlots, setOfferSlots] = useState<OfferSlot[]>([]);
   const [isMobile, setIsMobile] = useState(false);
-  const [showMobileSlider, setShowMobileSlider] = useState(false); // Ensure this is false by default
+  const [showMobileSlider, setShowMobileSlider] = useState(false);
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hoveredProduct, setHoveredProduct] = useState<string | null>(null);
@@ -124,17 +128,42 @@ export default function OfferProductsPage() {
   }, [offerId, checkAuthentication]);
 
   const getTotalProductCount = useCallback((productId: string) => {
+    // This counts how many times a product is selected IN THE CURRENT OFFER SLOTS
     return offerSlots.filter(slot => slot.product?.id === productId).length;
   }, [offerSlots]);
 
-  const canAddProduct = useCallback(() => {
+  const canAddProductToOfferSlot = useCallback((product: ProductItem) => {
     const emptySlots = offerSlots.filter(slot => !slot.product);
-    return emptySlots.length > 0;
-  }, [offerSlots]);
+    if (emptySlots.length === 0) {
+        return false; // No more empty slots in the offer
+    }
+
+    // --- NEW LOGIC: Check effective available stock ---
+    const totalProductQuantitiesMap = getTotalProductQuantitiesInCart();
+    const productIdClean = product.id.replace(/-/g, '');
+    
+    // Total quantity of this product already in the user's entire cart (normal + offer items)
+    const currentTotalQuantityInCart = totalProductQuantitiesMap.get(productIdClean) || 0;
+
+    // Total stock from the API for this product
+    const productAPIStock = product.quantity; 
+
+    // The actual available stock for adding *new* instances of this product
+    // is the total API stock minus what's *already* in the cart.
+    const effectiveAvailableStock = productAPIStock - currentTotalQuantityInCart;
+
+    // We can only add if the product is in stock (API status) AND
+    // if there's at least one unit of effective available stock
+    // AND if there's an empty slot in the offer.
+    return product.product_status && effectiveAvailableStock > 0;
+  }, [offerSlots, getTotalProductQuantitiesInCart, cartItems]); // cartItems as dependency for getTotalProductQuantitiesInCart
 
   const handleProductAdd = useCallback((product: ProductItem) => {
     const emptySlot = offerSlots.find(slot => !slot.product);
-    if (!emptySlot) return;
+    if (!emptySlot || !canAddProductToOfferSlot(product)) { // Re-check canAddProduct here for safety
+        console.warn(`OfferProductsPage: Cannot add product ${product.product_name}. No empty slots or out of stock.`);
+        return;
+    }
     setOfferSlots(prev => 
       prev.map(slot => 
         slot.id === emptySlot.id 
@@ -142,7 +171,7 @@ export default function OfferProductsPage() {
           : slot
       )
     );
-  }, [offerSlots]);
+  }, [offerSlots, canAddProductToOfferSlot]); // Added canAddProductToOfferSlot as dependency
 
   const handleOpenCartDrawer = useCallback(() => {
     setShowMobileSlider(false); // Close slider if open when opening cart drawer
@@ -188,7 +217,11 @@ export default function OfferProductsPage() {
 
   const ProductSelectionButton = ({ product }: { product: ProductItem }) => {
     const selectedCount = getTotalProductCount(product.id);
-    const canAdd = canAddProduct();
+    // Use the new canAddProductToOfferSlot for disabling the button
+    const canAdd = canAddProductToOfferSlot(product); 
+
+    // Determine disabled status more comprehensively
+    const isDisabled = !canAdd || !product.product_status || product.quantity <= 0;
 
     return (
       <button
@@ -196,7 +229,7 @@ export default function OfferProductsPage() {
           e.stopPropagation();
           handleProductAdd(product);
         }}
-        disabled={!canAdd}
+        disabled={isDisabled} // Use the new isDisabled
         className="w-full flex items-center cursor-pointer justify-center gap-2 py-2 px-3 bg-[#175e7a] text-white rounded-md hover:bg-[#0f4c67] disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
       >
         <ShoppingBag size={14} />
@@ -272,6 +305,18 @@ export default function OfferProductsPage() {
               
               const totalSelected = getTotalProductCount(product.id); 
 
+              // Get the total quantity of this product already in the user's entire cart
+              const totalProductQuantitiesMap = getTotalProductQuantitiesInCart();
+              const productIdClean = product.id.replace(/-/g, '');
+              const currentTotalQuantityInCart = totalProductQuantitiesMap.get(productIdClean) || 0;
+
+              // Calculate how many more of this product can be added to the offer slots
+              // It's the product's total stock MINUS all instances of it currently in the cart.
+              const effectiveAvailableStockForOffer = product.quantity - currentTotalQuantityInCart;
+
+              const isProductEffectivelyOutOfStockForOffer = effectiveAvailableStockForOffer <= 0;
+
+
               return (
                 <div 
                   key={product.id} 
@@ -314,11 +359,11 @@ export default function OfferProductsPage() {
                       loading="lazy"
                     />
                     
-                    {!product.product_status && (
+                    {!product.product_status || isProductEffectivelyOutOfStockForOffer ? ( // Use the new effective stock check for "Out of Stock" overlay
                       <div className="absolute inset-0 bg-red-500/20 flex items-center justify-center">
                         <span className="bg-red-500 text-white text-xs px-2 py-1 rounded">Out of Stock</span>
                       </div>
-                    )}
+                    ) : null}
                     
                     {discount && (
                       <div className="absolute top-2 left-2 bg-green-500 text-white text-xs px-2 py-1 rounded z-10">
@@ -353,7 +398,8 @@ export default function OfferProductsPage() {
                         </>
                       )}
                     </div>
-                    {product.product_status && <ProductSelectionButton product={product} />}
+                    {/* Pass the product to the button component for its internal logic */}
+                    <ProductSelectionButton product={product} /> 
                   </div>
                 </div>
               );
@@ -405,7 +451,7 @@ export default function OfferProductsPage() {
       {isMobile && (
         <OfferMobileSlider
           isOpen={showMobileSlider}
-          onClose={() => setShowMobileSlider(false)} /* Pass onClose to allow closing */
+          onClose={() => setShowMobileSlider(false)}
           offerData={offerData}
           slots={offerSlots}
           onSlotClear={handleSlotClear}
