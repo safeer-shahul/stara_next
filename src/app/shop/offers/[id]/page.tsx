@@ -1,4 +1,6 @@
+// src/app/shop/offers/[id]/page.tsx
 'use client';
+
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -8,7 +10,10 @@ import Link from 'next/link';
 import OfferMobileSlider from '@/components/OfferMobileSlider';
 import OfferCartSidebar from '@/components/OfferCartSidebar';
 import CartDrawer from '@/components/CartDrawer';
+import { ProductItemDetails } from '@/context/cartContext'; // Import ProductItemDetails
 
+// Re-define ProductItem here to be consistent with ProductItemDetails
+// This ensures that when a ProductItem is selected for a slot, it has all necessary fields
 interface ProductItem {
   id: string;
   images: {
@@ -22,7 +27,12 @@ interface ProductItem {
   product_status: boolean;
   product_code: string;
   product_description: string;
-  quantity: number;
+  quantity: number; // This is stock quantity
+  product_weight: string;
+  product_box_weight: string;
+  created_at: string;
+  updated_at: string;
+  sub_category: string;
 }
 
 interface OfferData {
@@ -33,12 +43,12 @@ interface OfferData {
   start_date: string;
   end_date: string;
   offer_image: string;
-  products: ProductItem[];
+  products: ProductItem[]; // These are the available products for the offer
 }
 
 interface OfferSlot {
   id: string;
-  product: ProductItem | null;
+  product: ProductItem | null; // Slot can hold a ProductItem
   slotIndex: number;
 }
 
@@ -51,7 +61,7 @@ export default function OfferProductsPage() {
   const [offerData, setOfferData] = useState<OfferData | null>(null);
   const [offerSlots, setOfferSlots] = useState<OfferSlot[]>([]);
   const [isMobile, setIsMobile] = useState(false);
-  const [showMobileSlider, setShowMobileSlider] = useState(false);
+  const [showMobileSlider, setShowMobileSlider] = useState(false); // Ensure this is false by default
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hoveredProduct, setHoveredProduct] = useState<string | null>(null);
@@ -135,7 +145,7 @@ export default function OfferProductsPage() {
   }, [offerSlots]);
 
   const handleOpenCartDrawer = useCallback(() => {
-    setShowMobileSlider(false); 
+    setShowMobileSlider(false); // Close slider if open when opening cart drawer
     setIsCartDrawerOpen(true); 
   }, []);
 
@@ -258,9 +268,10 @@ export default function OfferProductsPage() {
               const discount = calculateDiscount(product.product_price, product.strike_price);
               const mainImage = product.images?.[0]?.product_image || '';
               const hoverImage = product.images?.[1]?.product_image || product.images?.[0]?.product_image || '';
-              const totalSelected = getTotalProductCount(product.id);
               const isCurrentlyNavigating = isNavigating === product.id;
               
+              const totalSelected = getTotalProductCount(product.id); 
+
               return (
                 <div 
                   key={product.id} 
@@ -324,7 +335,7 @@ export default function OfferProductsPage() {
                   
                   <div>
                     <h3 
-                      className={`font-medium line-clamp-2 mb-1 cursor-pointer hover:text-blue-500 transition-colors text-sm ${
+                      className={`font-medium line-clamp-2 mb-1 cursor-pointer hover:text-blue-500 transition-colors ${
                         isCurrentlyNavigating ? 'text-gray-500' : ''
                       }`}
                       onClick={() => handleProductClick(product.id)}
@@ -350,6 +361,7 @@ export default function OfferProductsPage() {
           </div>
         </div>
 
+        {/* This is the desktop sidebar, which should always be present on desktop */}
         {!isMobile && (
           <OfferCartSidebar 
             offerData={offerData}
@@ -362,10 +374,12 @@ export default function OfferProductsPage() {
       </div>
 
       {isMobile && filledSlots.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 bg-[#175e7a] rounded-tr-2xl rounded-tl-2xl shadow-lg px-4 pt-4 pb-14 z-50">
+        <div 
+          className="fixed bottom-0 left-0 right-0 bg-[#175e7a] rounded-tr-2xl rounded-tl-2xl shadow-lg px-4 pt-4 pb-14 z-50"
+          onClick={() => setShowMobileSlider(true)} /* Clicking this bar opens the mobile slider */
+        >
           <div
             className="flex items-center justify-between cursor-pointer"
-            onClick={() => setShowMobileSlider(true)}
           >
             <div className="flex items-center gap-3">
               <div className="relative">
@@ -391,7 +405,7 @@ export default function OfferProductsPage() {
       {isMobile && (
         <OfferMobileSlider
           isOpen={showMobileSlider}
-          onClose={() => setShowMobileSlider(false)}
+          onClose={() => setShowMobileSlider(false)} /* Pass onClose to allow closing */
           offerData={offerData}
           slots={offerSlots}
           onSlotClear={handleSlotClear}

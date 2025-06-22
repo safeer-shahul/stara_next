@@ -8,7 +8,12 @@ import FilterDrawer from '@/components/FilterDrawer';
 import Link from 'next/link';
 import WishlistButton from '@/components/WishlistButton';
 import CartDrawer from '@/components/CartDrawer';
+import { useCart, CartNormalItem, ProductItemDetails } from '@/context/cartContext'; // Import useCart and CartNormalItem
+import { v4 as uuidv4 } from 'uuid'; // FIX: Import uuidv4 for temporary local IDs
 
+
+// Re-define ProductItem here to be consistent with ProductItemDetails
+// This ensures that when a ProductItem is selected for a slot, it has all necessary fields
 interface ProductItem {
   id: string;
   images: {
@@ -20,7 +25,17 @@ interface ProductItem {
   product_price: string;
   strike_price: string;
   product_status: boolean;
+  product_code: string;
+  product_description: string;
+  quantity: number; // This is stock quantity from the API response
+  product_weight: string;
+  product_box_weight: string;
+  created_at: string;
+  updated_at: string;
+  sub_category: string;
+  isInStock?: boolean; // Add isInStock for consistency with ProductItemDetails
 }
+
 
 export default function CategoryPage() {
   const params = useParams();
@@ -48,8 +63,10 @@ export default function CategoryPage() {
   // Navigation and cart state
   const [isNavigating, setIsNavigating] = useState<string | null>(null);
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
-  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
-  
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null); // Keep if you still need to highlight product in cart.
+
+  const { dispatchCart } = useCart(); // Access dispatchCart
+
   // Check if filters are active
   const isFilterActive = priceRange[0] > 0 || priceRange[1] < 50000 || sortBy !== '';
 
@@ -77,16 +94,23 @@ export default function CategoryPage() {
           }
         );
         
+        // Ensure fetched products conform to ProductItem and add isInStock
+        const fetchedProductsWithStock: ProductItem[] = productsData.products.map((p: any) => ({
+            ...p,
+            isInStock: p.product_status && p.quantity > 0, // Derive isInStock
+        }));
+
+
         if (currentPage === 1) {
-          setProducts(productsData.products || []);
+          setProducts(fetchedProductsWithStock || []);
         } else {
-          setProducts(prev => [...prev, ...(productsData.products || [])]);
+          setProducts(prev => [...prev, ...(fetchedProductsWithStock || [])]);
         }
         
         setTotalProducts(productsData.total_products || 0);
         console.log(totalProducts)
         // Check if all products are loaded
-        const loadedProductsCount = (currentPage - 1) * pageSize + productsData.products.length;
+        const loadedProductsCount = (currentPage - 1) * pageSize + (productsData.products || []).length;
         setAllProductsLoaded(loadedProductsCount >= productsData.total_products);
         
         // Format category name from slug for display
@@ -105,7 +129,7 @@ export default function CategoryPage() {
     };
 
     fetchCategoryProducts();
-  }, [subCategoryId, categorySlug, currentPage, priceRange, sortBy]);
+  }, [subCategoryId, categorySlug, currentPage, priceRange, sortBy, totalProducts]); // Added totalProducts as dependency, just in case
 
   const loadMoreProducts = useCallback(() => {
     setCurrentPage(prev => prev + 1);
@@ -162,70 +186,36 @@ export default function CategoryPage() {
     // Implement wishlist functionality here
   }, []);
 
-  const handleAddToBag = useCallback((e: React.MouseEvent, productId: string): void => {
+  // UPDATED: handleAddToBag to use cartContext dispatch
+  const handleAddToBag = useCallback((e: React.MouseEvent, product: ProductItem): void => {
     e.stopPropagation();
     
-    // Set the selected product ID to pass to CartDrawer
-    setSelectedProductId(productId);
+    setSelectedProductId(product.id); // Still set selected product for potential highlights
     
-    // Open the cart drawer
-    setIsCartOpen(true);
+    // FIX: Assign a new UUID to the `id` field for local identification.
+    // This ID will be replaced by the backend-assigned ID during sync.
+    const tempCartItemId = uuidv4(); 
+
+    // Dispatch ADD_NORMAL_ITEM action to update cart context and local storage
+    dispatchCart({
+      type: 'ADD_NORMAL_ITEM',
+      payload: {
+        id: tempCartItemId, // FIX: Use the temporary UUID here
+        product_id: product.id,
+        quantity: 1, // Always add 1 at a time from this button
+        type: 'normal',
+        isSynced: false, // Mark as unsynced
+        product_name: product.product_name,
+        product_price: product.product_price,
+        strike_price: product.strike_price,
+        images: product.images,
+        isInStock: product.product_status && product.quantity > 0, // Stock status from fetched product
+        stock_quantity: product.quantity, // Actual stock quantity from fetched product
+      } as CartNormalItem, // Explicitly cast to CartNormalItem
+    });
     
-    // For backward compatibility, also update localStorage
-    // Get current cart items
-    const storedCartItems = JSON.parse(localStorage.getItem('cartItems') || '[]');
-    
-    // Check if we're dealing with the old format (array of strings)
-    if (storedCartItems.length > 0 && typeof storedCartItems[0] === 'string') {
-      // Convert old format items, removing hyphens
-      const formattedCartIds = storedCartItems.map((id: any) => id.replace(/-/g, ''));
-      
-      // Add new product ID
-      const productIdWithoutHyphens = productId.replace(/-/g, '');
-      const updatedCart = [...formattedCartIds, productIdWithoutHyphens];
-      
-      // Count occurrences and convert to new format
-      const productCounts: any = {};
-      updatedCart.forEach(id => {
-        productCounts[id] = (productCounts[id] || 0) + 1;
-      });
-      
-      // Convert to new format with quantities
-      const newFormatCart = Object.keys(productCounts).map(id => ({
-        id,
-        quantity: productCounts[id]
-      }));
-      
-      localStorage.setItem('cartItems', JSON.stringify(newFormatCart));
-    } else {
-      // Already using new format
-      const productIdWithoutHyphens = productId.replace(/-/g, '');
-      
-      // Find if product already exists in cart
-      const existingItemIndex = storedCartItems.findIndex(
-        (item: any) => item.id === productIdWithoutHyphens
-      );
-      
-      let updatedCartItems;
-      
-      if (existingItemIndex >= 0) {
-        // Product already exists, increase quantity
-        updatedCartItems = [...storedCartItems];
-        updatedCartItems[existingItemIndex] = {
-          ...updatedCartItems[existingItemIndex],
-          quantity: updatedCartItems[existingItemIndex].quantity + 1
-        };
-      } else {
-        // Product doesn't exist in cart, add it with quantity 1
-        updatedCartItems = [
-          ...storedCartItems, 
-          { id: productIdWithoutHyphens, quantity: 1 }
-        ];
-      }
-      
-      localStorage.setItem('cartItems', JSON.stringify(updatedCartItems));
-    }
-  }, []);
+    setIsCartOpen(true); // Open the cart drawer
+  }, [dispatchCart]); // Depend on dispatchCart
 
   // Handle cart drawer close
   const handleCartClose = useCallback(() => {
@@ -419,9 +409,9 @@ export default function CategoryPage() {
                       className={`absolute bottom-3 right-3 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 text-white shadow-sm transition-opacity ${
                         hoveredProduct === product.id ? 'opacity-100' : 'opacity-0'
                       }`}
-                      onClick={(e) => handleAddToBag(e, product.id)}
+                      onClick={(e) => handleAddToBag(e, product)} // Pass the full product object
                       aria-label="Add to bag"
-                      disabled={!product.product_status}
+                      disabled={!product.product_status || product.quantity <= 0} // Disable if out of stock
                     >
                       <ShoppingCart size={18} />
                     </button>
@@ -485,7 +475,6 @@ export default function CategoryPage() {
       <CartDrawer 
         isOpen={isCartOpen} 
         onClose={handleCartClose} 
-        productId={selectedProductId} 
       />
     </div>
   );

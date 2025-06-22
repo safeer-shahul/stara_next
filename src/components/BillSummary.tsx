@@ -83,25 +83,21 @@ const BillSummary: React.FC<BillSummaryProps> = ({
     };
   }, []);
 
-  // Helper to flatten structured CartOfferItem into backend's expected format
+  // Helper to format structured CartOfferItem into backend's expected flat format
   const formatOfferSetsForBackend = (sets: CartOfferItem[]) => {
     return sets.map((set) => {
       const flattenedProducts: { product: string; quantity: number }[] = [];
-      if (set.main_product) {
-        // Use ProductItemDetails for main_product
-        flattenedProducts.push({ product: set.main_product.id.replace(/-/g, ''), quantity: set.main_product.quantity || 1 });
-      }
-      set.offer_products_extra.forEach(p => {
-        // Use ProductItemDetails for extra products
+      // Iterate over the consolidated offer_items to reconstruct the backend's expected flat list
+      set.offer_items.forEach(p => {
         flattenedProducts.push({ product: p.id.replace(/-/g, ''), quantity: p.quantity || 1 });
       });
 
       return {
-        id: set.id.replace(/-/g, ''), // Cart item ID for the offer set
+        id: set?.id?.replace(/-/g, ''), // Cart item ID for the offer set
         offer: set.offer.replace(/-/g, ''), // Original offer ID
         offer_products: flattenedProducts, // Array of { product_id, quantity }
-        buy_count: set.buy_count,
-        get_count: set.get_count,
+        buy_count: set.buy_count, // Still pass buy_count from frontend for backend validation/logic
+        get_count: set.get_count, // Still pass get_count from frontend for backend validation/logic
       };
     });
   };
@@ -154,7 +150,15 @@ const BillSummary: React.FC<BillSummaryProps> = ({
   };
 
   useEffect(() => {
-    fetchBillDetails();
+    // Only fetch if cart items are present or if a coupon code is applied (for re-calculation)
+    if (normalItems.length > 0 || offerSets.length > 0 || couponCode) {
+      fetchBillDetails();
+    } else {
+        // If cart is empty, set loading to false and clear any previous data/errors
+        safeSetState(setLoading, false);
+        safeSetState(setResponseData, null);
+        safeSetState(setError, null);
+    }
   }, [normalItems, offerSets, couponCode, destinationPincode]); // Depend on normalItems and offerSets
 
   const handlePlaceOrder = async () => {
@@ -194,62 +198,71 @@ const BillSummary: React.FC<BillSummaryProps> = ({
     }
   };
 
+  // Helper to "explode" quantities within an offer set into individual product units for calculation (client-side)
+  const _getIndividualOfferProducts = (offerSet: CartOfferItem): ProductItemDetails[] => {
+    const allIndividualProducts: ProductItemDetails[] = [];
+    offerSet.offer_items.forEach(product => {
+      for (let i = 0; i < product.quantity; i++) {
+        allIndividualProducts.push({ ...product, quantity: 1 }); // Create a new object for each individual unit
+      }
+    });
+    return allIndividualProducts;
+  };
+
   const calculateTotals = () => {
     if (!responseData) return null;
 
-    // Subtotal for normal products
-    const subtotalNormal = responseData.items.reduce((sum, item) => sum + item.final_price, 0);
+    // Calculate sum of original prices for all items (normal and offers)
+    let totalOriginalPrice = 0;
+    responseData.items.forEach(item => {
+        totalOriginalPrice += parseFloat(item.product_price) * item.final_quantity;
+    });
 
-    // Subtotal and savings for offer sets
-    let subtotalOffers = 0;
+    // Calculate savings from offer sets based on the refined logic
     let offerSavings = 0;
-    if (responseData.offer_sets) {
-      responseData.offer_sets.forEach((offerSet) => {
-        // NOTE: The offerSet received in responseData.offer_sets is from backend's calculation,
-        // which still uses the flat offer_products array. So we process it as such.
-        const sortedProducts = offerSet.offer_products.sort(
-          (a, b) => parseFloat(b.product_price) - parseFloat(a.product_price)
-        );
-        // Assuming buy_count applies to highest priced items in this flat list
-        const itemsToCharge = Math.min(offerSet.buy_count, sortedProducts.length);
-        subtotalOffers += sortedProducts
-          .slice(0, itemsToCharge)
-          .reduce((sum, product) => sum + product.final_price, 0);
-        
-        // Savings are the price of the 'get_count' cheapest items from the full list
-        const allProductsSortedAsc = [...offerSet.offer_products].sort(
-            (a, b) => parseFloat(a.product_price) - parseFloat(b.product_price)
-        );
-        const itemsToGetFree = offerSet.get_count || 0;
-        offerSavings += allProductsSortedAsc
-            .slice(0, Math.min(itemsToGetFree, allProductsSortedAsc.length))
-            .reduce((sum, product) => sum + parseFloat(product.product_price), 0);
-      });
-    }
+    offerSets.forEach(offerSet => {
+        const allIndividualOfferProducts = _getIndividualOfferProducts(offerSet);
 
-    const subtotal = subtotalNormal + subtotalOffers;
+        // Sort products by price in descending order to identify paid items
+        const sortedProductsDesc = [...allIndividualOfferProducts].sort(
+            (a, b) => parseFloat(b.product_price) - parseFloat(a.product_price)
+        );
+        const itemsToCharge = Math.min(offerSet.buy_count || 0, sortedProductsDesc.length);
+        let payableForThisOffer = 0;
+        for (let i = 0; i < itemsToCharge; i++) {
+            payableForThisOffer += parseFloat(sortedProductsDesc[i].product_price);
+        }
+
+        const totalOriginalPriceOfAllUnitsInOffer = allIndividualOfferProducts.reduce((sum, p) => sum + parseFloat(p.product_price), 0);
+        offerSavings += (totalOriginalPriceOfAllUnitsInOffer - payableForThisOffer);
+
+        // Add original price of all items in this offer set to totalOriginalPrice
+        allIndividualOfferProducts.forEach(p => {
+            totalOriginalPrice += parseFloat(p.product_price) * (p.quantity || 1); // Add original price * quantity
+        });
+    });
+
+    // Recalculate total discount (normal item discounts + offer savings)
+    let totalDiscount = 0;
+    responseData.items.forEach(item => {
+        totalDiscount += (parseFloat(item.product_price) * item.final_quantity) - item.final_price;
+    });
+    totalDiscount += offerSavings; // Add offer savings from our `calculateOfferSavings`
+
     const shippingCost = responseData.shipping_cost;
-    // FIX: Total calculation must include subtracting total offer savings
-    const total = subtotal + shippingCost - offerSavings; 
+    const tax = 0; // Assuming no tax returned from backend yet or always zero
 
-    // Calculate total discount (difference between original price and final price for normal products)
-    const totalOriginalPriceNormal = responseData.items.reduce((sum, item) => {
-      const itemPrice = parseFloat(item.product_price) * item.final_quantity;
-      return sum + itemPrice;
-    }, 0);
-
-    const discountNormal = Math.max(0, totalOriginalPriceNormal - subtotalNormal);
-    // FIX: Total discount should now be the sum of normal item discounts and offer savings
-    const totalDiscount = discountNormal + offerSavings;
+    // Final Total = (Sum of original prices) - (Total discounts from normal items + total offer savings) + Shipping + Tax
+    const finalTotal = totalOriginalPrice - totalDiscount + shippingCost + tax;
 
 
     return {
-      subtotal,
-      discount: totalDiscount, // This now reflects total discount including offers
-      offerSavings, // Kept separate for display, but included in `discount`
+      subtotal: totalOriginalPrice, // This is now total original price before any discounts
+      discount: totalDiscount,     // Total discount from product markdowns and offers
+      offerSavings: offerSavings,  // Separate display for offer savings
       shippingCost,
-      tax: 0, // If tax is not provided in the API response
-      total,
+      tax,
+      total: finalTotal,
     };
   };
 
@@ -286,7 +299,8 @@ const BillSummary: React.FC<BillSummaryProps> = ({
                 <span className="font-semibold">₹{totals.subtotal.toFixed(2)}</span>
               </div>
 
-              {totals.discount > 0 && ( // Display total discount including offer savings
+              {/* Display total discount including offer savings, now accurately calculated */}
+              {totals.discount > 0 && ( 
                 <div className="flex justify-between text-green-600 text-[13px]">
                   <span>Discount{couponCode ? ` (${couponCode})` : ''}</span>
                   <span>-₹{(totals.discount).toFixed(2)}</span>

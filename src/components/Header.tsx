@@ -1,6 +1,7 @@
+// src/components/Header.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Search, User, Heart, Menu, X, LogOut, ShoppingCart } from 'lucide-react';
@@ -8,6 +9,7 @@ import CartDrawer from './CartDrawer';
 import UserDropdown from './auth/UserDropdown';
 import AuthModal from './auth/AuthModal';
 import apiService from '@/utils/api/apiService';
+import { useCart, CartItemType } from '@/context/cartContext'; // Import useCart and CartItemType
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
@@ -20,7 +22,21 @@ export default function Header() {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [wishlistCount, setWishlistCount] = useState<number>(0);
-  const [cartCount, setCartCount] = useState<number>(0);
+  // Remove local cartCount state, use cart context instead
+  // const [cartCount, setCartCount] = useState<number>(0); 
+
+  const { cartItems } = useCart(); // Access cartItems from global context
+
+  // Derive cartCount directly from cartItems from context
+  const totalCartUnits = cartItems.reduce((total: number, item: CartItemType) => {
+    if (item.type === 'normal') {
+      return total + item.quantity;
+    } else { // item.type === 'offer'
+      // Sum the quantities of all products within the offer_items array
+      return total + item.offer_items.reduce((offerTotal, p) => offerTotal + p.quantity, 0);
+    }
+  }, 0);
+
 
   // Fetch categories for header menu
   useEffect(() => {
@@ -52,22 +68,7 @@ export default function Header() {
   }, []);
   
 
-  // Function to get cart count from localStorage
-  const getCartCountFromLocalStorage = () => {
-    try {
-      const cartItems = localStorage.getItem('cartItems');
-      if (cartItems) {
-        const parsedCartItems = JSON.parse(cartItems);
-        return Array.isArray(parsedCartItems) ? parsedCartItems.length : 0;
-      }
-      return 0;
-    } catch (error) {
-      console.error('Error reading cart from localStorage:', error);
-      return 0;
-    }
-  };
-
-  // Function to get wishlist count from localStorage
+  // Function to get wishlist count from localStorage (still used if no dedicated context)
   const getWishlistCountFromLocalStorage = () => {
     try {
       const wishList = localStorage.getItem('wishlist');
@@ -91,13 +92,13 @@ export default function Header() {
         console.log('testtttt token')
         setIsLoggedIn(true);
         fetchUserProfile();
-        // For logged-in users, we'll fetch counts from API in fetchUserProfile
+        // Cart count now comes from useCart context, not directly from API/localStorage in this useEffect.
+        // Wishlist count will be fetched in fetchUserProfile for logged in users.
       } else {
         console.log('testtttt noooo token')
         setIsLoggedIn(false);
         setUserProfile(null);
-        // For non-logged-in users, get counts from localStorage
-        setCartCount(getCartCountFromLocalStorage());
+        // For non-logged-in users, get wishlist count from localStorage
         setWishlistCount(getWishlistCountFromLocalStorage());
       }
     };
@@ -109,11 +110,9 @@ export default function Header() {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'accessToken') {
         checkAuthStatus();
-      } else if (e.key === 'cartItems') {
-        if (!isLoggedIn) {
-          setCartCount(getCartCountFromLocalStorage());
-        }
-      } else if (e.key === 'wishList') {
+      } 
+      // cartItems changes are now handled by useCart context, no need for direct Header listener
+      else if (e.key === 'wishlist') { // Only listen for wishlist if no dedicated context
         if (!isLoggedIn) {
           setWishlistCount(getWishlistCountFromLocalStorage());
         }
@@ -136,19 +135,19 @@ export default function Header() {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('userLoggedIn', handleUserLogin);
     };
-  }, [isLoggedIn]);
+  }, [isLoggedIn]); // Removed cartCount and wishlistCount from dependencies as they are derived/updated elsewhere
 
-  // Also listen for local changes to cart and wishlist when not logged in
-  useEffect(() => {
-    if (!isLoggedIn) {
-      const interval = setInterval(() => {
-        setCartCount(getCartCountFromLocalStorage());
-        setWishlistCount(getWishlistCountFromLocalStorage());
-      }, 1000); // Check every second for local changes
+  // Removed useEffect for setInterval polling as useCart context handles reactivity
+  // useEffect(() => {
+  //   if (!isLoggedIn) {
+  //     const interval = setInterval(() => {
+  //       setCartCount(getCartCountFromLocalStorage());
+  //       setWishlistCount(getWishlistCountFromLocalStorage());
+  //     }, 1000); // Check every second for local changes
       
-      return () => clearInterval(interval);
-    }
-  }, [isLoggedIn]);
+  //     return () => clearInterval(interval);
+  //   }
+  // }, [isLoggedIn]);
 
   const fetchUserProfile = async () => {
     try {
@@ -157,21 +156,18 @@ export default function Header() {
       setUserProfile(response);
       
       // For logged in users, get counts from API
-      if (response?.cart_items_count !== undefined) {
-        setCartCount(response.cart_items_count);
-      } else {
-        setCartCount(getCartCountFromLocalStorage());
-      }
-      
+      // cart_items_count and wishlist_item_count from API (if backend provides total units)
+      // Otherwise, the useCart context will eventually reflect the backend state correctly
+      // For wishlist, update if provided by API
       if (response?.wishlist_item_count !== undefined) {
         setWishlistCount(response.wishlist_item_count);
       } else {
-        setWishlistCount(getWishlistCountFromLocalStorage());
+        setWishlistCount(getWishlistCountFromLocalStorage()); // Fallback for wishlist
       }
+      // No need to set cartCount here, as useCart already manages it globally based on backend/localStorage.
     } catch (error) {
       console.error('Failed to fetch user profile:', error);
-      // Fallback to localStorage if API fails
-      setCartCount(getCartCountFromLocalStorage());
+      // Fallback to localStorage for wishlist if API fails
       setWishlistCount(getWishlistCountFromLocalStorage());
     }
   };
@@ -253,7 +249,7 @@ export default function Header() {
             <a href="#" className="relative" onClick={handleCartClick}>
               <ShoppingCart size={22} />
               <span className={`absolute ${isLoggedIn ? 'bottom-[-1px]' : 'bottom-[-11px]'} left-1/2 transform -translate-x-1/2 bg-[#F0FBFF] text-[#175e7a] text-[11px] h-3 w-6 flex items-center justify-center`}>
-                {cartCount}
+                {totalCartUnits} {/* Use totalCartUnits from context */}
               </span>
             </a>
           </div>

@@ -1,4 +1,3 @@
-// src/app/product/[id]/page.tsx
 'use client';
 
 import { CheckCircle2, Star, Tag } from 'lucide-react';
@@ -13,7 +12,7 @@ import CartDrawer from '@/components/CartDrawer';
 import CheckoutModal from '@/components/CheckoutModal';
 import apiService from '@/utils/api/apiService';
 import { useCart } from '@/context/cartContext';
-import { v4 as uuidv4 } from 'uuid';
+import { v4 as uuidv4 } from 'uuid'; // FIX: uuidv4 is now used for temporary IDs.
 import { ProductItemDetails } from '@/context/cartContext';
 
 
@@ -47,7 +46,7 @@ export default function ProductDetailPage() {
   const [isGift, setIsGift] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
-  const [isCheckoutOpen, setIsCheckoutOpen] = useState<boolean>(false);
+  const [isCheckoutOpen, setIsCheckoutToOpen] = useState<boolean>(false);
   const [product, setProduct] = useState<ProductItemDetails | null>(null); // Use ProductItemDetails type
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +57,7 @@ export default function ProductDetailPage() {
       try {
         if (productId) {
           setIsLoading(true);
-          const fetchedProduct: ProductItemDetails = await apiService.getProductByID(productId);
+          const fetchedProduct: ProductItemDetails = await apiService.getProductByID(productId.replace(/-/g, ''));
           setProduct(fetchedProduct);
         }
       } catch (err) {
@@ -81,20 +80,22 @@ export default function ProductDetailPage() {
   const handleAddToBag = async () => {
     if (product) {
       setSelectedProductId(product.id);
+      // FIX: Assign a new UUID to the `id` field for local identification.
+      const tempCartItemId = uuidv4(); 
       dispatchCart({
         type: 'ADD_NORMAL_ITEM',
         payload: {
-          id: uuidv4(), // Generate temporary local ID
+          id: tempCartItemId, // FIX: Use the temporary UUID here
           product_id: product.id,
-          quantity: 1, // Quantity in cart is 1 for a new add
+          quantity: 1, 
           type: 'normal',
-          isSynced: false, // Mark as not synced yet
+          isSynced: false, 
           product_name: product.product_name,
           product_price: product.product_price,
           strike_price: product.strike_price,
           images: product.images,
-          isInStock: product.product_status && product.quantity > 0, // Derive from product.quantity (stock)
-          stock_quantity: product.quantity, // Populate with the actual stock quantity from fetched product
+          isInStock: product.product_status && product.quantity > 0, 
+          stock_quantity: product.quantity, 
         },
       });
       setIsCartOpen(true);
@@ -103,33 +104,35 @@ export default function ProductDetailPage() {
 
   const handleBuyNow = async () => {
     if (product) {
+      // FIX: Assign a new UUID to the `id` field for local identification.
+      const tempCartItemId = uuidv4(); 
       dispatchCart({
         type: 'ADD_NORMAL_ITEM',
         payload: {
-          id: uuidv4(),
+          id: tempCartItemId, // FIX: Use the temporary UUID here
           product_id: product.id,
-          quantity: 1, // Quantity in cart is 1 for a new add
+          quantity: 1, 
           type: 'normal',
           isSynced: false,
           product_name: product.product_name,
           product_price: product.product_price,
           strike_price: product.strike_price,
           images: product.images,
-          isInStock: product.product_status && product.quantity > 0, // Derive from product.quantity (stock)
-          stock_quantity: product.quantity, // Populate with the actual stock quantity from fetched product
+          isInStock: product.product_status && product.quantity > 0, 
+          stock_quantity: product.quantity, 
         },
       });
-      setIsCheckoutOpen(true);
+      setIsCheckoutToOpen(true); // FIX: Corrected variable name
     }
   };
 
   const handleCheckoutClose = () => {
-    setIsCheckoutOpen(false);
+    setIsCheckoutToOpen(false); // FIX: Corrected variable name
   };
 
   const handleAddressSelected = (addressId: string): void => {
     console.log(`Proceeding with address ID: ${addressId}`);
-    setIsCheckoutOpen(false);
+    setIsCheckoutToOpen(false); // FIX: Corrected variable name
   };
 
   const checkPincode = async (pincode: string) => {

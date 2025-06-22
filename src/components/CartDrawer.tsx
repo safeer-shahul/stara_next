@@ -1,14 +1,14 @@
-// src/components/CartDrawer.tsx
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { X, ShoppingCart } from 'lucide-react';
 import CartItem from './CartItem';
-import OfferCartItem from './OfferCartItem'; // This is the correct component for offers
+import OfferCartItem from './OfferCartItem';
 import CheckoutModal from './CheckoutModal';
 import { useCart, CartItemType, CartNormalItem, CartOfferItem, ProductItemDetails } from '@/context/cartContext';
 import { cartService } from '@/utils/api/cartService';
 import apiService from '@/utils/api/apiService';
 import { cartUtils } from '@/utils/cartUtils';
+import { v4 as uuidv4 } from 'uuid'; // FIX: Import uuidv4
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -22,10 +22,13 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
   const [localLoading, setLocalLoading] = useState<boolean>(false);
   const [showCheckoutModal, setShowCheckoutModal] = useState<boolean>(false);
 
+  // This function is now mostly for *re-fetching* the cart state from backend/local storage
+  // and dispatching it to the context. It should be called after actions that modify cart.
   const getAndSetCartItems = useCallback(async () => {
     setLocalLoading(true);
     try {
-      const items = await cartService.fetchCartFromBackend();
+      // This will now fetch the latest state, also reconciling any changes if an access token is present
+      const items = await cartService.fetchCartFromBackend(); 
       dispatchCart({ type: 'SET_CART_ITEMS', payload: items });
     } catch (error) {
       console.error('Error fetching/enriching cart:', error);
@@ -36,59 +39,80 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
 
   useEffect(() => {
     if (isOpen && typeof window !== 'undefined') {
-      getAndSetCartItems();
+      getAndSetCartItems(); // Fetch cart items when drawer opens
     }
   }, [isOpen, getAndSetCartItems]);
 
   useEffect(() => {
+    // Re-fetch cart items after checkout modal closes to ensure latest state
     if (!showCheckoutModal && isOpen) {
       getAndSetCartItems();
     }
   }, [showCheckoutModal, isOpen, getAndSetCartItems]);
 
+  // FIX: handleRemoveItem now correctly handles local-only vs. synced items
   const handleRemoveItem = async (id: string): Promise<void> => {
+    const itemToRemove = cartItems.find(item => item.id === id);
+
+    if (!itemToRemove) {
+      console.warn(`Attempted to remove item with ID: ${id}, but it was not found in current cart state.`);
+      return;
+    }
+
     try {
-      const itemToRemove = cartItems.find(item => item.id === id);
-      if (itemToRemove) {
+      if (itemToRemove.isSynced && itemToRemove.id !== null) {
+        // If synced with backend, call API to remove
         if (itemToRemove.type === 'normal') {
           await apiService.addToCart({ product_id: itemToRemove.product_id.replace(/-/g, ''), mode: 'delete' });
+          console.log(`Removed normal item with backend ID ${itemToRemove.id} from backend.`);
         } else if (itemToRemove.type === 'offer') {
-          await handleRemoveOfferSet(id);
-          return;
+          await apiService.addToCart({ item_id: itemToRemove.id.replace(/-/g, ''), mode: 'delete' });
+          console.log(`Removed offer set with backend ID ${itemToRemove.id} from backend.`);
         }
       } else {
-        console.warn(`Attempted to remove item with ID: ${id}, but it was not found.`);
+        // If not synced (local only), directly dispatch removal from local state
+        console.log(`Removing unsynced item with local ID ${itemToRemove.id || 'null'} from local state.`);
       }
-      await getAndSetCartItems();
-    } catch (error) {
-      console.error('Error removing item from cart:', error);
+      
+      // Optimistically remove from UI, then re-fetch to ensure consistency with backend
       dispatchCart({ type: 'REMOVE_ITEM', payload: id });
-    }
-  };
-
-  const handleRemoveOfferSet = async (setId: string): Promise<void> => {
-    try {
-      console.log('Removing offer set with ID:', setId);
-      await apiService.addToCart({ item_id: setId.replace(/-/g, ''), mode: 'delete' }); 
-      await getAndSetCartItems();
+      await getAndSetCartItems(); // Re-fetch after local removal or API call
     } catch (error) {
-      console.error('Error removing offer set:', error);
-      dispatchCart({ type: 'REMOVE_ITEM', payload: setId });
+      console.error(`Error removing item (ID: ${id}):`, error);
+      // If backend removal fails, revert local optimistic removal or show error
+      // For now, we'll let the next getAndSetCartItems attempt to resync.
     }
   };
 
+  // FIX: handleQuantityChange now only for normal items, handles backend update
   const handleQuantityChange = async (id: string, change: number): Promise<void> => {
+    const itemToUpdate = cartItems.find(item => item.id === id);
+
+    if (!itemToUpdate || itemToUpdate.type !== 'normal') {
+      console.warn(`Attempted to change quantity of non-normal item or item not found with ID: ${id}`);
+      return;
+    }
+    
+    // Quantity changes are only supported for synced items via backend API.
+    // Unsynced items (id: null) should only be added/removed as whole units via handleAddToBag/handleRemoveItem.
+    if (!itemToUpdate.isSynced || itemToUpdate.id === null) {
+      console.warn(`Attempted to change quantity of unsynced local item. This action is not supported.`);
+      return;
+    }
+
     try {
-      const itemToUpdate = cartItems.find(item => item.id === id);
-      if (itemToUpdate && itemToUpdate.type === 'normal') {
-        const cleanProductId = itemToUpdate.product_id.replace(/-/g, '');
-        await apiService.addToCart({ product_id: cleanProductId, mode: change > 0 ? '+' : '-' });
-        await getAndSetCartItems();
-      } else {
-        console.warn(`Attempted to change quantity of non-normal item or item not found with ID: ${id}`);
+      const newQuantity = itemToUpdate.quantity + change;
+      if (newQuantity <= 0) {
+        // If quantity goes to 0 or less, remove the item
+        await handleRemoveItem(id);
+        return;
       }
+
+      await apiService.addToCart({ product_id: itemToUpdate.product_id.replace(/-/g, ''), mode: change > 0 ? '+' : '-' });
+      console.log(`Changed quantity for item ${id} by ${change}.`);
+      await getAndSetCartItems(); // Re-fetch to get updated state from backend
     } catch (error) {
-      console.error('Error updating cart quantity:', error);
+      console.error(`Error updating cart quantity for item ${id}:`, error);
     }
   };
 
@@ -109,19 +133,19 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
 
   const handleCheckoutClose = (): void => {
     setShowCheckoutModal(false);
-    getAndSetCartItems();
+    getAndSetCartItems(); // Re-fetch cart after checkout modal closes to ensure latest state
   };
 
   const handleAddressSelected = (addressId: string): void => {
-    console.log(`Address ID selected: ${addressId}`);
+    console.log(`Proceeding with address ID: ${addressId}`);
     setShowCheckoutModal(false);
-    getAndSetCartItems();
+    getAndSetCartItems(); // Re-fetch cart after address selection (likely for order placement)
   };
 
   const clearCart = async (): Promise<void> => {
     try {
       await apiService.addToCart({ mode: 'delete_cart' });
-      dispatchCart({ type: 'SET_CART_ITEMS', payload: [] });
+      dispatchCart({ type: 'SET_CART_ITEMS', payload: [] }); // Clear local state immediately
     } catch (error) {
       console.error('Error clearing cart:', error);
     }
@@ -137,13 +161,18 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
 
   if (!isOpen) return null;
 
-  const totalNormalItems = cartItems
-    .filter((item: CartItemType) => item.type === 'normal')
-    .reduce((total: number, item: CartNormalItem) => total + item.quantity, 0);
+  const totalCartUnits = cartItems.reduce((total: number, item: CartItemType) => {
+    if (item.type === 'normal') {
+      return total + item.quantity;
+    } else { 
+      return total + item.offer_items.reduce((offerTotal, p) => offerTotal + p.quantity, 0);
+    }
+  }, 0);
 
   const subtotal = cartUtils.calculateSubtotal(cartItems);
   const offerSavings = cartUtils.calculateTotalOfferSavings(cartItems);
-  const finalTotal = subtotal - offerSavings;
+  
+  const finalTotal = subtotal; 
 
   return (
     <>
@@ -155,7 +184,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
               <div className="flex items-center">
                 <ShoppingCart className="mr-2 text-[#7F7F7F]" size={18} />
                 <h3 className="text-[16px] font-medium text-[#7F7F7F]">
-                  Your Cart ({totalNormalItems} items)
+                  Your Cart ({totalCartUnits} items) 
                 </h3>
               </div>
               <button onClick={onClose} className="text-black hover:text-gray-700">
@@ -176,23 +205,22 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                 <>
                   {cartItems.length > 0 ? (
                     <>
-                      {/* Separate mapping for normal items and offer items for clearer type inference */}
                       {cartItems.map((item) => {
                         if (item.type === 'normal') {
                           return (
                             <CartItem
-                              key={item.id}
-                              product={item} // item is guaranteed CartNormalItem here
-                              onRemove={handleRemoveItem}
+                              key={item.id ?? uuidv4()} 
+                              product={item} 
+                              onRemove={handleRemoveItem} 
                               onQuantityChange={handleQuantityChange}
                             />
                           );
-                        } else { // item.type === 'offer'
+                        } else { 
                           return (
                             <OfferCartItem
-                              key={item.id}
-                              offerSet={item} // item is guaranteed CartOfferItem here
-                              onRemove={handleRemoveOfferSet}
+                              key={item.id ?? uuidv4()} 
+                              offerSet={item} 
+                              onRemove={handleRemoveItem} // Pass handleRemoveItem (which now handles offer sets)
                             />
                           );
                         }

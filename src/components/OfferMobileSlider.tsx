@@ -4,10 +4,8 @@ import Image from 'next/image';
 import { X, ShoppingBag, Info } from 'lucide-react';
 import apiService from '@/utils/api/apiService';
 import { v4 as uuidv4 } from 'uuid';
-// Import the actual CartOfferItem and ProductItemDetails types from your context
 import { useCart, CartOfferItem, ProductItemDetails } from '@/context/cartContext';
 
-// Re-defining ProductItem for clarity, should ideally be consistent with CartContext's ProductItemDetails
 interface ProductItem {
     id: string;
     images: {
@@ -19,10 +17,9 @@ interface ProductItem {
     product_price: string;
     strike_price: string;
     product_status: boolean;
-    // Added for consistency with ProductItemDetails from cartContext
     product_code?: string;
     product_description?: string;
-    quantity?: number; // This is stock quantity, distinct from cart quantity
+    quantity?: number; 
     product_weight?: string;
     product_box_weight?: string;
     created_at?: string;
@@ -49,9 +46,6 @@ interface OfferSlot {
     slotIndex: number;
 }
 
-// REMOVE CartOfferItemPayload - we will use CartOfferItem directly from cartContext
-// The dispatch payload must conform to CartOfferItem
-
 interface OfferMobileSliderProps {
     isOpen: boolean;
     onClose: () => void;
@@ -64,18 +58,22 @@ interface OfferMobileSliderProps {
 
 export default function OfferMobileSlider({
     isOpen,
-    onClose,
+    onClose, 
     offerData,
     slots,
     onSlotClear,
     onOpenCartDrawer,
     isAuthenticated = false
 }: OfferMobileSliderProps) {
+    console.log(isOpen,"isOpen from OfferMobileSlider"); 
+
     useEffect(() => {
         if (isOpen) {
             document.body.style.overflow = 'hidden';
+            console.log("OfferMobileSlider: Body overflow hidden.");
         } else {
             document.body.style.overflow = 'unset';
+            console.log("OfferMobileSlider: Body overflow unset.");
         }
         return () => {
             document.body.style.overflow = 'unset';
@@ -91,21 +89,44 @@ export default function OfferMobileSlider({
             return { payableTotal: 0, savings: 0, freeItems: [] };
         }
 
-        // Sort by price for calculating payable items and free items
-        const sortedProducts = filledSlots
-            .map(slot => ({ ...slot.product!, slotId: slot.id }))
+        const allIndividualProductsInSlots: (ProductItemDetails & { uniqueSlotId: string })[] = filledSlots.map(slot => {
+            const product = slot.product!; 
+            return {
+                id: product.id,
+                images: product.images || [],
+                product_name: product.product_name,
+                product_price: product.product_price,
+                strike_price: product.strike_price,
+                product_status: product.product_status,
+                product_code: product.product_code || '',
+                product_description: product.product_description || '',
+                quantity: 1, 
+                product_weight: product.product_weight || '',
+                product_box_weight: product.product_box_weight || '',
+                created_at: product.created_at || new Date().toISOString(),
+                updated_at: product.updated_at || new Date().toISOString(),
+                sub_category: product.sub_category || '',
+                isInStock: product.product_status && (product.quantity || 1) > 0,
+                uniqueSlotId: slot.id, 
+            };
+        });
+
+        const sortedProductsDesc = [...allIndividualProductsInSlots]
             .sort((a, b) => parseFloat(b.product_price) - parseFloat(a.product_price));
 
-        const itemsToCharge = Math.min(offerData.buy_count, sortedProducts.length);
-        const payableTotal = sortedProducts
+        const itemsToCharge = Math.min(offerData.buy_count, sortedProductsDesc.length);
+        const payableTotal = sortedProductsDesc
             .slice(0, itemsToCharge)
             .reduce((sum, product) => sum + parseFloat(product.product_price), 0);
 
-        const savings = sortedProducts
-            .slice(itemsToCharge)
-            .reduce((sum, product) => sum + parseFloat(product.product_price), 0);
+        const freeItemsActualCount = Math.min(offerData.get_count, sortedProductsDesc.length - itemsToCharge);
+        
+        const freeItemsForDisplay = sortedProductsDesc.slice(itemsToCharge, itemsToCharge + freeItemsActualCount);
+        
+        const savings = freeItemsForDisplay.reduce((sum, product) => sum + parseFloat(product.product_price), 0);
 
-        return { payableTotal, savings, freeItems: sortedProducts.slice(itemsToCharge) };
+
+        return { payableTotal, savings, freeItems: freeItemsForDisplay };
     };
 
     const isOfferComplete = () => {
@@ -120,81 +141,94 @@ export default function OfferMobileSlider({
 
         const filledSlots = slots.filter(slot => slot.product);
 
-        // Ensure filledSlots contains actual ProductItem objects, which need to be convertible to ProductItemDetails
-        // Add missing fields from ProductItemDetails if they're not present in ProductItem
-        const enrichedProductsForPayload: ProductItemDetails[] = filledSlots.map(slot => ({
-            id: slot.product!.id,
-            images: slot.product!.images || [],
-            product_name: slot.product!.product_name,
-            product_price: slot.product!.product_price,
-            strike_price: slot.product!.strike_price,
-            product_status: slot.product!.product_status,
-            // Add default/placeholder values for fields missing in ProductItem if they are required by ProductItemDetails
-            product_code: slot.product!.product_code || '',
-            product_description: slot.product!.product_description || '',
-            quantity: slot.product!.quantity || 1, // Assuming default quantity for offer products is 1
-            product_weight: slot.product!.product_weight || '',
-            product_box_weight: slot.product!.product_box_weight || '',
-            created_at: slot.product!.created_at || new Date().toISOString(),
-            updated_at: slot.product!.updated_at || new Date().toISOString(),
-            sub_category: slot.product!.sub_category || '',
-            isInStock: slot.product!.product_status && (slot.product!.quantity || 1) > 0,
-        }));
+        const aggregatedOfferItemsMap = new Map<string, ProductItemDetails>();
 
-        // Prepare payload for local storage and internal cart state, directly using CartOfferItem type
+        filledSlots.forEach(slot => {
+            if (slot.product) {
+                const product = slot.product; 
+                const productDetails: ProductItemDetails = {
+                    id: product.id,
+                    images: product.images || [],
+                    product_name: product.product_name,
+                    product_price: product.product_price,
+                    strike_price: product.strike_price,
+                    product_status: product.product_status,
+                    product_code: product.product_code || '',
+                    product_description: product.product_description || '',
+                    quantity: 1, 
+                    product_weight: product.product_weight || '',
+                    product_box_weight: product.product_box_weight || '',
+                    created_at: product.created_at || new Date().toISOString(),
+                    updated_at: product.updated_at || new Date().toISOString(),
+                    sub_category: product.sub_category || '',
+                    isInStock: product.product_status && (product.quantity || 1) > 0, 
+                };
+
+                if (aggregatedOfferItemsMap.has(productDetails.id)) {
+                    const existingProduct = aggregatedOfferItemsMap.get(productDetails.id)!;
+                    aggregatedOfferItemsMap.set(productDetails.id, {
+                        ...existingProduct,
+                        quantity: existingProduct.quantity + 1, 
+                    });
+                } else {
+                    aggregatedOfferItemsMap.set(productDetails.id, productDetails);
+                }
+            }
+        });
+
+        const aggregatedOfferItems: ProductItemDetails[] = Array.from(aggregatedOfferItemsMap.values());
+
+        // FIX: Generate a temporary ID for the offer set if it's not synced yet.
+        const temporaryId = uuidv4(); 
+
         const offerSetPayload: CartOfferItem = {
-            id: uuidv4(), // Always generate a local ID initially
+            id: temporaryId, // FIX: Assign a temporary ID here.
             offer: offerData.id,
-            offer_name: { id: offerData.id, offer_name: offerData.offer_name }, // Add the required offer_name
-            main_product: enrichedProductsForPayload[0], // Pass the full ProductItemDetails object
-            offer_products_extra: enrichedProductsForPayload.slice(1), // Pass full ProductItemDetails objects
+            offer_name: { id: offerData.id, offer_name: offerData.offer_name },
             buy_count: offerData.buy_count,
             get_count: offerData.get_count,
-            isSynced: isAuthenticated, // Mark as synced if authenticated, otherwise false for guest
+            isSynced: isAuthenticated, 
             type: 'offer',
+            offer_items: aggregatedOfferItems, 
         };
 
-        // Prepare payload for the backend API (flat list of product IDs)
         const productIdsForBackend = filledSlots.map(slot => slot.product!.id.replace(/-/g, ''));
 
         try {
-            if (isAuthenticated) {
+            dispatchCart({ type: 'ADD_OFFER_SET', payload: offerSetPayload }); 
+            if (isAuthenticated) { 
                 const response = await apiService.addToCartOffer({
                     offer_id: offerData.id.replace(/-/g, ''),
-                    product_ids: productIdsForBackend, // Send the flat list of product UUIDs
+                    product_ids: productIdsForBackend, 
                 });
                 console.log(`Backend responded with ID: ${response.id}`);
             }
-            // Dispatch the structured offerSetPayload to update context and local storage
-            dispatchCart({ type: 'ADD_OFFER_SET', payload: offerSetPayload });
-            onOpenCartDrawer();
+            onOpenCartDrawer(); 
         } catch (error) {
             console.error('Failed to add to cart:', error);
+            // Revert optimistic update if API call fails
+            // FIX: Pass the temporaryId for removal
+            dispatchCart({ type: 'REMOVE_ITEM', payload: temporaryId });
             alert('Failed to add offer. Please try again.');
-            if (isAuthenticated) {
-                dispatchCart({ type: 'REMOVE_ITEM', payload: offerSetPayload.id });
-            }
         } finally {
             setLoading(false);
         }
     };
-
-    if (!isOpen) return null;
 
     const filledSlots = slots.filter(slot => slot.product !== null);
     const totalRequiredItems = offerData.buy_count + offerData.get_count;
     const { payableTotal, savings, freeItems } = calculateTotals();
 
     return (
-        <>
+        <div style={{ display: isOpen ? 'block' : 'none' }}>
             <div
                 className="fixed inset-0 bg-black/70 z-51"
-                onClick={onClose}
+                onClick={onClose} 
             />
             <div className="fixed bottom-0 left-0 right-0 bg-white rounded-t-xl z-52 p-4 max-h-[80vh] overflow-y-auto">
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold">Your Selection</h3>
-                    <button className='cursor-pointer' onClick={onClose}>
+                    <button className='cursor-pointer' onClick={onClose}> 
                         <X size={20} />
                     </button>
                 </div>
@@ -229,7 +263,7 @@ export default function OfferMobileSlider({
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-xs font-medium line-clamp-2">{slot.product.product_name}</p>
-                                                {freeItems.some(item => item.slotId === slot.id) ? (
+                                                {freeItems.some(freeItem => freeItem.uniqueSlotId === slot.id) ? (
                                                     <div className="flex items-center gap-2">
                                                         <span className="text-xs text-gray-500 line-through">₹{parseFloat(slot.product.product_price).toLocaleString()}</span>
                                                         <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-medium">FREE</span>
@@ -277,6 +311,6 @@ export default function OfferMobileSlider({
                     </div>
                 )}
             </div>
-        </>
+        </div>
     );
 }

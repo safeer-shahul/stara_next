@@ -1,18 +1,15 @@
-// src/components/CheckoutModal.tsx
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { X, ArrowLeft } from 'lucide-react';
 import apiService from '@/utils/api/apiService';
 import AddressForm from './AddressForm';
-import INDIAN_STATES from './states';
 import AuthModal from './auth/AuthModal';
 import ProductSummary from './ProductSummary';
 import BillSummary from './BillSummary';
 import RazorpayPayment from './RazorpayPayment';
 import OrderConfirmation from './OrderConfirmation';
 
-// FIX: Import the specific CartItem types from your context
 import { CartOfferItem, CartNormalItem, CartItemType } from '@/context/cartContext'; 
 
 enum CheckoutStep {
@@ -26,7 +23,7 @@ interface Address {
   id: string;
   address: string;
   town: string;
-  state: string;
+  state: string; 
   pincode: string;
   phone_number_1: string;
   phone_number_2?: string;
@@ -37,19 +34,58 @@ interface CheckoutModalProps {
   isOpen: boolean;
   onClose: () => void;
   onProceed: (addressId: string) => void;
-  // FIX: Replace orderItems and offer_sets with a single cartItems prop
   cartItems: CartItemType[]; 
   coupon_code_id?: string;
 }
+
+const INDIAN_STATES: { [key: string]: string } = { 
+    "AN":"Andaman and Nicobar Islands", 
+    "AP":"Andhra Pradesh", 
+    "AR":"Arunachal Pradesh", 
+    "AS":"Assam", 
+    "BR":"Bihar", 
+    "CG":"Chandigarh", 
+    "CH":"Chhattisgarh", 
+    "DN":"Dadra and Nagar Haveli", 
+    "DD":"Daman and Diu", 
+    "DL":"Delhi", 
+    "GA":"Goa", 
+    "GJ":"Gujarat", 
+    "HR":"Haryana", 
+    "HP":"Himachal Pradesh", 
+    "JK":"Jammu and Kashmir", 
+    "JH":"Jharkhand", 
+    "KA":"Karnataka", 
+    "KL":"Kerala", 
+    "LA":"Ladakh", 
+    "LD":"Lakshadweep", 
+    "MP":"Madhya Pradesh", 
+    "MH":"Maharashtra", 
+    "MN":"Manipur", 
+    "ML":"Meghalaya", 
+    "MZ":"Mizoram", 
+    "NL":"Nagaland", 
+    "OR":"Odisha", 
+    "PY":"Puducherry", 
+    "PB":"Punjab", 
+    "RJ":"Rajasthan", 
+    "SK":"Sikkim", 
+    "TN":"Tamil Nadu", 
+    "TS":"Telangana", 
+    "TR":"Tripura", 
+    "UP":"Uttar Pradesh", 
+    "UK":"Uttarakhand", 
+    "WB":"West Bengal"
+};
+
 
 const CheckoutModal: React.FC<CheckoutModalProps> = ({
   isOpen,
   onClose,
   onProceed,
-  cartItems = [], // Now receiving all cart items
+  cartItems = [], 
   coupon_code_id,
 }) => {
-  // FIX: Filter normal and offer items from the unified cartItems prop
   const normalItems = cartItems.filter((item): item is CartNormalItem => item.type === 'normal');
   const offerSets = cartItems.filter((item): item is CartOfferItem => item.type === 'offer');
 
@@ -126,8 +162,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const clearCart = useCallback(async () => {
     try {
       await apiService.addToCart({ mode: 'delete_cart' });
-      // FIX: CartDrawer is now responsible for updating its own state via context after clearing
-      // This modal should not directly manipulate localStorage cartItems
       setCartCleared(true);
     } catch (error) {
       console.error('Error clearing cart:', error);
@@ -202,8 +236,10 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   };
 
   const handleContinueShopping = () => {
+    // FIX: Always call onProceed (which is a prop from CartDrawer) after order completion.
+    // This ensures CartDrawer is notified to re-fetch/update its state.
     if (selectedAddressId) {
-      onProceed(selectedAddressId); // This triggers cart refresh in CartDrawer after checkout completion
+      onProceed(selectedAddressId); 
     }
     onClose();
   };
@@ -211,7 +247,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const handleAuthSuccess = () => {
     setIsAuthenticated(true);
     setShowAuthModal(false);
-    fetchAddresses(); // Fetch addresses after successful auth
+    fetchAddresses(); 
   };
 
   const handleAuthModalClose = () => {
@@ -238,9 +274,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const handleClose = () => {
     onClose();
   };
-
-  // FIX: Removed handleRemoveOfferSet logic here, as CartDrawer handles all cart manipulations
-  // and will trigger a re-render/re-fetch as needed.
 
   const handleAddressFormSuccess = async (newAddressId: string) => {
     await fetchAddresses();
@@ -294,7 +327,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
             <div className="p-5">
               {currentStep === CheckoutStep.ADDRESS_SELECTION && (
                 <>
-                  {/* FIX: Pass normalItems and offerSets derived from cartItems */}
                   {(normalItems.length > 0 || offerSets.length > 0) && (
                     <div className="mb-6">
                       <ProductSummary
@@ -365,7 +397,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                                   <div className="mt-[-5px] text-[14px]">
                                     <p className="text-gray-800">{address.address}</p>
                                     <p className="text-gray-600">
-                                      {address.town}, {INDIAN_STATES[address.state]} - {address.pincode}
+                                      {address.town}, {INDIAN_STATES[address.state] ?? address.state} - {address.pincode}
                                     </p>
                                     <p className="text-gray-600">Phone: {address.phone_number_1}</p>
                                     {address.phone_number_2 && (
@@ -389,8 +421,8 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
               )}
               {currentStep === CheckoutStep.BILL_SUMMARY && selectedAddress && (
                 <BillSummary
-                  normalItems={normalItems} // Pass CartNormalItem[]
-                  offerSets={offerSets} // Pass CartOfferItem[]
+                  normalItems={normalItems} 
+                  offerSets={offerSets} 
                   couponCode={coupon_code_id}
                   destinationPincode={selectedAddress.pincode}
                   onPlaceOrder={handleOrderCreated}

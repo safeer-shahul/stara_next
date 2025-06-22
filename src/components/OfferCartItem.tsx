@@ -1,76 +1,64 @@
-// src/components/OfferCartItem.tsx
 'use client';
 
 import Image from 'next/image';
-import { X, ChevronDown, ChevronUp } from 'lucide-react';
-// apiService is kept here, but the getValidOffers call inside useEffect is removed
-import apiService from '@/utils/api/apiService'; 
-import { useState, useEffect } from 'react';
-// Import the specific CartOfferItem and ProductItemDetails types
+import { X } from 'lucide-react'; 
 import { CartOfferItem, ProductItemDetails } from '@/context/cartContext'; 
 
 interface OfferCartItemProps {
-  offerSet: CartOfferItem; // FIX: Now expects the structured CartOfferItem
-  onRemove?: (setId: string) => void;
-  fromProductSummary?: boolean; // Indicates if it's rendered in ProductSummary
+  offerSet: CartOfferItem; 
+  onRemove?: (id: string) => Promise<void>; // FIX: Changed parameter type to string
+  fromProductSummary?: boolean; 
 }
 
 export default function OfferCartItem({ offerSet, onRemove, fromProductSummary = false }: OfferCartItemProps) {
-  // FIX: Offer name is now directly available on offerSet.offer_name
   const offerName = offerSet.offer_name?.offer_name || 'Special Offer';
-  const [isCollapsed, setIsCollapsed] = useState(true);
-
-  // FIX: Removed useEffect for fetching offer name as it's now part of the offerSet prop
-  // The offerSet should already be fully enriched from cartService.fetchCartFromBackend
-  // No need for additional API calls here.
 
   console.log('OfferCartItem: offerSet:', offerSet);
 
   const calculateOfferTotals = () => {
-    // FIX: Flatten main_product and offer_products_extra for calculation
-    const allProducts: ProductItemDetails[] = [];
-    if (offerSet.main_product) {
-      allProducts.push(offerSet.main_product);
-    }
-    if (offerSet.offer_products_extra) {
-      allProducts.push(...offerSet.offer_products_extra);
-    }
+    const allIndividualProducts: ProductItemDetails[] = [];
+    offerSet.offer_items.forEach(product => {
+      for (let i = 0; i < product.quantity; i++) {
+        allIndividualProducts.push({ ...product, quantity: 1 }); 
+      }
+    });
 
-    if (allProducts.length === 0) {
+    if (allIndividualProducts.length === 0) {
       return { payableTotal: 0, savings: 0, freeItems: [] };
     }
 
-    const sortedProducts = [...allProducts].sort(
+    const sortedProductsDesc = [...allIndividualProducts].sort(
       (a, b) => parseFloat(b.product_price) - parseFloat(a.product_price)
     );
     
-    // Assuming offerSet.buy_count applies to the highest priced items
-    const itemsToCharge = Math.min(offerSet.buy_count || 1, sortedProducts.length);
-    const payableTotal = sortedProducts
-      .slice(0, itemsToCharge)
-      .reduce((sum, product) => sum + parseFloat(product.product_price), 0);
+    const itemsToCharge = Math.min(offerSet.buy_count || 0, sortedProductsDesc.length);
+    let payableTotal = 0;
+    for (let i = 0; i < itemsToCharge; i++) {
+        payableTotal += parseFloat(sortedProductsDesc[i].product_price);
+    }
     
-    // Savings are the sum of the remaining items' prices (the free items)
-    const savings = sortedProducts
-      .slice(itemsToCharge)
-      .reduce((sum, product) => sum + parseFloat(product.product_price), 0);
-    const freeItems = sortedProducts.slice(itemsToCharge);
+    const freeItemsActualCount = Math.min(offerSet.get_count || 0, sortedProductsDesc.length - itemsToCharge);
+    const freeItemsForDisplay = sortedProductsDesc.slice(itemsToCharge, itemsToCharge + freeItemsActualCount);
+    
+    const savings = freeItemsForDisplay.reduce((sum, product) => sum + parseFloat(product.product_price), 0);
 
-    return { payableTotal, savings, freeItems };
+    return { payableTotal, savings, freeItems: freeItemsForDisplay };
   };
 
   const { payableTotal, savings, freeItems } = calculateOfferTotals();
 
-  const handleRemove = () => {
-    if (onRemove) {
-      onRemove(offerSet.id); // Pass the cart item ID of the offer set
+  const handleRemove = async () => { 
+    // FIX: Simplified: offerSet.id is now always a string.
+    // The responsibility to decide if it's a local-only removal or needs backend API call
+    // lies with the `onRemove` handler passed from `CartDrawer.tsx`.
+    if (onRemove) { 
+      await onRemove(offerSet.id); 
     }
   };
 
-  // Ensure main_product exists before rendering to prevent errors
-  if (!offerSet.main_product) {
-      console.warn('OfferCartItem: main_product is missing for offerSet:', offerSet);
-      return null; // Or render a placeholder/error message for a malformed offer
+  if (offerSet.offer_items.length === 0) {
+      console.warn('OfferCartItem: offer_items is empty for offerSet:', offerSet);
+      return null; 
   }
 
   return (
@@ -87,82 +75,34 @@ export default function OfferCartItem({ offerSet, onRemove, fromProductSummary =
         )}
       </div>
       <div className="space-y-2">
-        {/* FIX: Render main_product separately */}
-        <div className="flex items-center gap-2 cursor-pointer" onClick={() => setIsCollapsed(!isCollapsed)}>
-          <div className="relative w-12 h-12 flex-shrink-0 rounded overflow-hidden">
-            <Image
-              src={offerSet.main_product.images[0]?.product_image
-                ? `${process.env.NEXT_PUBLIC_API_BASE_URL}${offerSet.main_product.images[0].product_image}`
-                : '/images/placeholder.png'}
-              alt={offerSet.main_product.product_name}
-              fill
-              className="object-cover"
-              sizes="48px"
-            />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium line-clamp-2">{offerSet.main_product.product_name}</p>
-            {!fromProductSummary && freeItems.some((item) => item.id === offerSet.main_product.id) ? (
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500 line-through">
-                  ₹{parseFloat(offerSet.main_product.product_price).toLocaleString()}
-                </span>
-                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-medium">
-                  FREE
-                </span>
-              </div>
-            ) : (
+        {offerSet.offer_items.map((product, index) => ( 
+          // FIX: product.id is guaranteed string here
+          <div key={product.id} className="flex items-center gap-2"> 
+            <div className="relative w-12 h-12 flex-shrink-0 rounded overflow-hidden">
+              <Image
+                src={product.images[0]?.product_image
+                  ? `${process.env.NEXT_PUBLIC_API_BASE_URL}${product.images[0].product_image}`
+                  : '/images/placeholder.png'}
+                alt={product.product_name}
+                fill
+                className="object-cover"
+                sizes="48px"
+              />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium line-clamp-2">{product.product_name} (Qty: {product.quantity})</p>
               <p className="text-xs text-gray-600">
-                ₹{parseFloat(offerSet.main_product.product_price).toLocaleString()}
+                ₹{parseFloat(product.product_price).toLocaleString()}
               </p>
-            )}
+            </div>
           </div>
-          {/* Only show collapse/expand icon if there are additional products */}
-          {offerSet.offer_products_extra.length > 0 && (isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />)}
-        </div>
-        {/* FIX: Render offer_products_extra only when expanded */}
-        {!isCollapsed && offerSet.offer_products_extra.length > 0 && (
-          <div className="space-y-2 pl-4 border-l border-gray-200 ml-4 pt-2"> {/* Added some styling for indentation */}
-            {offerSet.offer_products_extra.map((product) => (
-              <div key={product.id} className="flex items-center gap-2">
-                <div className="relative w-12 h-12 flex-shrink-0 rounded overflow-hidden">
-                  <Image
-                    src={product.images[0]?.product_image
-                      ? `${process.env.NEXT_PUBLIC_API_BASE_URL}${product.images[0].product_image}`
-                      : '/images/placeholder.png'}
-                    alt={product.product_name}
-                    fill
-                    className="object-cover"
-                    sizes="48px"
-                  />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium line-clamp-2">{product.product_name}</p>
-                  {!fromProductSummary && freeItems.some((item) => item.id === product.id) ? (
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-500 line-through">
-                        ₹{parseFloat(product.product_price).toLocaleString()}
-                      </span>
-                      <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-medium">
-                        FREE
-                      </span>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-gray-600">
-                      ₹{parseFloat(product.product_price).toLocaleString()}
-                    </p>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        ))}
       </div>
       {!fromProductSummary && (
         <div className="mt-2 text-sm">
           {savings > 0 && (
             <div className="flex justify-between text-green-600">
-              <span>You Save ({freeItems.length} free item{freeItems.length > 1 ? 's' : ''}):</span>
+              <span>You Save ({freeItems.length} free item{freeItems.length !== 1 ? 's' : ''}):</span>
               <span className="font-medium">₹{savings.toLocaleString()}</span>
             </div>
           )}

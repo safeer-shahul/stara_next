@@ -1,4 +1,3 @@
-// src/components/ProductSummary.tsx
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -6,8 +5,8 @@ import { ChevronRight } from 'lucide-react';
 import Image from 'next/image';
 import apiService from '@/utils/api/apiService';
 import OfferCartItem from './OfferCartItem'; 
-// Import the specific cart item types from your context
 import { CartNormalItem, CartOfferItem, ProductItemDetails } from '@/context/cartContext'; 
+import { v4 as uuidv4 } from 'uuid';
 
 interface CouponType {
   code: string;
@@ -16,14 +15,13 @@ interface CouponType {
 }
 
 interface ProductSummaryProps {
-  normalItems: CartNormalItem[]; // Now receives CartNormalItem[]
-  offerSets: CartOfferItem[]; // Now receives CartOfferItem[] (already structured and enriched)
+  normalItems: CartNormalItem[]; 
+  offerSets: CartOfferItem[]; 
   coupon_code_id?: string;
 }
 
 const ProductSummary: React.FC<ProductSummaryProps> = ({ normalItems, offerSets = [], coupon_code_id }) => {
-  const [productsForDisplay, setProductsForDisplay] = useState<any[]>([]); // For normal items summary
-  // offerSets is already enriched, so no need for offerSetsWithOffer state here
+  const [productsForDisplay, setProductsForDisplay] = useState<any[]>([]); 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [couponCode, setCouponCode] = useState(coupon_code_id || '');
@@ -45,7 +43,6 @@ const ProductSummary: React.FC<ProductSummaryProps> = ({ normalItems, offerSets 
         
         console.log('ProductSummary: Starting formatting with normalItems:', normalItems, 'offerSets:', offerSets);
         
-        // Normal items are already enriched from CartDrawer/cartService, just map for display
         const mappedNormalProducts = normalItems.map(item => ({
           id: item.id,
           name: item.product_name,
@@ -75,9 +72,8 @@ const ProductSummary: React.FC<ProductSummaryProps> = ({ normalItems, offerSets 
     };
 
     formatItemsForDisplay();
-  }, [normalItems, offerSets]); // Depend on both normalItems and offerSets
+  }, [normalItems, offerSets]); 
 
-  // Apply initial coupon if provided
   useEffect(() => {
     if (coupon_code_id && !loading) {
       setCouponCode(coupon_code_id);
@@ -85,67 +81,72 @@ const ProductSummary: React.FC<ProductSummaryProps> = ({ normalItems, offerSets 
     }
   }, [coupon_code_id, loading]);
 
-  // Helper to flatten products from an offer set for calculations
-  const _getFlattenedOfferProducts = (offerSet: CartOfferItem) => {
-    const allProducts: ProductItemDetails[] = [];
-    if (offerSet.main_product) {
-      allProducts.push(offerSet.main_product);
-    }
-    if (offerSet.offer_products_extra) {
-      allProducts.push(...offerSet.offer_products_extra);
-    }
-    return allProducts;
+  const _getIndividualOfferProducts = (offerSet: CartOfferItem): ProductItemDetails[] => {
+    const allIndividualProducts: ProductItemDetails[] = [];
+    offerSet.offer_items.forEach(product => {
+      for (let i = 0; i < product.quantity; i++) {
+        allIndividualProducts.push({ ...product, quantity: 1 }); 
+      }
+    });
+    return allIndividualProducts;
   };
 
   const calculateSubtotal = (): number => {
     let total = productsForDisplay.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
     offerSets.forEach((offerSet) => {
-      const allOfferProducts = _getFlattenedOfferProducts(offerSet);
+      const allIndividualOfferProducts = _getIndividualOfferProducts(offerSet);
 
-      const sortedProducts = [...allOfferProducts].sort((a, b) => 
+      const sortedProductsDesc = [...allIndividualOfferProducts].sort((a, b) => 
         parseFloat(b.product_price) - parseFloat(a.product_price)
       );
-      const itemsToCharge = Math.min(offerSet.buy_count || 1, sortedProducts.length);
-      total += sortedProducts
-        .slice(0, itemsToCharge)
-        .reduce((sum, product) => sum + parseFloat(product.product_price), 0);
+      
+      const itemsToCharge = Math.min(offerSet.buy_count || 0, sortedProductsDesc.length);
+      for (let i = 0; i < itemsToCharge; i++) {
+          total += parseFloat(sortedProductsDesc[i].product_price);
+      }
     });
 
     return total;
   };
 
   const calculateOfferSavings = (): number => {
-    let savings = 0;
+    let totalSavings = 0;
     offerSets.forEach((offerSet) => {
-      const allOfferProducts = _getFlattenedOfferProducts(offerSet);
+      const allIndividualOfferProducts = _getIndividualOfferProducts(offerSet);
 
-      const sortedProducts = [...allOfferProducts].sort((a, b) => 
-        parseFloat(b.product_price) - parseFloat(a.product_price)
+      const totalOriginalPriceOfAllUnits = allIndividualOfferProducts.reduce((sum, p) => sum + parseFloat(p.product_price || '0'), 0);
+
+      const sortedProductsDesc = [...allIndividualOfferProducts].sort(
+        (a: ProductItemDetails, b: ProductItemDetails) => (parseFloat(b.product_price || '0') || 0) - (parseFloat(a.product_price || '0') || 0)
       );
-      const itemsToCharge = Math.min(offerSet.buy_count || 1, sortedProducts.length);
-      savings += sortedProducts
-        .slice(itemsToCharge)
-        .reduce((sum, product) => sum + parseFloat(product.product_price), 0);
+      const itemsToCharge = offerSet.buy_count || 0;
+      let payableForThisOffer = 0;
+      for (let i = 0; i < Math.min(itemsToCharge, sortedProductsDesc.length); i++) {
+        payableForThisOffer += (parseFloat(sortedProductsDesc[i].product_price || '0') || 0);
+      }
+      
+      totalSavings += (totalOriginalPriceOfAllUnits - payableForThisOffer);
     });
-    return savings;
+    return totalSavings;
   };
 
   const handleApplyCoupon = (): void => {
-    const subtotal = calculateSubtotal();
+    const currentSubtotal = calculateSubtotal(); 
+
     const coupon = couponCode.toUpperCase();
     
     if (coupon === 'B1G1') {
       setAppliedCoupon({
         code: 'B1G1',
         description: 'Buy 1 Get 1 Free',
-        discount: subtotal * 0.5,
+        discount: currentSubtotal * 0.5, 
       });
     } else if (coupon === 'TANK') {
       setAppliedCoupon({
         code: 'TANK',
         description: '10% off on all jewelry',
-        discount: subtotal * 0.1,
+        discount: currentSubtotal * 0.1,
       });
     } else {
       setAppliedCoupon(null);
@@ -153,19 +154,10 @@ const ProductSummary: React.FC<ProductSummaryProps> = ({ normalItems, offerSets 
     setShowCoupons(false);
   };
 
-  // This handleRemoveOfferSet is for local UI update only, CartDrawer handles API call
-  const handleRemoveOfferSet = async (setId: string) => {
-    // This component does not directly remove from cart, it just displays summary.
-    // The actual removal logic is in CartDrawer.
-    console.warn("ProductSummary: handleRemoveOfferSet called, but actual removal should be done by CartDrawer's dispatch.");
-    // To update the display locally if needed, one might filter `offerSets` prop,
-    // but typically the parent `CartDrawer` would re-render.
-  };
-
   const subtotal = calculateSubtotal();
   const offerSavings = calculateOfferSavings();
   const couponDiscount = appliedCoupon ? appliedCoupon.discount : 0;
-  const total = subtotal - couponDiscount; // Assuming coupon applies after offer savings
+  const finalTotal = subtotal - offerSavings - couponDiscount; 
 
   if (loading) return <div className="py-4 text-center">Loading product details...</div>;
   if (error) return <div className="py-4 text-center text-red-500">{error}</div>;
@@ -183,7 +175,6 @@ const ProductSummary: React.FC<ProductSummaryProps> = ({ normalItems, offerSets 
             </button>
           </div>
           <div className="space-y-3">
-            {/* Coupon list goes here */}
           </div>
         </div>
       ) : (
@@ -221,12 +212,11 @@ const ProductSummary: React.FC<ProductSummaryProps> = ({ normalItems, offerSets 
                 </div>
               </div>
             ))}
-            {/* Render OfferCartItem for each structured offer set */}
             {offerSets.map((offerSet) => (
               <OfferCartItem
-                key={offerSet.id}
-                offerSet={offerSet} // Pass the structured offer set
-                onRemove={undefined} // ProductSummary does not allow removal directly
+                key={offerSet.id ?? `offer-${uuidv4()}`} // Use offerSet.id for key, fallback to uuidv4
+                offerSet={offerSet} 
+                onRemove={undefined} 
                 fromProductSummary={true}
               />
             ))}
@@ -251,7 +241,7 @@ const ProductSummary: React.FC<ProductSummaryProps> = ({ normalItems, offerSets 
               )}
               <div className="flex justify-between text-[16px] pt-2 border-t border-gray-200">
                 <span className="text-gray-500">Total</span>
-                <span className="font-semibold">₹{total.toFixed(2)}</span>
+                <span className="font-semibold">₹{finalTotal.toFixed(2)}</span>
               </div>
             </div>
           </div>

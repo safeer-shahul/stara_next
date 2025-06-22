@@ -12,6 +12,8 @@ import 'swiper/css/autoplay';
 import { isMobile } from 'react-device-detect';
 import WishlistButton from '@/components/WishlistButton';
 import CartDrawer from '@/components/CartDrawer';
+import { useCart, CartNormalItem } from '@/context/cartContext'; // FIX: Import useCart and CartNormalItem
+import { v4 as uuidv4 } from 'uuid'; // FIX: Import uuidv4 for temporary local IDs
 
 interface ProductImage {
   id: string;
@@ -27,11 +29,15 @@ interface Product {
   product_description: string;
   product_price: string;
   strike_price: string;
-  quantity: number;
+  quantity: number; // This is stock quantity from the API response
   product_status: boolean;
   created_at: string;
   updated_at: string;
   sub_category: string;
+  // It's good practice to align this with ProductItemDetails if possible
+  isInStock?: boolean; 
+  product_weight?: string;
+  product_box_weight?: string;
 }
 
 interface ProductSliderProps {
@@ -49,6 +55,9 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [isNavigating, setIsNavigating] = useState<string | null>(null);
   
+  // FIX: Access dispatchCart from useCart context
+  const { dispatchCart } = useCart();
+
   useEffect(() => {
     const handleResize = () => {
       setWindowWidth(window.innerWidth);
@@ -96,71 +105,44 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
     router.prefetch(`/shop/products/${productId}`);
   }, [router]);
 
-  // Updated handleAddToBag function with the same logic as ProductDetail page
+  // FIX: Updated handleAddToBag function to use cartContext dispatch
   const handleAddToBag = useCallback((e: React.MouseEvent, productId: string): void => {
     e.stopPropagation();
     
-    // Set the selected product ID to pass to CartDrawer
+    // Find the product details from the `products` prop
+    const productToAdd = products.find(p => p.id === productId);
+
+    if (!productToAdd) {
+      console.error(`Product with ID ${productId} not found in slider data.`);
+      return;
+    }
+
     setSelectedProductId(productId);
     
-    // Open the cart drawer
-    setIsCartOpen(true);
+    // FIX: Assign a new UUID to the `id` field for local identification.
+    const tempCartItemId = uuidv4(); 
+
+    // Dispatch ADD_NORMAL_ITEM action to update cart context and local storage
+    dispatchCart({
+      type: 'ADD_NORMAL_ITEM',
+      payload: {
+        id: tempCartItemId, // Use the temporary UUID here
+        product_id: productToAdd.id,
+        quantity: 1, // Always add 1 at a time from this button
+        type: 'normal',
+        isSynced: false, // Mark as unsynced
+        product_name: productToAdd.product_name,
+        product_price: productToAdd.product_price,
+        strike_price: productToAdd.strike_price,
+        images: productToAdd.images,
+        // Ensure isInStock and stock_quantity are populated from fetched product data
+        isInStock: productToAdd.product_status && productToAdd.quantity > 0, 
+        stock_quantity: productToAdd.quantity, 
+      } as CartNormalItem, 
+    });
     
-    // For backward compatibility, also update localStorage
-    // Get current cart items
-    const storedCartItems = JSON.parse(localStorage.getItem('cartItems') || '[]');
-    
-    // Check if we're dealing with the old format (array of strings)
-    if (storedCartItems.length > 0 && typeof storedCartItems[0] === 'string') {
-      // Convert old format items, removing hyphens
-      const formattedCartIds = storedCartItems.map((id: any) => id.replace(/-/g, ''));
-      
-      // Add new product ID
-      const productIdWithoutHyphens = productId.replace(/-/g, '');
-      const updatedCart = [...formattedCartIds, productIdWithoutHyphens];
-      
-      // Count occurrences and convert to new format
-      const productCounts: any = {};
-      updatedCart.forEach(id => {
-        productCounts[id] = (productCounts[id] || 0) + 1;
-      });
-      
-      // Convert to new format with quantities
-      const newFormatCart = Object.keys(productCounts).map(id => ({
-        id,
-        quantity: productCounts[id]
-      }));
-      
-      localStorage.setItem('cartItems', JSON.stringify(newFormatCart));
-    } else {
-      // Already using new format
-      const productIdWithoutHyphens = productId.replace(/-/g, '');
-      
-      // Find if product already exists in cart
-      const existingItemIndex = storedCartItems.findIndex(
-        (item: any) => item.id === productIdWithoutHyphens
-      );
-      
-      let updatedCartItems;
-      
-      if (existingItemIndex >= 0) {
-        // Product already exists, increase quantity
-        updatedCartItems = [...storedCartItems];
-        updatedCartItems[existingItemIndex] = {
-          ...updatedCartItems[existingItemIndex],
-          quantity: updatedCartItems[existingItemIndex].quantity + 1
-        };
-      } else {
-        // Product doesn't exist in cart, add it with quantity 1
-        updatedCartItems = [
-          ...storedCartItems, 
-          { id: productIdWithoutHyphens, quantity: 1 }
-        ];
-      }
-      
-      localStorage.setItem('cartItems', JSON.stringify(updatedCartItems));
-    }
-  }, []);
+    setIsCartOpen(true); // Open the cart drawer
+  }, [products, dispatchCart]); // Depend on products (to find productToAdd) and dispatchCart
 
   // Handle cart drawer close
   const handleCartClose = useCallback(() => {
@@ -396,7 +378,7 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
       <CartDrawer 
         isOpen={isCartOpen} 
         onClose={handleCartClose} 
-        productId={selectedProductId} 
+        // FIX: Removed productId prop as CartDrawer should rely on global cartItems context
       />
     </div>
   );
