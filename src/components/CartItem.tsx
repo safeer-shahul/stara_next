@@ -92,18 +92,26 @@ const CartItem = ({ product, onRemove, onQuantityChange, fromProductSummary = fa
           )}
         </div>
 
-        {isOutOfStockOverall ? (
-          <div className="flex items-center mt-2 text-red-500 text-xs">
-            <AlertCircle size={14} className="mr-1" />
-            Out of Stock
-          </div>
-        ) : (
-          <div className="flex items-center mt-2 text-xs text-gray-600">
-            {/* --- MODIFIED LINE HERE --- */}
-            {/* Display the maxAllowedQuantity as the "Available Stock" to the user */}
-            Available Stock: {currentMaxLimit}
-          </div>
-        )}
+    {!fromProductSummary ? (
+      isOutOfStockOverall ? (
+        <div className="flex items-center mt-2 text-red-500 text-xs">
+          <AlertCircle size={14} className="mr-1" />
+          Out of Stock
+        </div>
+      ) : (
+        <div className="flex items-center mt-2 text-xs text-gray-600">
+          {/* Display the actual available quantity of the product */}
+          Available Stock: {currentMaxLimit}
+        </div>
+      )
+    ) : (
+      <div className="flex items-center mt-2 text-xs text-gray-600">
+        {/* Display the actual quantity of the product */}
+        Quantity: {product.quantity}
+      </div>
+    )}
+
+
 
         {!fromProductSummary && ( // Conditionally render quantity controls
           <div className="flex items-center mt-2">
