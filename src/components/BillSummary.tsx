@@ -1,10 +1,8 @@
-// src/components/BillSummary.tsx
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
 import apiService from '@/utils/api/apiService';
-// Import the specific cart item types from your context
-import { CartNormalItem, CartOfferItem, ProductItemDetails } from '@/context/cartContext'; 
+import { CartNormalItem, CartOfferItem, ProductItemDetails } from '@/context/cartContext';
 
 // Define the expected structure from the getProductAmountDetailed API response
 interface DetailedProductFromAPI {
@@ -21,46 +19,50 @@ interface DetailedProductFromAPI {
   }>;
 }
 
+// Keep DetailedOfferSetFromAPI if your API might still return it in response,
+// even if we don't send offer_sets in the request payload.
 interface DetailedOfferSetFromAPI {
-  id: string; // The cart item ID for the offer set
-  offer: string; // The offer UUID
-  offer_products: Array<{ // This is a flattened list of products within the offer from API after calculation
-    id: string; // Product UUID
+  id: string;
+  offer: string;
+  offer_products: Array<{
+    id: string;
     product_name: string;
     product_price: string;
-    final_price: number; // Final price of this specific product in the offer
+    final_price: number;
     images: { product_image: string }[];
   }>;
   buy_count: number;
   get_count: number;
 }
 
+
 interface APIResponse {
-  items: DetailedProductFromAPI[]; // Normal products
-  offer_sets?: DetailedOfferSetFromAPI[]; // Offer sets
+  items: DetailedProductFromAPI[];
+  offer_sets?: DetailedOfferSetFromAPI[]; // Backend might still return this for cart mode even if not sent
   shipping_cost: number;
-  // If your API returns total discounts, final total etc., include them here
-  // Otherwise, these values are calculated client-side based on the items and shipping_cost.
 }
 
 interface BillSummaryProps {
-  normalItems: CartNormalItem[]; // FIX: Now receives CartNormalItem[]
-  offerSets: CartOfferItem[]; // FIX: Now receives CartOfferItem[] (already structured and enriched)
-  couponCode?: string;
+  // `normalItems` are passed for display in both modes, and for payload in 'buy_now' mode.
+  normalItems: CartNormalItem[];
+  // `offerSets` are passed for display and client-side savings calculation ONLY in 'cart' mode.
+  offerSets: CartOfferItem[];
+  
   destinationPincode: string;
   onPlaceOrder: (paymentMethod: 'Cod' | 'Razorpay', razorpayOrderId: string, staraOrderID: any) => void;
   onError: (errorMessage: string) => void;
   addressID: string | null;
+  checkoutMode: 'cart' | 'buy_now'; // To differentiate payload
 }
 
 const BillSummary: React.FC<BillSummaryProps> = ({
-  normalItems,
-  offerSets = [],
-  couponCode,
+  normalItems, // Used for displaying and for 'buy_now' payload
+  offerSets = [], // Used for displaying (only in 'cart' mode for totals calculation)
   destinationPincode,
   onPlaceOrder,
   onError,
   addressID,
+  checkoutMode,
 }) => {
   const [loading, setLoading] = useState(true);
   const [responseData, setResponseData] = useState<APIResponse | null>(null);
@@ -70,6 +72,7 @@ const BillSummary: React.FC<BillSummaryProps> = ({
   const isMounted = useRef(true);
   const fetchInProgress = useRef(false);
 
+  // Helper to safely update state only if component is still mounted
   const safeSetState = (setter: any, value: any) => {
     if (isMounted.current) {
       setter(value);
@@ -83,46 +86,67 @@ const BillSummary: React.FC<BillSummaryProps> = ({
     };
   }, []);
 
-  // Helper to format structured CartOfferItem into backend's expected flat format
-  const formatOfferSetsForBackend = (sets: CartOfferItem[]) => {
-    return sets.map((set) => {
-      const flattenedProducts: { product: string; quantity: number }[] = [];
-      // Iterate over the consolidated offer_items to reconstruct the backend's expected flat list
-      set.offer_items.forEach(p => {
-        flattenedProducts.push({ product: p.id.replace(/-/g, ''), quantity: p.quantity || 1 });
-      });
-
-      return {
-        id: set?.id?.replace(/-/g, ''), // Cart item ID for the offer set
-        offer: set.offer.replace(/-/g, ''), // Original offer ID
-        offer_products: flattenedProducts, // Array of { product_id, quantity }
-        buy_count: set.buy_count, // Still pass buy_count from frontend for backend validation/logic
-        get_count: set.get_count, // Still pass get_count from frontend for backend validation/logic
-      };
+  // Helper to "explode" quantities within an offer set into individual product units for client-side calculation.
+  // This is used ONLY for calculating client-side totals display for offer savings.
+  const _getIndividualOfferProducts = (offerSet: CartOfferItem): ProductItemDetails[] => {
+    const allIndividualProducts: ProductItemDetails[] = [];
+    offerSet.offer_items.forEach(product => {
+      for (let i = 0; i < product.quantity; i++) {
+        allIndividualProducts.push({ ...product, quantity: 1 });
+      }
     });
+    return allIndividualProducts;
   };
+
 
   const fetchBillDetails = async () => {
     if (fetchInProgress.current) return;
+    
+    // Determine if we actually have items to process for 'buy_now' scenario,
+    // or if the cart is empty for 'cart' scenario.
+    if (checkoutMode === 'buy_now' && normalItems.length === 0) {
+      safeSetState(setLoading, false);
+      safeSetState(setError, 'No product selected for direct buy.');
+      onError('No product selected for direct buy.');
+      fetchInProgress.current = false; // Reset flag on early exit
+      return;
+    }
+    if (checkoutMode === 'cart' && normalItems.length === 0 && offerSets.length === 0) {
+      safeSetState(setLoading, false);
+      safeSetState(setResponseData, null); // Clear previous data if cart becomes empty
+      safeSetState(setError, 'Your cart is empty.');
+      onError('Your cart is empty.');
+      fetchInProgress.current = false; // Reset flag on early exit
+      return;
+    }
+
 
     fetchInProgress.current = true;
     safeSetState(setLoading, true);
     safeSetState(setError, null);
-
+    
     try {
-      // FIX: Format offer sets from the new structured format to backend's expected format
-      const formattedOfferSets = formatOfferSetsForBackend(offerSets);
-      console.log('BillSummary: Formatted offer sets for API:', formattedOfferSets);
-
-      const response = await apiService.getProductAmountDetailed({
-        coupon_code_id: couponCode,
-        items: normalItems.map((item) => ({
-          product_id: item.product_id.replace(/-/g, ''),
-          quantity: item.quantity,
-        })),
-        offer_sets: formattedOfferSets, // Pass the flattened format
+      const payload: any = {
         destination_pincode: destinationPincode,
-      });
+        is_cart: checkoutMode === 'cart' ? 'yes' : 'no', // IMPORTANT: Pass the mode
+      };
+
+      if (checkoutMode === 'buy_now') {
+        // For 'buy_now', payload *must* contain the items
+        // `normalItems` here contains the single product passed from ProductDetailPage
+        payload.items = normalItems.map((item) => ({
+          product_id: item.product_id.replace(/-/g, ''),
+          quantity: item.quantity, // Should be 1 for a direct buy_now item
+        }));
+        // IMPORTANT: As per your last instruction, do not send offer_sets in buy_now mode.
+        // It's not explicitly omitted, but also not added.
+      }
+      // If checkoutMode is 'cart', items and offer_sets are *omitted* from payload
+      // as backend is expected to retrieve them from the user's cart on the server.
+
+      console.log('BillSummary: getProductAmountDetailed payload:', payload);
+
+      const response = await apiService.getProductAmountDetailed(payload);
 
       if (!isMounted.current) return;
 
@@ -150,16 +174,22 @@ const BillSummary: React.FC<BillSummaryProps> = ({
   };
 
   useEffect(() => {
-    // Only fetch if cart items are present or if a coupon code is applied (for re-calculation)
-    if (normalItems.length > 0 || offerSets.length > 0 || couponCode) {
+    // Trigger fetch if normalItems or offerSets change, or mode changes, or pincode changes
+    // Condition to trigger:
+    // 1. In 'buy_now' mode, if normalItems (the single product) is present.
+    // 2. In 'cart' mode, if there are any normalItems OR offerSets (as these indicate a non-empty cart).
+    const shouldFetch = (checkoutMode === 'buy_now' && normalItems.length > 0) ||
+                        (checkoutMode === 'cart' && (normalItems.length > 0 || offerSets.length > 0));
+
+    if (shouldFetch) {
       fetchBillDetails();
     } else {
-        // If cart is empty, set loading to false and clear any previous data/errors
-        safeSetState(setLoading, false);
-        safeSetState(setResponseData, null);
-        safeSetState(setError, null);
+      // If no items to process (e.g., empty cart), explicitly set states to null/false
+      safeSetState(setLoading, false);
+      safeSetState(setResponseData, null);
+      safeSetState(setError, null);
     }
-  }, [normalItems, offerSets, couponCode, destinationPincode]); // Depend on normalItems and offerSets
+  }, [normalItems, offerSets, destinationPincode, checkoutMode]);
 
   const handlePlaceOrder = async () => {
     if (!responseData || !addressID) return;
@@ -168,18 +198,27 @@ const BillSummary: React.FC<BillSummaryProps> = ({
     safeSetState(setError, null);
 
     try {
-      // FIX: Format offer sets from the new structured format to backend's expected format
-      const formattedOfferSets = formatOfferSetsForBackend(offerSets);
-
-      const response = await apiService.createProductsOrder({
-        items: normalItems.map((item) => ({
-          product_id: item.product_id.replace(/-/g, ''),
-          quantity: item.quantity,
-        })),
-        offer_sets: formattedOfferSets, // Pass the flattened format
+      const payload: any = {
         payment_mode: paymentMethod,
         address: addressID.replace(/-/g, ''),
-      });
+        is_cart: checkoutMode === 'cart' ? 'yes' : 'no', // IMPORTANT: Pass the mode
+      };
+
+      if (checkoutMode === 'buy_now') {
+        // For 'buy_now', payload *must* contain the items
+        payload.items = normalItems.map((item) => ({
+          product_id: item.product_id.replace(/-/g, ''),
+          quantity: item.quantity, // Should be 1 for a direct buy_now item
+        }));
+        // IMPORTANT: As per your last instruction, do not send offer_sets in buy_now mode.
+      }
+      // If checkoutMode is 'cart', items and offer_sets are *omitted* from payload
+      // as backend is expected to retrieve them from the user's cart on the server.
+
+
+      console.log('BillSummary: Order creation payload:', payload);
+
+      const response = await apiService.createProductsOrder(payload);
 
       console.log('BillSummary: Order creation response:', response);
 
@@ -198,71 +237,65 @@ const BillSummary: React.FC<BillSummaryProps> = ({
     }
   };
 
-  // Helper to "explode" quantities within an offer set into individual product units for calculation (client-side)
-  const _getIndividualOfferProducts = (offerSet: CartOfferItem): ProductItemDetails[] => {
-    const allIndividualProducts: ProductItemDetails[] = [];
-    offerSet.offer_items.forEach(product => {
-      for (let i = 0; i < product.quantity; i++) {
-        allIndividualProducts.push({ ...product, quantity: 1 }); // Create a new object for each individual unit
-      }
-    });
-    return allIndividualProducts;
-  };
-
+  // Calculate totals from the response data for display
   const calculateTotals = () => {
     if (!responseData) return null;
 
-    // Calculate sum of original prices for all items (normal and offers)
-    let totalOriginalPrice = 0;
-    responseData.items.forEach(item => {
-        totalOriginalPrice += parseFloat(item.product_price) * item.final_quantity;
-    });
-
-    // Calculate savings from offer sets based on the refined logic
-    let offerSavings = 0;
-    offerSets.forEach(offerSet => {
-        const allIndividualOfferProducts = _getIndividualOfferProducts(offerSet);
-
-        // Sort products by price in descending order to identify paid items
-        const sortedProductsDesc = [...allIndividualOfferProducts].sort(
-            (a, b) => parseFloat(b.product_price) - parseFloat(a.product_price)
-        );
-        const itemsToCharge = Math.min(offerSet.buy_count || 0, sortedProductsDesc.length);
-        let payableForThisOffer = 0;
-        for (let i = 0; i < itemsToCharge; i++) {
-            payableForThisOffer += parseFloat(sortedProductsDesc[i].product_price);
-        }
-
-        const totalOriginalPriceOfAllUnitsInOffer = allIndividualOfferProducts.reduce((sum, p) => sum + parseFloat(p.product_price), 0);
-        offerSavings += (totalOriginalPriceOfAllUnitsInOffer - payableForThisOffer);
-
-        // Add original price of all items in this offer set to totalOriginalPrice
-        allIndividualOfferProducts.forEach(p => {
-            totalOriginalPrice += parseFloat(p.product_price) * (p.quantity || 1); // Add original price * quantity
-        });
-    });
-
-    // Recalculate total discount (normal item discounts + offer savings)
+    let subtotal = 0;
     let totalDiscount = 0;
-    responseData.items.forEach(item => {
-        totalDiscount += (parseFloat(item.product_price) * item.final_quantity) - item.final_price;
-    });
-    totalDiscount += offerSavings; // Add offer savings from our `calculateOfferSavings`
+    let offerSavings = 0;
+
+    // Sum up the final_price from items returned by the API
+    // This `items` array from `responseData` represents what the backend calculated as chargeable.
+    if (responseData.items) {
+      subtotal = responseData.items.reduce((sum, item) => sum + item.final_price, 0);
+
+      // Also calculate total original price and product-level discounts from backend response
+      const totalOriginalPriceOfIndividualItems = responseData.items.reduce((sum, item) => {
+        // Use strike_price if available and higher, otherwise product_price
+        const originalIndividualPrice = parseFloat(item.strike_price) > parseFloat(item.product_price) ?
+                                        parseFloat(item.strike_price) : parseFloat(item.product_price);
+        return sum + (originalIndividualPrice * item.final_quantity);
+      }, 0);
+      
+      // Discount is the difference between original highest price and final charged price
+      totalDiscount = Math.max(0, totalOriginalPriceOfIndividualItems - subtotal);
+    }
+
+
+    // If it's a cart-based checkout, display client-side calculated offer savings separately
+    // This is for visual display, not affecting the backend's final_price from responseData.
+    if (checkoutMode === 'cart') {
+        offerSets.forEach(offerSet => {
+            const allIndividualOfferProducts = _getIndividualOfferProducts(offerSet);
+
+            const sortedProductsDesc = [...allIndividualOfferProducts].sort(
+                (a, b) => parseFloat(b.product_price) - parseFloat(a.product_price)
+            );
+            const itemsToCharge = Math.min(offerSet.buy_count || 0, sortedProductsDesc.length);
+            let payableForThisOffer = 0;
+            for (let i = 0; i < Math.min(itemsToCharge, sortedProductsDesc.length); i++) {
+                payableForThisOffer += parseFloat(sortedProductsDesc[i].product_price);
+            }
+
+            const totalOriginalPriceOfAllUnitsInOffer = allIndividualOfferProducts.reduce((sum, p) => sum + parseFloat(p.product_price), 0);
+            offerSavings += (totalOriginalPriceOfAllUnitsInOffer - payableForThisOffer);
+        });
+    }
 
     const shippingCost = responseData.shipping_cost;
-    const tax = 0; // Assuming no tax returned from backend yet or always zero
+    const tax = 0; // Assuming no tax provided by backend or always zero
 
-    // Final Total = (Sum of original prices) - (Total discounts from normal items + total offer savings) + Shipping + Tax
-    const finalTotal = totalOriginalPrice - totalDiscount + shippingCost + tax;
-
+    // The 'total' should reflect the 'subtotal' from backend's calculated items, plus shipping and tax.
+    const finalCalculatedTotal = subtotal + shippingCost + tax;
 
     return {
-      subtotal: totalOriginalPrice, // This is now total original price before any discounts
-      discount: totalDiscount,     // Total discount from product markdowns and offers
-      offerSavings: offerSavings,  // Separate display for offer savings
+      subtotal: subtotal, // This is already the final calculated price of products by backend
+      discount: totalDiscount, // Total product-level discount from backend response
+      offerSavings: offerSavings, // Client-side display of offer savings (only for 'cart' mode)
       shippingCost,
       tax,
-      total: finalTotal,
+      total: finalCalculatedTotal
     };
   };
 
@@ -295,22 +328,28 @@ const BillSummary: React.FC<BillSummaryProps> = ({
 
             <div className="space-y-2">
               <div className="flex justify-between text-[13px]">
-                <span className="text-gray-500">Subtotal</span>
-                <span className="font-semibold">₹{totals.subtotal.toFixed(2)}</span>
+                <span className='text-gray-500'>Product Subtotal</span> {/* Renamed for clarity */}
+                <span className='font-semibold'>₹{totals.subtotal.toFixed(2)}</span>
               </div>
 
-              {/* Display total discount including offer savings, now accurately calculated */}
-              {totals.discount > 0 && ( 
+              {totals.discount > 0 && (
                 <div className="flex justify-between text-green-600 text-[13px]">
-                  <span>Discount{couponCode ? ` (${couponCode})` : ''}</span>
-                  <span>-₹{(totals.discount).toFixed(2)}</span>
+                  <span>Product Discounts</span>
+                  <span>-₹{totals.discount.toFixed(2)}</span>
                 </div>
               )}
-
+              
+              {checkoutMode === 'cart' && totals.offerSavings > 0 && ( // Only show offer savings if from cart
+                <div className="flex justify-between text-green-600 text-[13px]">
+                  <span>Offer Savings</span>
+                  <span>-₹{totals.offerSavings.toFixed(2)}</span>
+                </div>
+              )}
+              
               <div className="flex justify-between text-[13px]">
-                <span className="text-gray-500">Shipping</span>
+                <span className='text-gray-500'>Shipping</span>
                 {totals.shippingCost > 0 ? (
-                  <span className="font-semibold">₹{totals.shippingCost.toFixed(2)}</span>
+                  <span className='font-semibold'>₹{totals.shippingCost.toFixed(2)}</span>
                 ) : (
                   <span className="text-green-600 font-semibold">Free</span>
                 )}
@@ -318,8 +357,8 @@ const BillSummary: React.FC<BillSummaryProps> = ({
 
               {totals.tax > 0 && (
                 <div className="flex justify-between text-[13px]">
-                  <span className="text-gray-500">Estimated Tax</span>
-                  <span className="font-semibold">₹{totals.tax.toFixed(2)}</span>
+                  <span className='text-gray-500'>Estimated Tax</span>
+                  <span className="text-green-600 font-semibold">₹{totals.tax.toFixed(2)}</span>
                 </div>
               )}
 
@@ -340,11 +379,9 @@ const BillSummary: React.FC<BillSummaryProps> = ({
                 }`}
                 onClick={() => setPaymentMethod('Razorpay')}
               >
-                <div
-                  className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                    paymentMethod === 'Razorpay' ? 'border-[#175e7a]' : 'border-gray-300'
-                  }`}
-                >
+                <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${
+                  paymentMethod === 'Razorpay' ? 'border-[#175e7a]' : 'border-gray-300'
+                }`}>
                   {paymentMethod === 'Razorpay' && (
                     <div className="w-3 h-3 rounded-full bg-[#175e7a]"></div>
                   )}
@@ -361,11 +398,9 @@ const BillSummary: React.FC<BillSummaryProps> = ({
                 }`}
                 onClick={() => setPaymentMethod('Cod')}
               >
-                <div
-                  className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                    paymentMethod === 'Cod' ? 'border-[#175e7a]' : 'border-gray-300'
-                  }`}
-                >
+                <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${
+                  paymentMethod === 'Cod' ? 'border-[#175e7a]' : 'border-gray-300'
+                }`}>
                   {paymentMethod === 'Cod' && (
                     <div className="w-3 h-3 rounded-full bg-[#175e7a]"></div>
                   )}
@@ -384,11 +419,7 @@ const BillSummary: React.FC<BillSummaryProps> = ({
               onClick={handlePlaceOrder}
               disabled={processingOrder}
             >
-              {processingOrder
-                ? 'Processing...'
-                : paymentMethod === 'Cod'
-                ? 'Place Order (COD)'
-                : 'Proceed to Payment'}
+              {processingOrder ? 'Processing...' : paymentMethod === 'Cod' ? 'Place Order (COD)' : 'Proceed to Payment'}
             </button>
             <p className="text-center text-[11px] text-gray-500 mt-2">
               By placing your order, you agree to our terms and conditions.

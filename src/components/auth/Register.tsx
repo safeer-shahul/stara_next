@@ -1,8 +1,8 @@
-// /src/components/auth/Register.tsx
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useCart } from '@/context/cartContext'; // Import useCart
 
 interface RegisterProps {
   onClose: () => void;
@@ -11,6 +11,8 @@ interface RegisterProps {
 
 const Register = ({ onClose, switchToLogin }: RegisterProps) => {
   const router = useRouter();
+  const { dispatchCart } = useCart(); // Access dispatchCart
+
   const [formData, setFormData] = useState({
     email: '',
     mobile: '',
@@ -60,14 +62,23 @@ const Register = ({ onClose, switchToLogin }: RegisterProps) => {
         throw new Error(data.message || 'Registration failed');
       }
 
-      // Store the token if auto-login is enabled
+      // Store the token if auto-login is enabled and token is returned
       if (data.accessToken) {
-        localStorage.setItem('accessTokenUser', data.accessToken);
+        localStorage.setItem('accessToken', data.accessToken);
+        if (data.refreshToken) {
+          localStorage.setItem('refreshToken', data.refreshToken);
+        }
       }
       
-      // Close the modal and redirect or refresh
+      // Trigger cart sync immediately after successful registration
+      console.log('🔄 Registration successful, triggering cart sync...');
+      dispatchCart({ type: 'TRIGGER_SYNC' }); // Trigger sync after user is authenticated
+
+      // Close the modal
       onClose();
-      router.refresh();
+      // No need to router.refresh() if CartProvider's sync handles everything.
+      // router.refresh(); // Remove this line if you want to rely purely on context updates
+
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred during registration');
     } finally {
@@ -81,7 +92,10 @@ const Register = ({ onClose, switchToLogin }: RegisterProps) => {
     setIsLoading(true);
     try {
       // Redirect to Google OAuth or handle it via your preferred method
-      window.location.href = '/api/auth/google';
+      // After successful Google signup and token storage:
+      // dispatchCart({ type: 'TRIGGER_SYNC' });
+      // onClose();
+      window.location.href = '/api/auth/google'; // Assuming this endpoint handles auth and redirects back
     } catch (err) {
       setError('Failed to initialize Google signup');
       setIsLoading(false);

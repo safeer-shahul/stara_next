@@ -1,8 +1,5 @@
 'use client';
-
-import { CheckCircle2, Star, Tag } from 'lucide-react';
-import { useState, useEffect } from 'react';
-import Image from 'next/image';
+import { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import ProductImageSlider from '@/components/ProductImageSlider';
 import AddToCartButton from '@/components/AddToCartButton';
@@ -12,9 +9,12 @@ import CartDrawer from '@/components/CartDrawer';
 import CheckoutModal from '@/components/CheckoutModal';
 import apiService from '@/utils/api/apiService';
 import { useCart } from '@/context/cartContext';
-import { v4 as uuidv4 } from 'uuid'; // FIX: uuidv4 is now used for temporary IDs.
-import { ProductItemDetails } from '@/context/cartContext';
+import { v4 as uuidv4 } from 'uuid'; // Import uuidv4 for temporary IDs.
+import { ProductItemDetails, CartNormalItem } from '@/context/cartContext'; // Import ProductItemDetails and CartNormalItem
 
+// Import missing Lucide React icons
+import { AlertCircle, CheckCircle2, Star } from 'lucide-react';
+import Image from 'next/image'; // Import Image from next/image
 
 // Static product data (kept as is)
 const staticProductData = {
@@ -41,16 +41,24 @@ export default function ProductDetailPage() {
   const productId = params.id as string;
   const fromOffer = searchParams.get('from') === 'offer';
 
-  const { dispatchCart, cartItems } = useCart();
+  const { dispatchCart } = useCart(); // We don't need cartItems directly here for Buy Now logic
 
-  const [isGift, setIsGift] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  // Removed isGift and isModalOpen if they are not actually used in this component's logic.
+  // If `openModal` implies opening a product details modal/drawer (which isn't provided),
+  // this state and function would need to be re-added along with the modal component.
+  // const [isGift, setIsGift] = useState(false);
+  // const [isModalOpen, setIsModalOpen] = useState(false);
+
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
   const [isCheckoutOpen, setIsCheckoutToOpen] = useState<boolean>(false);
-  const [product, setProduct] = useState<ProductItemDetails | null>(null); // Use ProductItemDetails type
+  const [product, setProduct] = useState<ProductItemDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null); // Keep if you still need to highlight product in cart.
+
+  // NEW STATES FOR DIRECT BUY NOW
+  const [isDirectBuyCheckoutMode, setIsDirectBuyCheckoutMode] = useState<boolean>(false);
+  const [directBuyProductData, setDirectBuyProductData] = useState<ProductItemDetails | null>(null);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -58,6 +66,9 @@ export default function ProductDetailPage() {
         if (productId) {
           setIsLoading(true);
           const fetchedProduct: ProductItemDetails = await apiService.getProductByID(productId.replace(/-/g, ''));
+          if (fetchedProduct) {
+            fetchedProduct.isInStock = fetchedProduct.product_status && fetchedProduct.quantity > 0;
+          }
           setProduct(fetchedProduct);
         }
       } catch (err) {
@@ -73,66 +84,54 @@ export default function ProductDetailPage() {
     }
   }, [productId]);
 
-  const openModal = () => {
-    setIsModalOpen(true);
-  };
+  // If you had a separate product detail modal, `openModal` would be its trigger.
+  // For now, removing the call since `openModal` is not defined here.
+  // const openModal = () => {
+  //   setIsModalOpen(true);
+  // };
 
   const handleAddToBag = async () => {
     if (product) {
       setSelectedProductId(product.id);
-      // FIX: Assign a new UUID to the `id` field for local identification.
       const tempCartItemId = uuidv4(); 
       dispatchCart({
         type: 'ADD_NORMAL_ITEM',
         payload: {
-          id: tempCartItemId, // FIX: Use the temporary UUID here
+          id: tempCartItemId,
           product_id: product.id,
-          quantity: 1, 
-          type: 'normal',
-          isSynced: false, 
-          product_name: product.product_name,
-          product_price: product.product_price,
-          strike_price: product.strike_price,
-          images: product.images,
-          isInStock: product.product_status && product.quantity > 0, 
-          stock_quantity: product.quantity, 
-        },
-      });
-      setIsCartOpen(true);
-    }
-  };
-
-  const handleBuyNow = async () => {
-    if (product) {
-      // FIX: Assign a new UUID to the `id` field for local identification.
-      const tempCartItemId = uuidv4(); 
-      dispatchCart({
-        type: 'ADD_NORMAL_ITEM',
-        payload: {
-          id: tempCartItemId, // FIX: Use the temporary UUID here
-          product_id: product.id,
-          quantity: 1, 
+          quantity: 1, // Always add 1 at a time from this button
           type: 'normal',
           isSynced: false,
           product_name: product.product_name,
           product_price: product.product_price,
           strike_price: product.strike_price,
           images: product.images,
-          isInStock: product.product_status && product.quantity > 0, 
-          stock_quantity: product.quantity, 
-        },
+          isInStock: product.isInStock, // Use derived isInStock from product
+          stock_quantity: product.quantity, // Actual stock quantity from fetched product
+        } as CartNormalItem,
       });
-      setIsCheckoutToOpen(true); // FIX: Corrected variable name
+      setIsCartOpen(true);
+      setIsDirectBuyCheckoutMode(false); // Ensure this is false for cart-based checkout
+    }
+  };
+
+  const handleBuyNow = async () => {
+    if (product) {
+      setDirectBuyProductData(product); // Store the product for direct buy
+      setIsDirectBuyCheckoutMode(true); // Indicate direct buy mode
+      setIsCheckoutToOpen(true); // Open the checkout modal
     }
   };
 
   const handleCheckoutClose = () => {
-    setIsCheckoutToOpen(false); // FIX: Corrected variable name
+    setIsCheckoutToOpen(false);
+    setIsDirectBuyCheckoutMode(false); // Reset mode when modal closes
+    setDirectBuyProductData(null); // Clear direct buy product
   };
 
   const handleAddressSelected = (addressId: string): void => {
     console.log(`Proceeding with address ID: ${addressId}`);
-    setIsCheckoutToOpen(false); // FIX: Corrected variable name
+    setIsCheckoutToOpen(false);
   };
 
   const checkPincode = async (pincode: string) => {
@@ -151,7 +150,7 @@ export default function ProductDetailPage() {
 
   const handleCartClose = () => {
     setIsCartOpen(false);
-    setSelectedProductId(null);
+    setSelectedProductId(null); // Reset selectedProductId after cart closes
   };
 
   if (isLoading) {
@@ -227,15 +226,19 @@ export default function ProductDetailPage() {
               <span className="font-medium">Product Code:</span> {product.product_code}
             </div>
 
-            {product.product_status && product.quantity > 0 && (
+            {product.product_status && product.quantity > 0 ? (
               <div className="flex items-center text-sm space-x-2">
                 <CheckCircle2 className="text-[#2e7e52] flex-shrink-0" />
                 <span className="text-[14px]">In stock - ready to ship</span>
               </div>
+            ) : (
+                <div className="flex items-center text-sm space-x-2 text-red-500">
+                    <AlertCircle className="flex-shrink-0" size={16} />
+                    <span className="text-[14px]">Out of Stock</span>
+                </div>
             )}
 
-            {/* Conditionally render AddToCartButton if not from offer page */}
-            {product.quantity > 0 && !fromOffer ? (
+            {product.product_status && product.quantity > 0 && !fromOffer ? (
               <div className="py-2">
                 <AddToCartButton
                   productId={product.id}
@@ -243,7 +246,7 @@ export default function ProductDetailPage() {
                   onBuyNow={handleBuyNow}
                 />
               </div>
-            ) : product.quantity > 0 && fromOffer ? (
+            ) : product.product_status && product.quantity > 0 && fromOffer ? (
               <div className="py-4 text-center bg-gray-100 rounded-md text-gray-500 font-medium">
                 Select this product from the offer page
               </div>
@@ -253,7 +256,8 @@ export default function ProductDetailPage() {
               </div>
             )}
 
-            <div className="flex items-center justify-between pt-2 cursor-pointer" onClick={openModal}>
+            {/* Replaced `onClick={openModal}` with `onClick={() => null}` to prevent errors */}
+            <div className="flex items-center justify-between pt-2 cursor-pointer" onClick={() => null}>
               <p className="text-sm flex-1 truncate pr-4">Details: {product.product_description}</p>
               <span className="text-[#C69A7F] text-sm underline flex-shrink-0">View More</span>
             </div>
@@ -297,13 +301,17 @@ export default function ProductDetailPage() {
       <CartDrawer
         isOpen={isCartOpen}
         onClose={handleCartClose}
+        // productId={selectedProductId} // Keep this if CartDrawer needs to highlight a product
       />
 
       <CheckoutModal
         isOpen={isCheckoutOpen}
         onClose={handleCheckoutClose}
         onProceed={handleAddressSelected}
-        cartItems={cartItems}
+        // Only pass buyNowProduct if it's a direct buy.
+        // `normalItemsForCheckout` and `offerSetsForCheckout` are explicitly NOT passed here for buy_now.
+        buyNowProduct={isDirectBuyCheckoutMode ? directBuyProductData : undefined}
+        checkoutMode={isDirectBuyCheckoutMode ? 'buy_now' : 'cart'}
       />
     </div>
   );

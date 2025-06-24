@@ -5,8 +5,7 @@ import { X, ShoppingCart } from 'lucide-react';
 import CartItem from './CartItem';
 import OfferCartItem from './OfferCartItem';
 import CheckoutModal from './CheckoutModal';
-// Import getTotalProductQuantitiesInCart from useCart
-import { useCart, CartItemType, CartNormalItem, CartOfferItem, ProductItemDetails } from '@/context/cartContext';
+import { useCart, CartItemType, CartNormalItem, CartOfferItem } from '@/context/cartContext';
 import { cartService } from '@/utils/api/cartService';
 import apiService from '@/utils/api/apiService';
 import { cartUtils } from '@/utils/cartUtils';
@@ -18,22 +17,23 @@ interface CartDrawerProps {
 }
 
 const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
-  // Destructure getTotalProductQuantitiesInCart from useCart
   const { cartItems, dispatchCart, loading: contextLoading, getTotalProductQuantitiesInCart } = useCart();
-  const [localLoading, setLocalLoading] = useState<boolean>(false);
+  // `localLoading` state is not strictly needed here as `contextLoading` from `useCart` covers it.
+  // const [localLoading, setLocalLoading] = useState<boolean>(false);
   const [showCheckoutModal, setShowCheckoutModal] = useState<boolean>(false);
 
-  const getAndSetCartItems = useCallback(async () => {
-    setLocalLoading(true);
-    try {
-      const items = await cartService.fetchCartFromBackend();
-      dispatchCart({ type: 'SET_CART_ITEMS', payload: items });
-    } catch (error) {
-      console.error('CartDrawer: Error fetching/enriching cart:', error);
-    } finally {
-      setLocalLoading(false);
-    }
-  }, [dispatchCart]);
+  // `getAndSetCartItems` is also no longer needed as CartProvider's internal sync handles fetching.
+  // const getAndSetCartItems = useCallback(async () => {
+  //   setLocalLoading(true);
+  //   try {
+  //     const items = await cartService.fetchCartFromBackend();
+  //     dispatchCart({ type: 'SET_CART_ITEMS', payload: items });
+  //   } catch (error) {
+  //     console.error('CartDrawer: Error fetching/enriching cart:', error);
+  //   } finally {
+  //     setLocalLoading(false);
+  //   }
+  // }, [dispatchCart]);
 
   useEffect(() => {
     if (isOpen) {
@@ -63,100 +63,76 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
     const newQuantity = itemToUpdate.quantity + change;
 
     if (newQuantity <= 0) {
-      await handleRemoveItem(id); // If new quantity is 0 or less, remove the item
+      await handleRemoveItem(id);
       return;
     }
 
-    // --- NEW LOGIC FOR INVENTORY CHECK ---
-    // Get the map of all product quantities currently in the cart
     const totalProductQuantitiesMap = getTotalProductQuantitiesInCart();
     const productIdBeingUpdated = (itemToUpdate as CartNormalItem).product_id.replace(/-/g, '');
 
-    // Get the total quantity of this specific product_id that is already IN THE ENTIRE CART
     const currentTotalQuantityOfThisProductInCart = totalProductQuantitiesMap.get(productIdBeingUpdated) || 0;
 
-    // The stock_quantity (`itemToUpdate.stock_quantity`) is the TOTAL available from backend for this product.
-    // To find out how much *more* can be added for this *specific normal item*,
-    // we need to consider the total stock MINUS all *other* instances of this product in the cart.
-    // So, we subtract `currentTotalQuantityOfThisProductInCart` but then add back `itemToUpdate.quantity`
-    // because we are calculating the effective limit *for this particular cart item's increase*, not the overall product limit for new adds.
     const effectiveAvailableStockForThisNormalItem = itemToUpdate.stock_quantity - (currentTotalQuantityOfThisProductInCart - itemToUpdate.quantity);
 
-    // Validate if the new quantity for THIS item exceeds the effective stock available for it
+
     if (newQuantity > effectiveAvailableStockForThisNormalItem) {
       console.warn(`CartDrawer: Cannot increase quantity for item ${id} beyond effective available stock (${effectiveAvailableStockForThisNormalItem}).`);
       // Optionally show a toast notification here to inform the user
       // Example: alert(`Cannot add more. Only ${effectiveAvailableStockForThisNormalItem} available.`);
       return;
     }
-    // --- END NEW LOGIC ---
 
     console.log(`CartDrawer: Dispatching UPDATE_ITEM_QUANTITY for item ${id} to new quantity: ${newQuantity}.`);
     dispatchCart({ type: 'UPDATE_ITEM_QUANTITY', payload: { id, quantity: newQuantity } });
   };
 
   const handleProceedToCheckout = (): void => {
-    const items = cartItems.filter(item => item.type === 'normal').map(item => ({
-      product_id: (item as CartNormalItem).product_id.replace(/-/g, ''),
-      quantity: item.quantity
-    }));
-
-    const offer_sets = cartItems.filter(item => item.type === 'offer').map(item => ({
-      id: item.id.replace(/-/g, ''),
-      offer: (item as CartOfferItem).offer.replace(/-/g, ''),
-      buy_count: (item as CartOfferItem).buy_count,
-      get_count: (item as CartOfferItem).get_count,
-      offer_products: (item as CartOfferItem).offer_items.map(p => ({
-        product: p.id.replace(/-/g, ''),
-        quantity: p.quantity
-      }))
-    }));
-
-    dispatchCart({
-      type: 'SET_CHECKOUT_DATA',
-      payload: {
-        items,
-        offer_sets
-      }
-    });
-
     setShowCheckoutModal(true);
   };
 
   const handleCheckoutClose = (): void => {
     setShowCheckoutModal(false);
+    // Trigger sync to ensure cart context reflects latest state after checkout modal
+    // (e.g., if cart was cleared by the checkout process)
     dispatchCart({ type: 'TRIGGER_SYNC' });
   };
 
   const handleAddressSelected = (addressId: string): void => {
     console.log(`CartDrawer: Proceeding with address ID: ${addressId}`);
     setShowCheckoutModal(false);
+    // Trigger sync to ensure cart context reflects latest state after address selection
     dispatchCart({ type: 'TRIGGER_SYNC' });
   };
 
   const clearCart = async (): Promise<void> => {
     try {
+      // Optimistically clear local cart in UI
       dispatchCart({ type: 'SET_CART_ITEMS', payload: [] });
       console.log('CartDrawer: Cart cleared locally.');
 
       if (localStorage.getItem('accessToken')) {
+        // For authenticated users, attempt to clear on backend
         console.log(`CartDrawer: Attempting to clear cart on backend for authenticated user.`);
         await apiService.addToCart({ mode: 'delete_cart' });
+        // After successful backend delete, trigger a sync to confirm
         dispatchCart({ type: 'TRIGGER_SYNC' });
       } else {
-        console.log(`CartDrawer: Cart cleared locally for guest user.`);
+        // For guest users, local storage is the source of truth for unsynced items.
+        // It's already cleared by `SET_CART_ITEMS` dispatch above.
+        console.log(`CartDrawer: Cart cleared locally for guest user (no backend interaction).`);
       }
     } catch (error) {
       console.error('CartDrawer: Error clearing cart:', error);
+      // If there's a network error during backend clear for authenticated user,
+      // the local state is already cleared. The next sync might re-fetch from backend if not cleared.
+      // For guest, this catch block is less relevant as no API call is made.
+      // A TRIGGER_SYNC here would attempt to re-fetch/reconcile, which might bring back items
+      // if the backend deletion failed for an auth user.
       dispatchCart({ type: 'TRIGGER_SYNC' });
     }
   };
 
   const hasOutOfStockItems = (): boolean => {
-    // This function still relies on item.isInStock and item.stock_quantity.
-    // You might want to update cartUtils.hasOutOfStockItems
-    // to use the effective available stock if you consider items in cart as "unavailable" for re-adding.
-    // For now, it will mark an item as out of stock if its initial API stock is zero or less.
     return cartUtils.hasOutOfStockItems(cartItems);
   };
 
@@ -177,7 +153,12 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
   const subtotal = cartUtils.calculateSubtotal(cartItems);
   const offerSavings = cartUtils.calculateTotalOfferSavings(cartItems);
 
-  const finalTotal = subtotal;
+  const finalTotal = subtotal; // Assuming finalTotal = subtotal - offerSavings in cart summary
+
+  // Prepare items for CheckoutModal (normal items from cart, and offer sets from cart)
+  const normalItemsForCheckout = cartItems.filter(item => item.type === 'normal') as CartNormalItem[];
+  const offerSetsForCheckout = cartItems.filter(item => item.type === 'offer') as CartOfferItem[];
+
 
   return (
     <>
@@ -201,7 +182,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
               <p className="text-white text-[12px]">BUY 1 GET 1 FREE | USE CODE : B1G1</p>
             </div>
             <div className="flex-1 overflow-y-auto">
-              {(localLoading || contextLoading) ? (
+              {contextLoading ? (
                 <div className="flex justify-center items-center h-40">
                   <div className="w-8 h-8 border-4 border-gray-200 border-t-[#175e7a] rounded-full animate-spin mr-2"></div>
                   <p>Loading cart items...</p>
@@ -212,16 +193,9 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                     <>
                       {cartItems.map((item) => {
                         if (item.type === 'normal') {
-                          // Calculate maxAllowedQuantity for THIS specific normal item
                           const totalProductQuantitiesMap = getTotalProductQuantitiesInCart();
                           const productIdForThisItem = item.product_id.replace(/-/g, '');
                           const currentTotalQuantityOfThisProductInCart = totalProductQuantitiesMap.get(productIdForThisItem) || 0;
-
-                          // The effective limit for this *specific* normal item is:
-                          // its product's total stock (from API)
-                          // MINUS the quantity of this product already in other cart items (including other normal items, if any, and offer items).
-                          // We then add back this specific item's current quantity, because we are determining the
-                          // maximum *this item itself* can be incremented to, considering the overall stock.
                           const effectiveMaxForThisNormalItem = item.stock_quantity - (currentTotalQuantityOfThisProductInCart - item.quantity);
 
                           return (
@@ -230,12 +204,10 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                               product={item}
                               onRemove={handleRemoveItem}
                               onQuantityChange={handleQuantityChange}
-                              maxAllowedQuantity={effectiveMaxForThisNormalItem} // Pass the calculated max
+                              maxAllowedQuantity={effectiveMaxForThisNormalItem}
                             />
                           );
                         } else {
-                          // Offer items typically don't have individual quantity controls directly in CartItem,
-                          // so maxAllowedQuantity might not be needed unless you add that functionality to OfferCartItem.
                           return (
                             <OfferCartItem
                               key={item.id ?? uuidv4()}
@@ -307,8 +279,10 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
             isOpen={showCheckoutModal}
             onClose={handleCheckoutClose}
             onProceed={handleAddressSelected}
-            cartItems={cartItems}
-            orderItems={cartItems.filter(item => item.type === 'normal').map(item => ({ product_id: (item as CartNormalItem).product_id.replace(/-/g, ''), quantity: item.quantity }))}
+            // Pass the explicitly prepared items for cart checkout
+            normalItemsForCheckout={normalItemsForCheckout}
+            offerSetsForCheckout={offerSetsForCheckout}
+            checkoutMode={'cart'}
           />
         )}
       </div>
