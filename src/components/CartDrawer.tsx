@@ -6,8 +6,8 @@ import CartItem from './CartItem';
 import OfferCartItem from './OfferCartItem';
 import CheckoutModal from './CheckoutModal';
 import { useCart, CartItemType, CartNormalItem, CartOfferItem } from '@/context/cartContext';
-import { cartService } from '@/utils/api/cartService';
-import apiService from '@/utils/api/apiService';
+import { cartService } from '@/utils/api/cartService'; // Keep this import
+import apiService from '@/utils/api/apiService'; // Keep this import
 import { cartUtils } from '@/utils/cartUtils';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -18,22 +18,7 @@ interface CartDrawerProps {
 
 const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
   const { cartItems, dispatchCart, loading: contextLoading, getTotalProductQuantitiesInCart } = useCart();
-  // `localLoading` state is not strictly needed here as `contextLoading` from `useCart` covers it.
-  // const [localLoading, setLocalLoading] = useState<boolean>(false);
   const [showCheckoutModal, setShowCheckoutModal] = useState<boolean>(false);
-
-  // `getAndSetCartItems` is also no longer needed as CartProvider's internal sync handles fetching.
-  // const getAndSetCartItems = useCallback(async () => {
-  //   setLocalLoading(true);
-  //   try {
-  //     const items = await cartService.fetchCartFromBackend();
-  //     dispatchCart({ type: 'SET_CART_ITEMS', payload: items });
-  //   } catch (error) {
-  //     console.error('CartDrawer: Error fetching/enriching cart:', error);
-  //   } finally {
-  //     setLocalLoading(false);
-  //   }
-  // }, [dispatchCart]);
 
   useEffect(() => {
     if (isOpen) {
@@ -56,7 +41,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
     const itemToUpdate = cartItems.find(item => item.id === id);
 
     if (!itemToUpdate || itemToUpdate.type !== 'normal') {
-      console.warn(`CartDrawer: Attempted to change quantity of non-normal item or item not found with ID: ${id}`);
+      console.warn(`CartDrawer: Attempted to change quantity of non-normal item or item not found with ID: ${id}. Only normal items can be adjusted here.`);
       return;
     }
 
@@ -77,8 +62,6 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
 
     if (newQuantity > effectiveAvailableStockForThisNormalItem) {
       console.warn(`CartDrawer: Cannot increase quantity for item ${id} beyond effective available stock (${effectiveAvailableStockForThisNormalItem}).`);
-      // Optionally show a toast notification here to inform the user
-      // Example: alert(`Cannot add more. Only ${effectiveAvailableStockForThisNormalItem} available.`);
       return;
     }
 
@@ -92,43 +75,34 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
 
   const handleCheckoutClose = (): void => {
     setShowCheckoutModal(false);
-    // Trigger sync to ensure cart context reflects latest state after checkout modal
-    // (e.g., if cart was cleared by the checkout process)
     dispatchCart({ type: 'TRIGGER_SYNC' });
   };
 
   const handleAddressSelected = (addressId: string): void => {
     console.log(`CartDrawer: Proceeding with address ID: ${addressId}`);
     setShowCheckoutModal(false);
-    // Trigger sync to ensure cart context reflects latest state after address selection
     dispatchCart({ type: 'TRIGGER_SYNC' });
   };
 
   const clearCart = async (): Promise<void> => {
     try {
-      // Optimistically clear local cart in UI
       dispatchCart({ type: 'SET_CART_ITEMS', payload: [] });
       console.log('CartDrawer: Cart cleared locally.');
 
       if (localStorage.getItem('accessToken')) {
-        // For authenticated users, attempt to clear on backend
         console.log(`CartDrawer: Attempting to clear cart on backend for authenticated user.`);
         await apiService.addToCart({ mode: 'delete_cart' });
-        // After successful backend delete, trigger a sync to confirm
         dispatchCart({ type: 'TRIGGER_SYNC' });
       } else {
-        // For guest users, local storage is the source of truth for unsynced items.
-        // It's already cleared by `SET_CART_ITEMS` dispatch above.
         console.log(`CartDrawer: Cart cleared locally for guest user (no backend interaction).`);
       }
     } catch (error) {
       console.error('CartDrawer: Error clearing cart:', error);
-      // If there's a network error during backend clear for authenticated user,
-      // the local state is already cleared. The next sync might re-fetch from backend if not cleared.
-      // For guest, this catch block is less relevant as no API call is made.
-      // A TRIGGER_SYNC here would attempt to re-fetch/reconcile, which might bring back items
-      // if the backend deletion failed for an auth user.
-      dispatchCart({ type: 'TRIGGER_SYNC' });
+      // For network error in authenticated clear:
+      // The local cart is already cleared. A subsequent sync (triggered below or by refresh)
+      // will fetch the real backend state. If backend failed to clear, items might reappear.
+      // For guest, this catch is less relevant as no network call is made during local clear.
+      dispatchCart({ type: 'TRIGGER_SYNC' }); // Trigger a sync to reconcile if backend failed to clear
     }
   };
 
@@ -153,9 +127,9 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
   const subtotal = cartUtils.calculateSubtotal(cartItems);
   const offerSavings = cartUtils.calculateTotalOfferSavings(cartItems);
 
-  const finalTotal = subtotal; // Assuming finalTotal = subtotal - offerSavings in cart summary
+  const finalTotal = subtotal;
 
-  // Prepare items for CheckoutModal (normal items from cart, and offer sets from cart)
+  // Prepare items for CheckoutModal when opened from CartDrawer
   const normalItemsForCheckout = cartItems.filter(item => item.type === 'normal') as CartNormalItem[];
   const offerSetsForCheckout = cartItems.filter(item => item.type === 'offer') as CartOfferItem[];
 

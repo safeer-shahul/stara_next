@@ -9,12 +9,12 @@ import CartDrawer from '@/components/CartDrawer';
 import CheckoutModal from '@/components/CheckoutModal';
 import apiService from '@/utils/api/apiService';
 import { useCart } from '@/context/cartContext';
-import { v4 as uuidv4 } from 'uuid'; // Import uuidv4 for temporary IDs.
-import { ProductItemDetails, CartNormalItem } from '@/context/cartContext'; // Import ProductItemDetails and CartNormalItem
+import { v4 as uuidv4 } from 'uuid';
+import { ProductItemDetails, CartNormalItem } from '@/context/cartContext';
 
 // Import missing Lucide React icons
 import { AlertCircle, CheckCircle2, Star } from 'lucide-react';
-import Image from 'next/image'; // Import Image from next/image
+import Image from 'next/image';
 
 // Static product data (kept as is)
 const staticProductData = {
@@ -41,20 +41,14 @@ export default function ProductDetailPage() {
   const productId = params.id as string;
   const fromOffer = searchParams.get('from') === 'offer';
 
-  const { dispatchCart } = useCart(); // We don't need cartItems directly here for Buy Now logic
-
-  // Removed isGift and isModalOpen if they are not actually used in this component's logic.
-  // If `openModal` implies opening a product details modal/drawer (which isn't provided),
-  // this state and function would need to be re-added along with the modal component.
-  // const [isGift, setIsGift] = useState(false);
-  // const [isModalOpen, setIsModalOpen] = useState(false);
+  const { dispatchCart } = useCart();
 
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
   const [isCheckoutOpen, setIsCheckoutToOpen] = useState<boolean>(false);
   const [product, setProduct] = useState<ProductItemDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedProductId, setSelectedProductId] = useState<string | null>(null); // Keep if you still need to highlight product in cart.
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null); // For potential highlighting in CartDrawer
 
   // NEW STATES FOR DIRECT BUY NOW
   const [isDirectBuyCheckoutMode, setIsDirectBuyCheckoutMode] = useState<boolean>(false);
@@ -84,16 +78,11 @@ export default function ProductDetailPage() {
     }
   }, [productId]);
 
-  // If you had a separate product detail modal, `openModal` would be its trigger.
-  // For now, removing the call since `openModal` is not defined here.
-  // const openModal = () => {
-  //   setIsModalOpen(true);
-  // };
 
   const handleAddToBag = async () => {
     if (product) {
-      setSelectedProductId(product.id);
-      const tempCartItemId = uuidv4(); 
+      setSelectedProductId(product.id); // For potential highlighting in cart drawer
+      const tempCartItemId = uuidv4();
       dispatchCart({
         type: 'ADD_NORMAL_ITEM',
         payload: {
@@ -106,8 +95,8 @@ export default function ProductDetailPage() {
           product_price: product.product_price,
           strike_price: product.strike_price,
           images: product.images,
-          isInStock: product.isInStock, // Use derived isInStock from product
-          stock_quantity: product.quantity, // Actual stock quantity from fetched product
+          isInStock: product.isInStock,
+          stock_quantity: product.quantity,
         } as CartNormalItem,
       });
       setIsCartOpen(true);
@@ -256,7 +245,7 @@ export default function ProductDetailPage() {
               </div>
             )}
 
-            {/* Replaced `onClick={openModal}` with `onClick={() => null}` to prevent errors */}
+            {/* Replaced `onClick={openModal}` with `onClick={() => null}` as openModal is not defined */}
             <div className="flex items-center justify-between pt-2 cursor-pointer" onClick={() => null}>
               <p className="text-sm flex-1 truncate pr-4">Details: {product.product_description}</p>
               <span className="text-[#C69A7F] text-sm underline flex-shrink-0">View More</span>
@@ -309,8 +298,11 @@ export default function ProductDetailPage() {
         onClose={handleCheckoutClose}
         onProceed={handleAddressSelected}
         // Only pass buyNowProduct if it's a direct buy.
-        // `normalItemsForCheckout` and `offerSetsForCheckout` are explicitly NOT passed here for buy_now.
         buyNowProduct={isDirectBuyCheckoutMode ? directBuyProductData : undefined}
+        // IMPORTANT: For 'buy_now' mode, do NOT pass `normalItemsForCheckout` or `offerSetsForCheckout`.
+        // For 'cart' mode, these props ARE expected by CheckoutModal from CartDrawer.
+        // We handle this by making them optional in CheckoutModalProps.
+        // ProductDetailPage only concerns itself with `buyNowProduct`.
         checkoutMode={isDirectBuyCheckoutMode ? 'buy_now' : 'cart'}
       />
     </div>

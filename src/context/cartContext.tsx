@@ -80,6 +80,7 @@ export type CartAction =
   }
   | { type: 'TRIGGER_SYNC' }; // Action to explicitly signal a need for sync
 
+
 // --- Cart State and Context Definitions ---
 
 interface CartState {
@@ -118,7 +119,6 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
       {
         console.log('Reducer: SET_CART_ITEMS action received. Payload:', action.payload);
         const serializedPayload = JSON.stringify(action.payload);
-        // Only update localStorage if there's an actual change in content
         if (JSON.stringify(state.cartItems) !== serializedPayload) {
           localStorage.setItem('cartItems', serializedPayload);
           console.log('Reducer: SET_CART_ITEMS: localStorage updated.');
@@ -132,11 +132,10 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
         console.log('Reducer: ADD_OFFER_SET action received. New offer set:', action.payload);
         const newOfferSet: CartOfferItem = {
           ...action.payload,
-          id: action.payload.id || uuidv4(), // Ensure ID is present for optimistic UI
-          isSynced: false, // Mark as unsynced until confirmed by backend
+          id: action.payload.id || uuidv4(),
+          isSynced: false,
         };
         const newItems = [...state.cartItems, newOfferSet];
-        // For guest users, update localStorage immediately. For authenticated, customDispatch handles backend then sync.
         if (!localStorage.getItem('accessToken')) {
             localStorage.setItem('cartItems', JSON.stringify(newItems));
         }
@@ -156,14 +155,14 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
           newItems[existingItemIndex] = {
             ...existingItem,
             quantity: existingItem.quantity + action.payload.quantity,
-            isSynced: false, // Mark as unsynced
+            isSynced: false,
           };
           console.log('Reducer: ADD_NORMAL_ITEM: Updated existing item quantity.');
         } else {
           const newNormalItem: CartNormalItem = {
             ...action.payload,
-            id: action.payload.id || uuidv4(), // Ensure ID is present for optimistic UI
-            isSynced: false, // Mark as unsynced
+            id: action.payload.id || uuidv4(),
+            isSynced: false,
           };
           newItems = [...state.cartItems, newNormalItem];
           console.log('Reducer: ADD_NORMAL_ITEM: Added new normal item with guaranteed ID.');
@@ -177,12 +176,12 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
       {
         console.log('Reducer: REMOVE_ITEM action received. Item ID to remove:', action.payload);
         const filteredItems = state.cartItems.filter((item) => item.id !== action.payload);
-        if (!localStorage.getItem('accessToken')) {
+        // if (!localStorage.getItem('accessToken')) {
             localStorage.setItem('cartItems', JSON.stringify(filteredItems));
             console.log('Reducer: REMOVE_ITEM: localStorage updated for guest user.');
-        } else {
-            console.log('Reducer: REMOVE_ITEM: Optimistically removed item locally for authenticated user. Backend sync will confirm.');
-        }
+        // } else {
+            // console.log('Reducer: REMOVE_ITEM: Optimistically removed item locally for authenticated user.');
+        // }
         return { ...state, cartItems: filteredItems };
       }
     case 'UPDATE_ITEM_QUANTITY':
@@ -193,7 +192,7 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
             return {
               ...item,
               quantity: action.payload.quantity,
-              isSynced: false, // Mark as unsynced
+              isSynced: false,
             };
           }
           return item;
@@ -229,9 +228,8 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [syncRequested, setSyncRequested] = useState(false);
-  const [guestCartMergePending, setGuestCartMergePending] = useState(false); // NEW STATE FOR MERGE
+  const [guestCartMergePending, setGuestCartMergePending] = useState(false); // State to manage guest cart merge
 
-  // Memoized function to calculate total quantity of each product ID across the entire cart
   const getTotalProductQuantitiesInCart = useCallback(() => {
     const quantities = new Map<string, number>(); // Map<productId (cleaned UUID), total_quantity_in_cart>
 
@@ -240,6 +238,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
         const productId = cartItem.product_id.replace(/-/g, '');
         quantities.set(productId, (quantities.get(productId) || 0) + cartItem.quantity);
       } else if (cartItem.type === 'offer') {
+        // For offer items, sum up quantities of all products within the offer_items array
         cartItem.offer_items.forEach(offerProduct => {
           const productId = offerProduct.id.replace(/-/g, ''); // offerProduct.id is the actual product UUID
           quantities.set(productId, (quantities.get(productId) || 0) + (offerProduct.quantity || 1));
@@ -247,7 +246,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       }
     });
     return quantities;
-  }, [state.cartItems]); // Recalculate whenever cartItems change
+  }, [state.cartItems]);
 
 
   const customDispatch: React.Dispatch<CartAction> = useCallback(async (action) => {
@@ -259,6 +258,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
         try {
             if (action.type === 'REMOVE_ITEM') {
                 console.log(`Custom Dispatch: Authenticated REMOVE_ITEM - Sending backend delete for cart item ID: ${action.payload}`);
+                // Backend still needs item_id for deletion
                 await cartService.addToCart({
                     item_id: action.payload.replace(/-/g, ''),
                     mode: 'delete'
@@ -272,15 +272,19 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
                     const quantityChange = newQuantity - currentQuantity;
 
                     if (quantityChange > 0) {
-                        for (let i = 0; i < quantityChange; i++) {
-                            console.log(`Custom Dispatch: Sending backend increment for product ID: ${itemToUpdate.product_id}`);
-                            await cartService.addToCart({ product_id: itemToUpdate.product_id.replace(/-/g, ''), mode: '+' });
-                        }
+                        // Backend only needs product_id for increment, it handles which item
+                        // No item_id is sent here based on your backend clarification.
+                        await cartService.addToCart({
+                            product_id: itemToUpdate.product_id.replace(/-/g, ''),
+                            mode: '+'
+                        });
                     } else if (quantityChange < 0) {
-                        for (let i = 0; i < Math.abs(quantityChange); i++) {
-                            console.log(`Custom Dispatch: Sending backend decrement for product ID: ${itemToUpdate.product_id}`);
-                            await cartService.addToCart({ product_id: itemToUpdate.product_id.replace(/-/g, ''), mode: '-' });
-                        }
+                        // Backend only needs product_id for decrement, it handles which item
+                        // No item_id is sent here based on your backend clarification.
+                        await cartService.addToCart({
+                            product_id: itemToUpdate.product_id.replace(/-/g, ''),
+                            mode: '-'
+                        });
                     }
                     console.log(`Custom Dispatch: Backend quantity update sent for ${itemToUpdate.product_id}.`);
                 } else {
@@ -294,11 +298,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
             } else if (action.type === 'ADD_OFFER_SET') {
                 const offerItem = action.payload as CartOfferItem;
                 const productIdsForBackend: string[] = [];
-                offerItem.offer_items.forEach(p => {
-                    for (let q = 0; q < p.quantity; q++) {
-                        productIdsForBackend.push(p.id.replace(/-/g, ''));
-                    }
-                });
+                offerItem.offer_items.forEach(p => { for (let q = 0; q < p.quantity; q++) { productIdsForBackend.push(p.id.replace(/-/g, '')); } });
                 console.log(`Custom Dispatch: Sending backend add offer for offer ID: ${offerItem.offer}`);
                 await apiService.addToCartOffer({
                     offer_id: offerItem.offer.replace(/-/g, ''),
@@ -308,21 +308,18 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
             }
         } catch (error) {
             console.error(`Custom Dispatch: Error during direct backend operation for ${action.type}:`, error);
-            // Optionally, handle this error more gracefully, e.g., revert local state
         }
     }
 
-    // Always dispatch to the reducer to update local state immediately (optimistic update)
     dispatch(action);
 
-    // Request a full sync after any authenticated action or explicit sync request
     if (currentTokenAtDispatch || action.type === 'TRIGGER_SYNC' ||
         action.type === 'ADD_NORMAL_ITEM' || action.type === 'ADD_OFFER_SET' ||
         action.type === 'UPDATE_ITEM_QUANTITY' || action.type === 'REMOVE_ITEM') {
       console.log(`Custom Dispatch: Authenticated or major action (${action.type}) - Requesting general sync.`);
       setSyncRequested(true);
     }
-  }, [state.cartItems]); // Dependency on state.cartItems is correct for itemToUpdate lookup
+  }, [state.cartItems]);
 
 
   // Initial Load Effect (runs once on mount)
@@ -341,10 +338,10 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
         dispatch({ type: 'SET_CART_ITEMS', payload: itemsWithGuaranteedIds });
         console.log('CartProvider Init Effect: Loaded cart from localStorage.');
 
-        // If there's a token and local items, a merge will be needed
+        // On initial load, if already authenticated AND local cart has items, trigger merge
         if (currentAccessToken && itemsWithGuaranteedIds.length > 0) {
           setGuestCartMergePending(true); // Flag for merge
-          console.log('CartProvider Init Effect: Authenticated user with local cart, setting guestCartMergePending to true.');
+          console.log('CartProvider Init Effect: Authenticated on initial load with local cart, setting guestCartMergePending to true.');
         }
 
       } catch (e) {
@@ -355,15 +352,40 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       console.log('CartProvider Init Effect: No cart items in localStorage.');
     }
 
-    prevAccessTokenRef.current = currentAccessToken; // Set initial token state
-    isInitialLoadComplete.current = true; // Mark initial load as complete
+    // Set initial prevAccessTokenRef here only.
+    prevAccessTokenRef.current = currentAccessToken;
+    isInitialLoadComplete.current = true;
     console.log('CartProvider Init Effect: Initial load complete.');
   }, []); // Empty dependency array means it runs once on mount
 
+
+  // NEW EFFECT: To explicitly trigger guestCartMergePending on token change (login/register)
+  useEffect(() => {
+    if (!isInitialLoadComplete.current) return; // Only run after initial cart load
+    
+    const currentAccessToken = localStorage.getItem('accessToken');
+    const hasLocalCartItems = state.cartItems.length > 0;
+    
+    // Check if token status changed from guest to authenticated
+    const wasGuest = !prevAccessTokenRef.current; // Was previously null or empty
+    const isNowAuthenticated = !!currentAccessToken; // Is now a non-null token
+
+    if (wasGuest && isNowAuthenticated && hasLocalCartItems) {
+      console.log("CartProvider: Detected transition from guest to authenticated with existing local cart. Setting guestCartMergePending to true.");
+      setGuestCartMergePending(true);
+    }
+    
+    // Update prevAccessTokenRef.current for the next evaluation
+    // This is crucial for correctly detecting token changes on subsequent runs.
+    prevAccessTokenRef.current = currentAccessToken;
+
+  }, [localStorage.getItem('accessToken'), state.cartItems.length, isInitialLoadComplete.current]); // Watch relevant values for this specific trigger
+
+
   // Effect for handling guest cart merge after login/register
+  // This useEffect relies on `guestCartMergePending` changing to true.
   useEffect(() => {
     if (typeof window === 'undefined' || !isInitialLoadComplete.current || !localStorage.getItem('accessToken') || !guestCartMergePending) {
-      // Skip if not client-side, initial load not done, not authenticated, or no merge pending
       return;
     }
 
@@ -374,44 +396,44 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
 
       try {
         const localUnsyncedItems = state.cartItems.filter(item => !item.isSynced);
+        
         if (localUnsyncedItems.length > 0) {
           console.log("CartProvider: Attempting to push local unsynced items to backend for merge:", localUnsyncedItems);
-          await cartService.pushLocalCartToBackend(localUnsyncedItems); // This will call your add/offer APIs
+          // This will re-send all unsynced items (normal and offers) to backend.
+          // Backend should handle idempotency: adding existing item increments, not duplicates.
+          await cartService.pushLocalCartToBackend(localUnsyncedItems);
           console.log("CartProvider: Successfully pushed local items to backend.");
         } else {
           console.log("CartProvider: No unsynced local items to push for merge.");
         }
 
-        // After pushing, fetch the canonical state from the backend
         const canonicalCart = await cartService.fetchCartFromBackend();
-        dispatch({ type: 'SET_CART_ITEMS', payload: canonicalCart }); // Update context and localStorage
+        dispatch({ type: 'SET_CART_ITEMS', payload: canonicalCart });
         console.log("CartProvider: Guest cart merged and canonical state fetched.");
 
       } catch (error) {
         console.error("CartProvider: Error during guest cart merge:", error);
-        // On error, the state will be whatever was last fetched/set.
-        // The normal sync mechanism should eventually re-attempt.
       } finally {
         dispatch({ type: 'SET_LOADING', payload: false });
-        // The localStorage will be cleared by the SET_CART_ITEMS dispatch above.
       }
     };
 
     mergeLocalCartWithBackend();
-  }, [guestCartMergePending, isInitialLoadComplete.current, state.cartItems, dispatch]); // Added dispatch to deps
+  }, [guestCartMergePending, isInitialLoadComplete.current, state.cartItems, dispatch]);
 
   // Main Sync Effect (runs on state changes, token changes, sync requests)
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    // Only proceed if initial load is complete
     if (!isInitialLoadComplete.current) {
         console.log("CartProvider Sync Effect: Initial load not complete, skipping sync logic.");
         return;
     }
 
     const currentAccessToken = localStorage.getItem('accessToken');
-    const tokenChanged = currentAccessToken !== prevAccessTokenRef.current;
-    prevAccessTokenRef.current = currentAccessToken; // Update ref for next render cycle
+    // `tokenChanged` is now primarily detected by the separate useEffect that updates `guestCartMergePending`.
+    // We still need to capture the current `prevAccessTokenRef.current` state for `shouldTriggerSync` conditions.
+    const tokenChangedDuringThisRenderCycle = currentAccessToken !== prevAccessTokenRef.current;
+
 
     const syncCartWithBackend = async () => {
       if (isProcessingSync.current) {
@@ -423,43 +445,50 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       console.log('CartProvider: Initiating cart synchronization with backend...');
 
       try {
-        // Fetch the latest authoritative cart from the backend (or local storage for guests)
         const updatedCartFromSource = await cartService.fetchCartFromBackend();
         console.log("CartProvider: Canonical cart fetched (from backend or enriched localStorage).");
 
-        // Compare fetched cart with current state to avoid unnecessary re-renders/localStorage writes
         if (JSON.stringify(state.cartItems) !== JSON.stringify(updatedCartFromSource)) {
           console.log("CartProvider: Cart content changed after sync/fetch. Dispatching SET_CART_ITEMS.");
-          // This dispatch will also correctly update localStorage for both guest and auth users.
           dispatch({ type: 'SET_CART_ITEMS', payload: updatedCartFromSource });
         } else {
-          console.log("CartProvider: Cart state identical after sync/fetch, no dispatch of SET_CART_ITEMS.");
+            console.log("CartProvider: Cart state identical after sync/fetch, no dispatch of SET_CART_ITEMS.");
         }
 
       } catch (error) {
         console.error('CartProvider: Error during cart synchronization:', error);
-        // Fallback or retry logic can be added here if needed
+        if (currentAccessToken) {
+          console.warn("CartProvider: Sync failed for authenticated user. Attempting fallback fetch from backend.");
+          try {
+            const fallbackCart = await cartService.fetchCartFromBackend();
+            dispatch({ type: 'SET_CART_ITEMS', payload: fallbackCart });
+          } catch (fallbackError) {
+            console.error("CartProvider: Fallback fetch also failed.", fallbackError);
+            dispatch({ type: 'SET_CART_ITEMS', payload: [] });
+          }
+        } else {
+            console.warn("CartProvider: Sync failed for guest user. Local state might be inconsistent with localStorage.");
+        }
       } finally {
         isProcessingSync.current = false;
-        setSyncRequested(false); // Reset sync request
+        setSyncRequested(false);
         dispatch({ type: 'SET_LOADING', payload: false });
         console.log('CartProvider: Cart synchronization finished.');
       }
     };
 
-    // Clear any pending sync timeout to avoid multiple runs if conditions change rapidly
     if (syncTimeoutRef.current) {
         clearTimeout(syncTimeoutRef.current);
     }
 
-    // Determine if a sync is needed based on current conditions
-    const shouldTriggerSync = syncRequested || tokenChanged ||
-                             (currentAccessToken && state.cartItems.length === 0 && !guestCartMergePending) || // Auth user with empty local cart, and no merge pending
-                             (!currentAccessToken && JSON.stringify(state.cartItems) !== localStorage.getItem('cartItems')); // Guest user with local state mismatch
+    const shouldTriggerSync = syncRequested ||
+                               (currentAccessToken && state.cartItems.length === 0 && !guestCartMergePending) ||
+                               (!currentAccessToken && JSON.stringify(state.cartItems) !== localStorage.getItem('cartItems'));
+
 
     console.log(`CartProvider Debug: Sync Conditions for scheduling:
       syncRequested: ${syncRequested}
-      tokenChanged: ${tokenChanged}
+      tokenChanged (for debug, based on immediate ref, dedicated effect handles the primary trigger): ${tokenChangedDuringThisRenderCycle}
       auth && emptyCart && !mergePending: ${currentAccessToken && state.cartItems.length === 0 && !guestCartMergePending}
       guest && localStateMismatch: ${!currentAccessToken && JSON.stringify(state.cartItems) !== localStorage.getItem('cartItems')}
       -> SHOULD TRIGGER SYNC: ${shouldTriggerSync}
@@ -468,19 +497,18 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
 
     if (shouldTriggerSync) {
         console.log(`CartProvider: Scheduling sync due to triggering factors.`);
-        syncTimeoutRef.current = setTimeout(syncCartWithBackend, 300); // Debounce sync calls
+        syncTimeoutRef.current = setTimeout(syncCartWithBackend, 300);
     } else {
-      console.log('CartProvider: No immediate sync needed based on current conditions.');
+      console.log('CartProvider: No sync needed based on current conditions.');
     }
 
-    // Cleanup function for this effect
     return () => {
         if (syncTimeoutRef.current) {
             clearTimeout(syncTimeoutRef.current);
         }
     };
 
-  }, [state.cartItems, syncRequested, guestCartMergePending]); // Dependencies for this effect
+  }, [state.cartItems, syncRequested, guestCartMergePending, localStorage.getItem('accessToken')]); // Keeping localStorage.getItem here as a dependency to ensure reactivity to token changes, even if handled by separate effect.
 
 
   const contextValue = useMemo(() => ({
@@ -493,8 +521,6 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
 
   return <CartContext.Provider value={contextValue}>{children}</CartContext.Provider>;
 };
-
-// --- Custom Hook to Consume Cart Context ---
 
 export const useCart = () => {
   const context = useContext(CartContext);

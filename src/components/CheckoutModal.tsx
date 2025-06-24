@@ -1,4 +1,3 @@
-// components/CheckoutModal.tsx
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -129,6 +128,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [paymentMethod, setPaymentMethod] = useState<'Cod' | 'Razorpay'>('Razorpay');
   const [orderId, setOrderId] = useState<string | null>(null);
   const [staraOrderId, setStaraOrderId] = useState<string | null>(null);
+  const [staraShippingCharge, setStaraShippingCharge] = useState<string | null>(null);
   const [paymentId, setPaymentId] = useState<string | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<'success' | 'failed' | 'canceled'>('success');
   const [cartCleared, setCartCleared] = useState(false);
@@ -456,7 +456,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                                   </div>
                                   <div className='mt-[-5px] text-[14px]'>
                                     <p className="text-gray-800">{address.address}</p>
-                                    <p className="text-gray-600">{address.town}, {INDIAN_STATES[address.state] ?? address.state} - {address.pincode}</p>
+                                    <p className="text-gray-600">{INDIAN_STATES[address.state] ?? address.state}, {address.town} - {address.pincode}</p>
                                     <p className="text-gray-600">Phone: {address.phone_number_1}</p>
                                     {address.phone_number_2 && <p className="text-gray-600">Alt Phone: {address.phone_number_2}</p>}
                                     {address.is_default && (
