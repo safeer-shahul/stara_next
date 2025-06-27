@@ -738,6 +738,42 @@ public async getPaginatedCategories(
     }
   }
 
+  public async getAllStaffes(): Promise<any> {
+    try {
+      const response = await this.get<any>(`/user/get_all_staff_users`);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  public async saveStaff(data:any): Promise<any> {
+    try {
+      const response = await this.post<any>('/user/create_staff_user', data);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  public async getStaffById(id:any): Promise<any> {
+    try {
+      const response = await this.get<any>(`/user/get_staff_user_by_id/${id}`);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  public async updateStaffStatus(id:any,data:any): Promise<any> {
+    try {
+      const response = await this.put<any>('/user/update_user_is_active/${id}', data);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
+
 }
 
 const apiService = ApiService.getInstance();

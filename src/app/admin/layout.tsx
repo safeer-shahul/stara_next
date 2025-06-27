@@ -26,7 +26,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     { href: '/admin/orders/list', label: 'Orders', startsWith: '/admin/orders', icon: ShoppingCart },
     { href: '/admin/offers/list', label: 'Offers', startsWith: '/admin/offers', icon: Percent },
     { href: '/admin/coupons/list', label: 'Coupons', startsWith: '/admin/coupons', icon: Tag },
-    { href: '/admin/staffs', label: 'Staffs', startsWith: true, icon: Users },
+    { href: '/admin/staff/list', label: 'Staffs', startsWith: true, icon: Users },
     // { href: '/admin/settings', label: 'Settings', startsWith: true, icon: Settings },
   ], []);
 
