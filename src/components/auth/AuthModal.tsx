@@ -66,7 +66,7 @@ const AuthModal = ({ isOpen, onClose, initialView = 'login' }: AuthModalProps) =
             <button
               className={`py-2 px-4 ${
                 view === 'login' 
-                  ? 'border-b-2 border-[#175e7a] text-[#175e7a] font-medium' 
+                  ? 'border-b-2 border-[var(--color-primary-950)] text-[var(--color-primary-950)] font-medium' 
                   : 'text-gray-500'
               }`}
               onClick={() => setView('login')}
@@ -76,7 +76,7 @@ const AuthModal = ({ isOpen, onClose, initialView = 'login' }: AuthModalProps) =
             <button
               className={`py-2 px-4 ${
                 view === 'register' 
-                  ? 'border-b-2 border-[#175e7a] text-[#175e7a] font-medium' 
+                  ? 'border-b-2 border-[var(--color-primary-950)] text-[var(--color-primary-950)] font-medium' 
                   : 'text-gray-500'
               }`}
               onClick={() => setView('register')}

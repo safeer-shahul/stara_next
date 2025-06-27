@@ -104,7 +104,7 @@ const OrderConfirmation: React.FC<OrderConfirmationProps> = ({
       <div className="flex flex-col sm:flex-row gap-3 justify-center">
         {(paymentStatus === 'failed' || paymentStatus === 'canceled') && onRetryPayment && (
           <button
-            className="px-6 py-2 bg-[#175e7a] text-[14px] text-white rounded-md hover:bg-[#0f4c67] transition-colors shadow-sm"
+            className="px-6 py-2 bg-[var(--color-primary-950)] text-[14px] text-white rounded-md hover:bg-[#0f4c67] transition-colors shadow-sm"
             onClick={onRetryPayment}
           >
             Retry Payment
@@ -112,7 +112,7 @@ const OrderConfirmation: React.FC<OrderConfirmationProps> = ({
         )}
         
         <button
-          className={`px-6 py-2 ${paymentStatus === 'success' ? 'bg-[#175e7a] text-white hover:bg-[#0f4c67]' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'} text-[14px] rounded-md cursor-pointer transition-colors shadow-sm`}
+          className={`px-6 py-2 ${paymentStatus === 'success' ? 'bg-[var(--color-primary-950)] text-white hover:bg-[#0f4c67]' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'} text-[14px] rounded-md cursor-pointer transition-colors shadow-sm`}
           onClick={onContinueShopping}
         >
           {paymentStatus === 'success' ? 'Continue Shopping' : 'Go Back to Shop'}

@@ -94,7 +94,7 @@ export default function ChangePassword() {
                 type={showCurrentPassword ? 'text' : 'password'}
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[#175e7a] focus:border-[#175e7a] outline-none"
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[#175e7a] focus:border-[var(--color-primary-950)] outline-none"
                 required
               />
               <button
@@ -117,7 +117,7 @@ export default function ChangePassword() {
                 type={showNewPassword ? 'text' : 'password'}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[#175e7a] focus:border-[#175e7a] outline-none"
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[#175e7a] focus:border-[var(--color-primary-950)] outline-none"
                 required
               />
               <button
@@ -153,7 +153,7 @@ export default function ChangePassword() {
                 type={showConfirmPassword ? 'text' : 'password'}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[#175e7a] focus:border-[#175e7a] outline-none"
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[#175e7a] focus:border-[var(--color-primary-950)] outline-none"
                 required
               />
               <button
@@ -176,7 +176,7 @@ export default function ChangePassword() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className={`w-full bg-[#175e7a] text-[14px] text-white py-2 px-4 rounded-md font-medium hover:bg-opacity-90 transition-colors ${
+              className={`w-full bg-[var(--color-primary-950)] text-[14px] text-white py-2 px-4 rounded-md font-medium hover:bg-opacity-90 transition-colors ${
                 isSubmitting ? 'opacity-70 cursor-not-allowed' : ''
               }`}
             >

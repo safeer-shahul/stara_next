@@ -72,7 +72,7 @@ export default function Support() {
               <div className='text-[14px]'>
                 <p className="font-medium">Live Chat</p>
                 <p className="text-[14px] text-gray-500">Available on our website</p>
-                <button className="text-[14px] text-[#175e7a] font-medium mt-1 flex items-center hover:underline">
+                <button className="text-[14px] text-[var(--color-primary-950)] font-medium mt-1 flex items-center hover:underline">
                   Start chat <ExternalLink size={14} className="ml-1" />
                 </button>
               </div>
@@ -114,7 +114,7 @@ export default function Support() {
                     type="text"
                     value={subject}
                     onChange={(e) => setSubject(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[#175e7a] focus:border-[#175e7a] outline-none"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[#175e7a] focus:border-[var(--color-primary-950)] outline-none"
                     required
                   />
                 </div>
@@ -128,7 +128,7 @@ export default function Support() {
                     rows={5}
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[#175e7a] focus:border-[#175e7a] outline-none"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[#175e7a] focus:border-[var(--color-primary-950)] outline-none"
                     required
                   ></textarea>
                 </div>
@@ -136,7 +136,7 @@ export default function Support() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className={`w-full bg-[#175e7a] text-[14px] text-white py-2 px-4 rounded-md font-medium hover:bg-opacity-90 transition-colors flex items-center justify-center ${
+                  className={`w-full bg-[var(--color-primary-950)] text-[14px] text-white py-2 px-4 rounded-md font-medium hover:bg-opacity-90 transition-colors flex items-center justify-center ${
                     isSubmitting ? 'opacity-70 cursor-not-allowed' : ''
                   }`}
                 >

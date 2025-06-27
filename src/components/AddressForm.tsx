@@ -300,7 +300,7 @@ const AddressForm: React.FC<AddressFormProps> = ({
         </button>
         <button
           type="submit"
-          className={`px-4 py-2 bg-[#175e7a] border border-transparent rounded-md text-[14px] font-medium text-white hover:bg-[#124b62] cursor-pointer ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
+          className={`px-4 py-2 bg-[var(--color-primary-950)] border border-transparent rounded-md text-[14px] font-medium text-white hover:bg-[#124b62] cursor-pointer ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
           disabled={loading}
         >
           {loading ? 'Saving...' : 'Save Address'}

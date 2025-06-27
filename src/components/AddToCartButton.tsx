@@ -41,7 +41,7 @@ export default function AddToCartButton({
     <div className="space-y-3">
       <div className="flex gap-1">
         <button
-          className={`flex-1 bg-[#175e7a] hover:bg-[#0f4c67] text-white py-3 flex items-center justify-center gap-2 cursor-pointer ${
+          className={`flex-1 bg-[var(--color-primary-950)] hover:bg-[#0f4c67] text-white py-3 flex items-center justify-center gap-2 cursor-pointer ${
             isShaking ? 'shake-animation' : ''
           }`}
           onClick={onAddToBag}
@@ -53,7 +53,7 @@ export default function AddToCartButton({
           </span>
         </button>
         <button
-          className="w-12 h-12 bg-[#175e7a] hover:bg-[#0f4c67] text-white flex items-center justify-center cursor-pointer"
+          className="w-12 h-12 bg-[var(--color-primary-950)] hover:bg-[#0f4c67] text-white flex items-center justify-center cursor-pointer"
           onClick={handleWishlistClick}
         >
           <Heart className={`h-5 w-5 ${isFavorite ? 'fill-white' : ''}`} />
@@ -61,7 +61,7 @@ export default function AddToCartButton({
       </div>
       
       <button
-        className="w-full bg-[#175e7a] hover:bg-[#0f4c67] text-white text-sm py-3 cursor-pointer"
+        className="w-full bg-[var(--color-primary-950)] hover:bg-[#0f4c67] text-white text-sm py-3 cursor-pointer"
         onClick={onBuyNow}
       >
         BUY NOW

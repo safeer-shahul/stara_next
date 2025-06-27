@@ -1,11 +1,11 @@
 // app/admin/products/categories/page.tsx
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Folder, Plus, Edit, ImageIcon, ArrowLeft } from 'lucide-react';
-import apiService from '@/utils/api/apiService';
+import { Folder, Plus, Edit, Image as ImageIcon, ArrowLeft, ChevronLeft, ChevronRight, Search, Trash2 } from 'lucide-react'; // Added Search, Trash2, ChevronLeft, ChevronRight icons
+import apiService from '@/utils/api/apiService'; // Assuming this path is correct
 
 interface Category {
   id: string;
@@ -20,21 +20,35 @@ export default function CategoriesPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
-  const [pageSize] = useState(10);
+  const [pageSize] = useState(10); // Keeping page size constant for this example
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(''); // For debounced search
 
+  // Debounce search query
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 500); // 500ms debounce
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchQuery]);
+
+  // Fetch categories whenever currentPage or debouncedSearchQuery changes
   useEffect(() => {
     fetchCategories();
-  }, [currentPage]);
+  }, [currentPage, debouncedSearchQuery]);
 
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     setLoading(true);
+    setError(null); // Clear previous errors
     try {
-      const response = await apiService.getPaginatedCategories(currentPage, pageSize);
+      // Pass search query to API if implemented
+      const response = await apiService.getPaginatedCategories(currentPage, pageSize, debouncedSearchQuery);
       setCategories(response.results);
       setTotalItems(response.count);
       setTotalPages(Math.ceil(response.count / pageSize));
-      setError(null);
     } catch (err) {
       console.error('Failed to fetch categories:', err);
       setError('Failed to load categories. Please try again.');
@@ -42,150 +56,197 @@ export default function CategoriesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, pageSize, debouncedSearchQuery]); // Memoize with dependencies
 
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
-    // You would need to implement search in your API and call it here
+    setCurrentPage(1); // Reset to first page on new search
   };
 
-  const handleNextPage = () => {
+  const handleNextPage = useCallback(() => {
     if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
+      setCurrentPage(prev => prev + 1);
     }
-  };
+  }, [currentPage, totalPages]);
 
-  const handlePrevPage = () => {
+  const handlePrevPage = useCallback(() => {
     if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
+      setCurrentPage(prev => prev - 1);
     }
-  };
+  }, [currentPage]);
+
+  // Placeholder for delete functionality (to show the button in UI)
+  const handleDeleteCategory = useCallback((categoryId: string) => {
+    if (confirm(`Are you sure you want to delete category ${categoryId}?`)) {
+      // Implement actual API call for deletion here
+      console.log(`Deleting category with ID: ${categoryId}`);
+      // After successful deletion, you might want to refetch categories
+      // fetchCategories(); // Uncomment this after implementing delete API
+      alert('Delete functionality not yet implemented in API.');
+    }
+  }, []);
 
   return (
-    <div>
+    <div className="space-y-8">
+      {/* Page Header and Add Button */}
       <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-2">
-          <Link href="/admin/products" className="text-blue-600 hover:text-blue-800">
-            <ArrowLeft className="w-5 h-5" />
+        <div className="flex items-center gap-4">
+          <Link
+            href="/admin/products"
+            className="text-gray-600 hover:text-[var(--color-primary-950)] transition-colors duration-200"
+            aria-label="Back to Products"
+          >
+            <ArrowLeft className="w-6 h-6" />
           </Link>
-          <h2 className="text-2xl font-bold">Categories</h2>
+          <h2 className="text-3xl font-extrabold text-gray-800">Product Categories</h2>
         </div>
-        <Link href="/admin/products/add-category" className="bg-blue-600 cursor-pointer text-white px-4 py-2 rounded-lg flex items-center">
-            <Plus className="w-5 h-5 mr-2" />
-            Add Category
+        <Link
+          href="/admin/products/add-category"
+          className="bg-[var(--color-primary-950)] text-white px-6 py-3 rounded-lg flex items-center shadow-md
+                     hover:bg-[color:var(--color-primary-950)]/90 transition-colors duration-200
+                     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-950)] focus-visible:ring-offset-2"
+        >
+          <Plus className="w-5 h-5 mr-2" />
+          Add Category
         </Link>
       </div>
 
-      <div className="bg-white shadow rounded-lg overflow-hidden">
-        <div className="p-4 border-b flex justify-between items-center">
+      {/* Main Content Area: Categories Table */}
+      <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+        {/* Table Header/Toolbar */}
+        <div className="p-5 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="flex items-center">
-            <Folder className="w-5 h-5 text-blue-600 mr-2" />
-            <h3 className="font-semibold">All Categories</h3>
+            <Folder className="w-6 h-6 text-[var(--color-primary-950)] mr-3" />
+            <h3 className="font-semibold text-lg text-gray-800">All Product Categories</h3>
           </div>
-          <div className="flex space-x-2">
-            <input 
-              type="text" 
-              placeholder="Search categories..." 
-              className="border rounded px-3 py-1 text-sm"
+          <div className="relative w-full sm:w-auto">
+            <input
+              type="text"
+              placeholder="Search categories..."
+              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-full text-sm
+                         focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent"
               value={searchQuery}
-              onChange={handleSearch}
+              onChange={handleSearchChange}
             />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           </div>
         </div>
 
+        {/* Error Message */}
         {error && (
-          <div className="p-4 text-red-700 bg-red-100">
-            {error}
+          <div className="p-6 text-red-700 bg-red-50 border-l-4 border-red-500">
+            <p className="font-medium">{error}</p>
           </div>
         )}
 
+        {/* Loading State */}
         {loading ? (
-          <div className="p-8 text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-            <p className="mt-2 text-gray-600">Loading categories...</p>
+          <div className="p-10 text-center">
+            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[var(--color-primary-950)] mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading categories...</p>
           </div>
         ) : (
           <>
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Image
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Category Name
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {categories.length > 0 ? (
-                  categories.map((category) => (
-                    <tr key={category.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="w-12 h-12 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center">
-                          {category.category_image ? (
-                            <Image 
-                              src={`${process.env.NEXT_PUBLIC_API_BASE_URL}${category.category_image}`}
-                              alt={category.category_name}
-                              width={48}
-                              height={48}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <ImageIcon className="w-6 h-6 text-gray-400" />
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <span className="font-medium">{category.category_name}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <Link href={`/admin/products/add-category?id=${category.id}`}>
-                            <Edit className="w-4 h-4 text-blue-600 cursor-pointer hover:text-blue-800" />
+            {/* Table */}
+            <div className="overflow-x-auto"> {/* Ensures table is scrollable on small screens */}
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      Image
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      Category Name
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {categories.length > 0 ? (
+                    categories.map((category) => (
+                      <tr key={category.id} className="hover:bg-gray-50 transition-colors duration-150">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200 flex-shrink-0">
+                            {category.category_image ? (
+                              <Image
+                                src={`${process.env.NEXT_PUBLIC_API_BASE_URL}${category.category_image}`}
+                                alt={category.category_name}
+                                width={64}
+                                height={64}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <ImageIcon className="w-8 h-8 text-gray-400" />
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="font-medium text-gray-800">{category.category_name}</span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex items-center space-x-3">
+                            <Link
+                              href={`/admin/products/add-category?id=${category.id}`}
+                              className="text-blue-600 hover:text-blue-800 transition-colors duration-200"
+                              title="Edit Category"
+                            >
+                              <Edit className="w-5 h-5" />
+                            </Link>
+                            <button
+                              onClick={() => handleDeleteCategory(category.id)}
+                              className="text-red-600 hover:text-red-800 transition-colors duration-200"
+                              title="Delete Category"
+                            >
+                              <Trash2 className="w-5 h-5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={3} className="px-6 py-10 text-center text-gray-500">
+                        No categories found.
+                        <Link href="/admin/products/add-category" className="block mt-4 text-[var(--color-primary-950)] hover:underline">
+                          Click here to add a new category.
                         </Link>
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={3} className="px-6 py-8 text-center text-gray-500">
-                      No categories found
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  )}
+                </tbody>
+              </table>
+            </div>
 
-            <div className="px-6 py-4 border-t flex justify-between items-center">
-              <p className="text-sm text-gray-500">
+            {/* Pagination */}
+            <div className="px-6 py-5 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4">
+              <p className="text-sm text-gray-600">
                 Showing {categories.length} of {totalItems} categories
               </p>
-              <div className="flex space-x-2">
-                <button 
+              <div className="flex items-center space-x-3">
+                <button
                   onClick={handlePrevPage}
-                  disabled={currentPage === 1}
-                  className={`px-3 py-1 rounded border ${currentPage === 1 ? 'text-gray-400 border-gray-200' : 'text-blue-600 cursor-pointer border-blue-600'}`}
+                  disabled={currentPage === 1 || loading}
+                  className={`px-4 py-2 rounded-md border border-gray-300 bg-white
+                              flex items-center justify-center transition-colors duration-200
+                              ${currentPage === 1 || loading ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-100 hover:border-[var(--color-primary-950)]'}`}
+                  aria-label="Previous page"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
+                  <ChevronLeft className="w-5 h-5" />
                 </button>
-                <span className="px-3 py-1 text-sm">
+                <span className="text-gray-700 font-medium text-sm">
                   Page {currentPage} of {totalPages}
                 </span>
-                <button 
+                <button
                   onClick={handleNextPage}
-                  disabled={currentPage === totalPages}
-                  className={`px-3 py-1 rounded border ${currentPage === totalPages ? 'text-gray-400 border-gray-200' : 'text-blue-600 cursor-pointer border-blue-600'}`}
+                  disabled={currentPage === totalPages || loading}
+                  className={`px-4 py-2 rounded-md border border-gray-300 bg-white
+                              flex items-center justify-center transition-colors duration-200
+                              ${currentPage === totalPages || loading ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-100 hover:border-[var(--color-primary-950)]'}`}
+                  aria-label="Next page"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
+                  <ChevronRight className="w-5 h-5" />
                 </button>
               </div>
             </div>

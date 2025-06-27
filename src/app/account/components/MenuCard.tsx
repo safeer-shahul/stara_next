@@ -52,13 +52,13 @@ export default function MenuCard({ onMenuItemClick, activeItem }: MenuCardProps)
           >
             <div className="flex items-center">
               <span className={`mr-3 text-gray-600 ${
-                activeItem === item.id ? 'text-[#175e7a]' : ''
+                activeItem === item.id ? 'text-[var(--color-primary-950)]' : ''
               }`}>
                 {item.icon}
               </span>
               <div>
                 <p className={`font-medium text-[14px] ${
-                  activeItem === item.id ? 'text-[#175e7a]' : 'text-gray-700'
+                  activeItem === item.id ? 'text-[var(--color-primary-950)]' : 'text-gray-700'
                 }`}>
                   {item.label}
                 </p>

@@ -228,7 +228,7 @@ export default function ReplacementOrderModal({ orderId, orderItems, onClose, on
                         value={reason}
                         checked={replacementReason === reason}
                         onChange={() => setReplacementReason(reason)}
-                        className="h-4 w-4 text-[#175e7a] focus:ring-[#175e7a] border-gray-300"
+                        className="h-4 w-4 text-[var(--color-primary-950)] focus:ring-[#175e7a] border-gray-300"
                       />
                       <label htmlFor={`reason-${reason}`} className="ml-3 block text-sm text-gray-700">
                         {reason}
@@ -248,7 +248,7 @@ export default function ReplacementOrderModal({ orderId, orderItems, onClose, on
                     value={otherReason}
                     onChange={(e) => setOtherReason(e.target.value)}
                     rows={3}
-                    className="shadow-sm focus:ring-[#175e7a] focus:border-[#175e7a] block w-full sm:text-sm border-gray-300 rounded-md"
+                    className="shadow-sm focus:ring-[#175e7a] focus:border-[var(--color-primary-950)] block w-full sm:text-sm border-gray-300 rounded-md"
                     placeholder="Tell us more about why you're requesting a replacement..."
                   />
                 </div>
@@ -258,7 +258,7 @@ export default function ReplacementOrderModal({ orderId, orderItems, onClose, on
                 <button
                   type="submit"
                   disabled={submitting}
-                  className={`w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-[#175e7a] text-base font-medium text-white hover:bg-[#0f4c67] focus:outline-none sm:ml-3 sm:w-auto sm:text-sm ${
+                  className={`w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-[var(--color-primary-950)] text-base font-medium text-white hover:bg-[#0f4c67] focus:outline-none sm:ml-3 sm:w-auto sm:text-sm ${
                     submitting ? 'opacity-70 cursor-not-allowed' : ''
                   }`}
                 >

@@ -27,7 +27,7 @@ const CouponsList = ({ onBack, onApplyCoupon }: CouponsListProps) => {
           </div>
           <button 
             onClick={() => onApplyCoupon('B1G1')}
-            className="px-3 py-1 bg-[#175e7a] text-white rounded-full text-sm"
+            className="px-3 py-1 bg-[var(--color-primary-950)] text-white rounded-full text-sm"
           >
             Apply
           </button>
@@ -41,7 +41,7 @@ const CouponsList = ({ onBack, onApplyCoupon }: CouponsListProps) => {
             <p className="text-sm text-gray-600">10% off on all jewelry</p>
           </div>
           <button 
-            className="px-3 py-1 bg-[#175e7a] text-white rounded-full text-sm"
+            className="px-3 py-1 bg-[var(--color-primary-950)] text-white rounded-full text-sm"
             onClick={() => onApplyCoupon('TANK')}
           >
             Apply

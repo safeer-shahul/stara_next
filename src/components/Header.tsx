@@ -194,7 +194,7 @@ export default function Header() {
 
   return (
     <>
-      <div className="bg-[#175e7a] text-white py-2 text-center text-[14px]">
+      <div className="bg-[var(--color-primary-950)] text-white py-2 text-center text-[14px]">
         <p>
           BUY 1 GET 1 FREE &nbsp;&nbsp;| &nbsp;&nbsp;Use Code&nbsp;&nbsp;
           <span className="bg-red-500 text-white px-2 py-1 rounded-full text-xs font-bold">TANK</span>
@@ -217,7 +217,7 @@ export default function Header() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
               <button className="absolute right-3 top-2.5">
-                <Search size={18} className='text-[#175e7a]'/>
+                <Search size={18} className='text-[var(--color-primary-950)]'/>
               </button>
             </div>
           </div>
@@ -240,7 +240,7 @@ export default function Header() {
             
             <Link href="/account/wishlist" className="hidden md:block relative">
               <Heart size={22} />
-              <span className={`absolute ${isLoggedIn ? 'bottom-[-1px]' : 'bottom-[-11px]'} left-1/2 transform -translate-x-1/2 bg-[#F0FBFF] text-[#175e7a] text-[11px] h-3 w-6 flex items-center justify-center`}>
+              <span className={`absolute ${isLoggedIn ? 'bottom-[-1px]' : 'bottom-[-11px]'} left-1/2 transform -translate-x-1/2 bg-[#F0FBFF] text-[var(--color-primary-950)] text-[11px] h-3 w-6 flex items-center justify-center`}>
                 {wishlistCount}
               </span>
             </Link>
@@ -248,7 +248,7 @@ export default function Header() {
             {/* Shopping Cart Icon */}
             <a href="#" className="relative" onClick={handleCartClick}>
               <ShoppingCart size={22} />
-              <span className={`absolute ${isLoggedIn ? 'bottom-[-1px]' : 'bottom-[-11px]'} left-1/2 transform -translate-x-1/2 bg-[#F0FBFF] text-[#175e7a] text-[11px] h-3 w-6 flex items-center justify-center`}>
+              <span className={`absolute ${isLoggedIn ? 'bottom-[-1px]' : 'bottom-[-11px]'} left-1/2 transform -translate-x-1/2 bg-[#F0FBFF] text-[var(--color-primary-950)] text-[11px] h-3 w-6 flex items-center justify-center`}>
                 {totalCartUnits} {/* Use totalCartUnits from context */}
               </span>
             </a>
@@ -287,17 +287,17 @@ export default function Header() {
               {/* Mobile user account link */}
               {isLoggedIn ? (
                 <div className="flex items-center py-2 border-b border-gray-100 mb-2">
-                  <div className="w-8 h-8 rounded-full bg-[#175e7a] text-white flex items-center justify-center mr-2">
+                  <div className="w-8 h-8 rounded-full bg-[var(--color-primary-950)] text-white flex items-center justify-center mr-2">
                     {userProfile?.first_name?.charAt(0) || 'U'}
                   </div>
                   <div>
                     <p className="text-sm font-medium">{userProfile?.first_name || 'User'}</p>
-                    <Link href="/account" className="text-xs text-[#175e7a]">View Profile</Link>
+                    <Link href="/account" className="text-xs text-[var(--color-primary-950)]">View Profile</Link>
                   </div>
                 </div>
               ) : (
                 <button 
-                  className="w-full py-2 px-4 mb-4 rounded-md border border-[#175e7a] text-[#175e7a] flex items-center justify-center"
+                  className="w-full py-2 px-4 mb-4 rounded-md border border-[var(--color-primary-950)] text-[var(--color-primary-950)] flex items-center justify-center"
                   onClick={() => setIsAuthModalOpen(true)}
                 >
                   <User size={16} className="mr-2" />
@@ -307,7 +307,7 @@ export default function Header() {
 
               <Link href="/account/wishlist" className="flex items-center justify-between py-2 border-b border-gray-100">
                 <span>My Wishlist</span>
-                <span className="bg-[#F0FBFF] text-[#175e7a] text-xs px-2 py-0.5 rounded-full">
+                <span className="bg-[#F0FBFF] text-[var(--color-primary-950)] text-xs px-2 py-0.5 rounded-full">
                   {wishlistCount}
                 </span>
               </Link>

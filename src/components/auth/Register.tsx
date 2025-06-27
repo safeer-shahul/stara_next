@@ -199,7 +199,7 @@ const Register = ({ onClose, switchToLogin }: RegisterProps) => {
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full bg-[#175e7a] text-white py-2 px-4 rounded-md hover:bg-[#124a62] focus:outline-none focus:ring-2 focus:ring-[#175e7a] focus:ring-opacity-50"
+          className="w-full bg-[var(--color-primary-950)] text-white py-2 px-4 rounded-md hover:bg-[#124a62] focus:outline-none focus:ring-2 focus:ring-[#175e7a] focus:ring-opacity-50"
         >
           {isLoading ? 'Creating Account...' : 'Create Account'}
         </button>
@@ -209,7 +209,7 @@ const Register = ({ onClose, switchToLogin }: RegisterProps) => {
         Already have an account?{' '}
         <button
           onClick={switchToLogin}
-          className="text-[#175e7a] hover:underline focus:outline-none"
+          className="text-[var(--color-primary-950)] hover:underline focus:outline-none"
         >
           Sign in
         </button>

@@ -154,7 +154,7 @@ const Login = ({ onClose, switchToRegister, onLoginSuccess }: LoginProps) => {
             <label htmlFor="password" className="block text-sm font-medium text-gray-700">
               Password
             </label>
-            <a href="#" className="text-sm text-[#175e7a] hover:underline">
+            <a href="#" className="text-sm text-[var(--color-primary-950)] hover:underline">
               Forgot password?
             </a>
           </div>
@@ -171,7 +171,7 @@ const Login = ({ onClose, switchToRegister, onLoginSuccess }: LoginProps) => {
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full bg-[#175e7a] text-white py-2 px-4 rounded-md hover:bg-[#124a62] focus:outline-none focus:ring-2 focus:ring-[#175e7a] focus:ring-opacity-50"
+          className="w-full bg-[var(--color-primary-950)] text-white py-2 px-4 rounded-md hover:bg-[#124a62] focus:outline-none focus:ring-2 focus:ring-[#175e7a] focus:ring-opacity-50"
         >
           {isLoading ? 'Logging in...' : 'Log In'}
         </button>
@@ -181,7 +181,7 @@ const Login = ({ onClose, switchToRegister, onLoginSuccess }: LoginProps) => {
         Don&apos;t have an account?{' '}
         <button
           onClick={switchToRegister}
-          className="text-[#175e7a] hover:underline focus:outline-none"
+          className="text-[var(--color-primary-950)] hover:underline focus:outline-none"
         >
           Sign up
         </button>

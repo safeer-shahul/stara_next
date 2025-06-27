@@ -194,7 +194,7 @@ export default function FilterDrawer({
           <div className="px-2 py-6 relative">
             <div className="w-full h-1 bg-gray-300 rounded-full relative">
               <div 
-                className="absolute h-full bg-[#175e7a] rounded-full" 
+                className="absolute h-full bg-[var(--color-primary-950)] rounded-full" 
                 style={{
                   left: `${minThumbPosition}%`,
                   width: `${maxThumbPosition - minThumbPosition}%`
@@ -202,7 +202,7 @@ export default function FilterDrawer({
               ></div>
               
               <div 
-                className="absolute w-5 h-5 bg-white border-2 border-[#175e7a] rounded-full -top-2 -ml-2.5 cursor-pointer"
+                className="absolute w-5 h-5 bg-white border-2 border-[var(--color-primary-950)] rounded-full -top-2 -ml-2.5 cursor-pointer"
                 style={{ left: `${minThumbPosition}%` }}
                 onMouseDown={handleMinThumbMove}
                 onTouchStart={handleMinThumbMove}
@@ -214,7 +214,7 @@ export default function FilterDrawer({
               ></div>
               
               <div 
-                className="absolute w-5 h-5 bg-white border-2 border-[#175e7a] rounded-full -top-2 -ml-2.5 cursor-pointer" 
+                className="absolute w-5 h-5 bg-white border-2 border-[var(--color-primary-950)] rounded-full -top-2 -ml-2.5 cursor-pointer" 
                 style={{ left: `${maxThumbPosition}%` }}
                 onMouseDown={handleMaxThumbMove}
                 onTouchStart={handleMaxThumbMove}
@@ -317,7 +317,7 @@ export default function FilterDrawer({
         <div className="p-4 flex gap-3">
           <button 
             onClick={handleApply}
-            className="flex-1 py-2 bg-[#175e7a] text-[14px] cursor-pointer text-white rounded hover:bg-gray-800 transition-colors"
+            className="flex-1 py-2 bg-[var(--color-primary-950)] text-[14px] cursor-pointer text-white rounded hover:bg-gray-800 transition-colors"
           >
             Apply
           </button>

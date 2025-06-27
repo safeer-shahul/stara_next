@@ -107,7 +107,7 @@ export default function CancelOrderModal({ orderId, onClose, onSuccess }: Cancel
                           value={r}
                           checked={reason === r}
                           onChange={() => setReason(r)}
-                          className="h-4 w-4 text-[#175e7a] focus:ring-[#175e7a] border-gray-300"
+                          className="h-4 w-4 text-[var(--color-primary-950)] focus:ring-[var(--color-primary-950)] border-gray-300"
                         />
                         <label htmlFor={`reason-${r}`} className="ml-3 block text-sm text-gray-700">
                           {r}
@@ -127,7 +127,7 @@ export default function CancelOrderModal({ orderId, onClose, onSuccess }: Cancel
                       value={otherReason}
                       onChange={(e) => setOtherReason(e.target.value)}
                       rows={3}
-                      className="shadow-sm focus:ring-[#175e7a] focus:border-[#175e7a] block w-full sm:text-sm border-gray-300 rounded-md"
+                      className="shadow-sm focus:ring-[#175e7a] focus:border-[var(--color-primary-950)] block w-full sm:text-sm border-gray-300 rounded-md"
                       placeholder="Tell us more about why you're cancelling..."
                     />
                   </div>

@@ -334,27 +334,42 @@ class ApiService {
     }
   }
 
-  public async getPaginatedCategories(page: number = 1, pageSize: number = 10): Promise<{
-    results: Array<{
-      id: string; 
-      category_name: string;
-      category_image: string | null; 
-      slug: string;
-    }>;
-    count: number;
-    next: string | null;
-    previous: string | null;
-  }> {
-    try {
-      const response = await this.get<any>(`/category/get_paginated_category?page=${page}&page_size=${pageSize}`);
-      return response;
-    } catch (error) {
-      console.error('Error fetching paginated categories:', error);
-      throw error;
+  // In your apiService.ts file (or wherever getPaginatedCategories is defined)
+
+public async getPaginatedCategories(
+  page: number = 1,
+  pageSize: number = 10,
+  searchQuery?: string // <--- Add this optional parameter
+): Promise<{
+  results: Array<{
+    id: string;
+    category_name: string;
+    category_image: string | null;
+    slug: string;
+  }>;
+  count: number;
+  next: string | null;
+  previous: string | null;
+}> {
+  try {
+    // Construct the base URL
+    let url = `/category/get_paginated_category?page=${page}&page_size=${pageSize}`;
+
+    // Add search query if provided and not empty
+    if (searchQuery) { // Check if searchQuery is provided and truthy
+      url += `&search=${encodeURIComponent(searchQuery)}`; // <--- Add search parameter
     }
+
+    const response = await this.get<any>(url); // Use the constructed URL
+    return response;
+  } catch (error) {
+    console.error('Error fetching paginated categories:', error);
+    throw error;
   }
+}
 
   public async getAllCategories(): Promise<Array<{
+    sub_categories?: any;
     id: string;
     category_name: string;
     category_image: string | null;
@@ -387,48 +402,54 @@ class ApiService {
 
 
   public async getPaginatedProducts(
-    page: number = 1,
-    pageSize: number = 10,
-    productIds?: string[],
-    filters?: {
-      subcategory_id?: string | number,
-      min_price?: number,
-      max_price?: number,
-      sort_by?: string
-    }
-  ): Promise<any> {
-    try {
-      let url = `/products/get_all_products?page=${page}&page_size=${pageSize}`;
-      
-      if (productIds && productIds.length > 0) {
-        url += `&ids=${productIds}`;
-      }
-      
-      if (filters) {
-        if (filters.subcategory_id) {
-          url += `&sub_category=${filters.subcategory_id}`;
-        }
-        
-        if (filters.min_price) {
-          url += `&min_price=${filters.min_price}`;
-        }
-        
-        if (filters.max_price) {
-          url += `&max_price=${filters.max_price}`;
-        }
-        
-        if (filters.sort_by) {
-          url += `&sort_by=${filters.sort_by}`;
-        }
-      }
-      
-      const response = await this.getPublic<any>(url);
-      return response;
-    } catch (error) {
-      console.error('Error fetching paginated products:', error);
-      throw error;
-    }
+  page: number = 1,
+  pageSize: number = 10,
+  searchQuery?: string, // <--- Add this new optional parameter
+  productIds?: string[],
+  filters?: {
+    subcategory_id?: string | number,
+    min_price?: number,
+    max_price?: number,
+    sort_by?: string
   }
+): Promise<any> { // Consider making 'any' more specific with an interface if possible
+  try {
+    let url = `/products/get_all_products?page=${page}&page_size=${pageSize}`;
+
+    // Add search query if provided and not empty
+    if (searchQuery) {
+      url += `&search=${encodeURIComponent(searchQuery)}`; // <--- Add search parameter to URL
+    }
+
+    if (productIds && productIds.length > 0) {
+      url += `&ids=${productIds.join(',')}`; // It's common for IDs arrays to be comma-separated
+    }
+
+    if (filters) {
+      if (filters.subcategory_id) {
+        url += `&sub_category=${filters.subcategory_id}`;
+      }
+
+      if (filters.min_price) {
+        url += `&min_price=${filters.min_price}`;
+      }
+
+      if (filters.max_price) {
+        url += `&max_price=${filters.max_price}`;
+      }
+
+      if (filters.sort_by) {
+        url += `&sort_by=${filters.sort_by}`;
+      }
+    }
+
+    const response = await this.getPublic<any>(url); // Assuming getPublic is your method for public endpoints
+    return response;
+  } catch (error) {
+    console.error('Error fetching paginated products:', error);
+    throw error;
+  }
+}
 
   public async createHomeCategory(data: any): Promise<any> {
     try {      

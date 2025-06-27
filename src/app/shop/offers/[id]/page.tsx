@@ -230,7 +230,7 @@ export default function OfferProductsPage() {
           handleProductAdd(product);
         }}
         disabled={isDisabled} // Use the new isDisabled
-        className="w-full flex items-center cursor-pointer justify-center gap-2 py-2 px-3 bg-[#175e7a] text-white rounded-md hover:bg-[#0f4c67] disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
+        className="w-full flex items-center cursor-pointer justify-center gap-2 py-2 px-3 bg-[var(--color-primary-950)] text-white rounded-md hover:bg-[#0f4c67] disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
       >
         <ShoppingBag size={14} />
         Add {selectedCount > 0 && `(${selectedCount})`}
@@ -372,7 +372,7 @@ export default function OfferProductsPage() {
                     )}
 
                     {totalSelected > 0 && (
-                      <div className="absolute top-2 right-2 bg-[#175e7a] text-white text-xs px-2 py-1 rounded-full z-10 font-medium">
+                      <div className="absolute top-2 right-2 bg-[var(--color-primary-950)] text-white text-xs px-2 py-1 rounded-full z-10 font-medium">
                         {totalSelected}
                       </div>
                     )}
@@ -421,7 +421,7 @@ export default function OfferProductsPage() {
 
       {isMobile && filledSlots.length > 0 && (
         <div 
-          className="fixed bottom-0 left-0 right-0 bg-[#175e7a] rounded-tr-2xl rounded-tl-2xl shadow-lg px-4 pt-4 pb-14 z-50"
+          className="fixed bottom-0 left-0 right-0 bg-[var(--color-primary-950)] rounded-tr-2xl rounded-tl-2xl shadow-lg px-4 pt-4 pb-14 z-50"
           onClick={() => setShowMobileSlider(true)} /* Clicking this bar opens the mobile slider */
         >
           <div
@@ -432,7 +432,7 @@ export default function OfferProductsPage() {
                 <div className="w-12 h-12 rounded-full border-2 border-white/30 flex items-center justify-center">
                   <ShoppingBag size={20} className="text-white" />
                 </div>
-                <span className="absolute -top-1 -right-1 bg-white text-[#175e7a] text-sm font-bold rounded-full w-6 h-6 flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 bg-white text-[var(--color-primary-950)] text-sm font-bold rounded-full w-6 h-6 flex items-center justify-center">
                   {filledSlots.length}
                 </span>
               </div>

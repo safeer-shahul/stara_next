@@ -313,7 +313,7 @@ const BillSummary: React.FC<BillSummaryProps> = ({
           <p className="text-red-500 mb-4">{error}</p>
           <button
             onClick={fetchBillDetails}
-            className="px-4 py-2 bg-[#175e7a] text-white rounded hover:bg-[#0f4c67] cursor-pointer"
+            className="px-4 py-2 bg-[var(--color-primary-950)] text-white rounded hover:bg-[#0f4c67] cursor-pointer"
           >
             Try Again
           </button>
@@ -375,15 +375,15 @@ const BillSummary: React.FC<BillSummaryProps> = ({
             <div className="space-y-3">
               <div
                 className={`flex items-center p-3 border rounded-md cursor-pointer ${
-                  paymentMethod === 'Razorpay' ? 'border-[#175e7a] bg-blue-50' : 'border-gray-200'
+                  paymentMethod === 'Razorpay' ? 'border-[var(--color-primary-950)] bg-blue-50' : 'border-gray-200'
                 }`}
                 onClick={() => setPaymentMethod('Razorpay')}
               >
                 <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                  paymentMethod === 'Razorpay' ? 'border-[#175e7a]' : 'border-gray-300'
+                  paymentMethod === 'Razorpay' ? 'border-[var(--color-primary-950)]' : 'border-gray-300'
                 }`}>
                   {paymentMethod === 'Razorpay' && (
-                    <div className="w-3 h-3 rounded-full bg-[#175e7a]"></div>
+                    <div className="w-3 h-3 rounded-full bg-[var(--color-primary-950)]"></div>
                   )}
                 </div>
                 <div className="ml-3">
@@ -394,15 +394,15 @@ const BillSummary: React.FC<BillSummaryProps> = ({
 
               <div
                 className={`flex items-center p-3 border rounded-md cursor-pointer ${
-                  paymentMethod === 'Cod' ? 'border-[#175e7a] bg-blue-50' : 'border-gray-200'
+                  paymentMethod === 'Cod' ? 'border-[var(--color-primary-950)] bg-blue-50' : 'border-gray-200'
                 }`}
                 onClick={() => setPaymentMethod('Cod')}
               >
                 <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                  paymentMethod === 'Cod' ? 'border-[#175e7a]' : 'border-gray-300'
+                  paymentMethod === 'Cod' ? 'border-[var(--color-primary-950)]' : 'border-gray-300'
                 }`}>
                   {paymentMethod === 'Cod' && (
-                    <div className="w-3 h-3 rounded-full bg-[#175e7a]"></div>
+                    <div className="w-3 h-3 rounded-full bg-[var(--color-primary-950)]"></div>
                   )}
                 </div>
                 <div className="ml-3">
@@ -415,7 +415,7 @@ const BillSummary: React.FC<BillSummaryProps> = ({
 
           <div className="mt-6">
             <button
-              className="w-full bg-[#175e7a] text-[14px] text-white font-medium py-3 rounded-md hover:bg-[#0f4c67] cursor-pointer transition-colors shadow-sm"
+              className="w-full bg-[var(--color-primary-950)] text-[14px] text-white font-medium py-3 rounded-md hover:bg-[#0f4c67] cursor-pointer transition-colors shadow-sm"
               onClick={handlePlaceOrder}
               disabled={processingOrder}
             >

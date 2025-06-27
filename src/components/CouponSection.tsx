@@ -1,12 +1,12 @@
 'use client';
 
 import { ChevronRight } from 'lucide-react';
-import { CouponType } from './type';
+// import { CouponType } from './type';
 
 type CouponSectionProps = {
   couponCode: string;
   setCouponCode: (code: string) => void;
-  appliedCoupon: CouponType | null;
+  appliedCoupon: any;
   onApply: () => void;
   onViewCoupons: () => void;
 };
@@ -29,7 +29,7 @@ const CouponSection = ({
           onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
         />
         <button 
-          className="text-[#175e7a] font-medium text-sm"
+          className="text-[var(--color-primary-950)] font-medium text-sm"
           onClick={onApply}
         >
           Apply
@@ -38,7 +38,7 @@ const CouponSection = ({
       
       <div className="flex justify-between mt-1">
         <button 
-          className="text-[#175e7a] font-medium text-[12px] flex items-center"
+          className="text-[var(--color-primary-950)] font-medium text-[12px] flex items-center"
           onClick={onViewCoupons}
         >
           View Coupons <ChevronRight size={16} />

@@ -1,27 +1,36 @@
-// app/admin/coupons/list/page.tsx
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { Ticket, Plus, Edit, ArrowLeft, Calendar, Clock, Percent, Hash } from 'lucide-react';
+// Import all necessary icons for consistent design
+import { Ticket, Plus, Edit, ArrowLeft, Calendar, Clock, Percent, Hash, Info, Trash2, DollarSign } from 'lucide-react';
 import apiService from '@/utils/api/apiService';
 
+// Define a more specific interface for Coupon
+interface Coupon {
+  id: string; // Assuming unique ID for the coupon
+  coupon_name: string;
+  coupon_code: string;
+  discount_type: 'percentage' | 'fixed_amount'; // Or 'fixed_amount'
+  discount_value: number;
+  start_date: string; // ISO date string
+  end_date: string;   // ISO date string
+  // Add other properties if your API returns them (e.g., usage_limit, min_cart_value)
+}
+
 export default function CouponListPage() {
-  const [coupons, setCoupons] = useState<any[]>([]);
+  const [coupons, setCoupons] = useState<Coupon[]>([]); // Use specific type
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchCoupons();
-  }, []);
-
-  const fetchCoupons = async () => {
+  // Memoize fetchCoupons for better performance
+  const fetchCoupons = useCallback(async () => {
     setLoading(true);
+    setError(null); // Clear previous errors
     try {
-      // Using the getAllCoupons function from apiService
+      // Assuming apiService.getAllCoupons() returns an object with a 'data' array
       const response = await apiService.getAllCoupons();
-      setCoupons(response.data);
-      setError(null);
+      setCoupons(response.data || []); // Ensure 'data' property is used and default to empty array
     } catch (err) {
       console.error('Failed to fetch coupons:', err);
       setError('Failed to load coupons. Please try again.');
@@ -29,121 +38,157 @@ export default function CouponListPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []); // No dependencies as it fetches all data on mount
+
+  useEffect(() => {
+    fetchCoupons();
+  }, [fetchCoupons]); // Depend on memoized fetchCoupons
 
   // Format date to readable format
-  const formatDate = (dateString: string) => {
+  const formatDate = useCallback((dateString: string) => {
     if (!dateString) return 'Not set';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
-  };
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (e) {
+      console.error("Invalid date string:", dateString, e);
+      return dateString; // Return original if invalid
+    }
+  }, []);
 
   // Get coupon status based on dates
-  const getCouponStatus = (startDate: string, endDate: string) => {
-    if (!startDate || !endDate) return { status: 'No dates', color: 'text-gray-500' };
-    
+  const getCouponStatus = useCallback((startDate: string, endDate: string) => {
+    if (!startDate || !endDate) return { status: 'No dates', colorClass: 'bg-gray-100 text-gray-800' };
+
     const today = new Date();
     const start = new Date(startDate);
     const end = new Date(endDate);
-    
+
     // Reset time to start of day for accurate comparison
     today.setHours(0, 0, 0, 0);
     start.setHours(0, 0, 0, 0);
     end.setHours(0, 0, 0, 0);
-    
+
     if (today < start) {
-      return { status: 'Upcoming', color: 'text-blue-600' };
+      return { status: 'Upcoming', colorClass: 'bg-blue-100 text-blue-800' };
     } else if (today > end) {
-      return { status: 'Expired', color: 'text-red-600' };
+      return { status: 'Expired', colorClass: 'bg-red-100 text-red-800' };
     } else {
-      return { status: 'Active', color: 'text-green-600' };
+      return { status: 'Active', colorClass: 'bg-green-100 text-green-800' };
     }
-  };
+  }, []);
 
   // Format discount value
-  const formatDiscount = (discountType: string, discountValue: number) => {
+  const formatDiscount = useCallback((discountType: string, discountValue: number) => {
     if (discountType === 'percentage') {
       return `${discountValue}%`;
     } else {
-      return `$${discountValue}`;
+      return `₹${discountValue}`; // Changed to ₹ for Indian Rupee
     }
-  };
+  }, []);
 
   // Get discount icon
-  const getDiscountIcon = (discountType: string) => {
+  const getDiscountIcon = useCallback((discountType: string) => {
     return discountType === 'percentage' ? (
-      <Percent className="w-4 h-4 text-green-600" />
+      <Percent className="w-5 h-5 mr-1 text-green-600" /> // Slightly larger icon
     ) : (
-      <span className="text-green-600 font-bold text-sm">$</span>
+      <DollarSign className="w-5 h-5 mr-1 text-green-600" /> // Using DollarSign as closest for fixed amount
     );
-  };
+  }, []);
+
+  // Placeholder for delete functionality
+  const handleDeleteCoupon = useCallback((couponId: string) => {
+    if (confirm(`Are you sure you want to delete coupon "${couponId}"?`)) {
+      // Implement actual API call for deletion here
+      console.log(`Deleting coupon with ID: ${couponId}`);
+      // After successful deletion, refetch coupons to update the list
+      // apiService.deleteCoupon(couponId).then(() => fetchCoupons());
+      alert('Delete functionality not yet implemented in API.');
+    }
+  }, [fetchCoupons]); // Depend on fetchCoupons to re-run it after deletion
 
   return (
-    <div>
+    <div className="space-y-8">
+      {/* Page Header and Add Button */}
       <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-2">
-          <h2 className="text-2xl font-bold">Coupons</h2>
+        <div className="flex items-center gap-4"> {/* Increased gap for better spacing */}
+          {/* No explicit back link, as per the original code's absence */}
+          <h2 className="text-3xl font-extrabold text-gray-800 flex items-center">
+            <Ticket className="w-8 h-8 mr-3 text-[var(--color-primary-950)]" /> {/* Larger, branded icon */}
+            Coupons
+          </h2>
         </div>
-        <Link className="bg-blue-600 cursor-pointer text-white px-4 py-2 rounded-lg flex items-center" href="/admin/coupons/create">
-            <Plus className="w-5 h-5 mr-2" />
-            Add Coupon
+        <Link
+          href="/admin/coupons/create"
+          className="bg-[var(--color-primary-950)] text-white px-6 py-3 rounded-lg flex items-center shadow-md
+                     hover:bg-[color:var(--color-primary-950)]/90 transition-colors duration-200
+                     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-950)] focus-visible:ring-offset-2"
+        >
+          <Plus className="w-5 h-5 mr-2" />
+          Add New Coupon
         </Link>
       </div>
 
-      <div className="bg-white shadow rounded-lg overflow-hidden">
-        <div className="p-4 border-b flex justify-between items-center">
+      {/* Main Content Area: Coupons Table */}
+      <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
+        {/* Table Header/Toolbar */}
+        <div className="p-5 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="flex items-center">
-            <Ticket className="w-5 h-5 text-blue-600 mr-2" />
-            <h3 className="font-semibold">All Coupons</h3>
+            <Ticket className="w-6 h-6 text-[var(--color-primary-950)] mr-3" /> {/* Consistent icon for toolbar */}
+            <h3 className="font-semibold text-lg text-gray-800">All Available Coupons</h3>
           </div>
+          {/* No search/filter in original, so keeping it out for now */}
         </div>
 
+        {/* Error Message */}
         {error && (
-          <div className="p-4 text-red-700 bg-red-100">
-            {error}
+          <div className="p-6 text-red-700 bg-red-50 border-l-4 border-red-500">
+            <p className="font-medium">{error}</p>
           </div>
         )}
 
+        {/* Loading State */}
         {loading ? (
-          <div className="p-8 text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-            <p className="mt-2 text-gray-600">Loading coupons...</p>
+          <div className="p-10 text-center">
+            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[var(--color-primary-950)] mx-auto"></div>
+            <p className="mt-4 text-lg text-gray-600">Loading coupons...</p>
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
+            {/* Table */}
+            <div className="overflow-x-auto"> {/* Ensures table is scrollable on small screens */}
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                       Coupon Details
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                       Discount
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                       <div className="flex items-center">
-                        <Calendar className="w-4 h-4 mr-1" />
+                        <Calendar className="w-4 h-4 mr-1 text-gray-500" /> {/* Icon styling */}
                         Start Date
                       </div>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                       <div className="flex items-center">
-                        <Calendar className="w-4 h-4 mr-1" />
+                        <Calendar className="w-4 h-4 mr-1 text-gray-500" /> {/* Icon styling */}
                         End Date
                       </div>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                       <div className="flex items-center">
-                        <Clock className="w-4 h-4 mr-1" />
+                        <Clock className="w-4 h-4 mr-1 text-gray-500" /> {/* Icon styling */}
                         Status
                       </div>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
@@ -151,50 +196,54 @@ export default function CouponListPage() {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {coupons?.length > 0 ? (
                     coupons.map((coupon) => {
-                      const { status, color } = getCouponStatus(coupon.start_date, coupon.end_date);
+                      const { status, colorClass } = getCouponStatus(coupon.start_date, coupon.end_date);
                       return (
-                        <tr key={coupon.id} className="hover:bg-gray-50">
+                        <tr key={coupon.id} className="hover:bg-gray-50 transition-colors duration-150">
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div>
-                              <div className="text-sm font-medium text-gray-900">{coupon.coupon_name}</div>
-                              {coupon.coupon_code && (
-                                <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded mt-1 inline-block font-mono">
-                                  {coupon.coupon_code}
-                                </div>
-                              )}
-                            </div>
+                            <div className="text-base font-medium text-gray-900">{coupon.coupon_name}</div>
+                            {coupon.coupon_code && (
+                              <div className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded mt-1 inline-flex items-center font-mono">
+                                <Hash className="w-3 h-3 mr-1 text-gray-500" /> {/* Hashtag icon for code */}
+                                {coupon.coupon_code}
+                              </div>
+                            )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center text-sm text-gray-900">
+                            <div className="flex items-center text-base font-medium text-gray-900">
                               {getDiscountIcon(coupon.discount_type)}
-                              <span className="ml-1 font-medium">
-                                {formatDiscount(coupon.discount_type, coupon.discount_value)}
-                              </span>
-                              <span className="ml-1 text-xs text-gray-500 capitalize">
-                                {coupon.discount_type}
+                              {formatDiscount(coupon.discount_type, coupon.discount_value)}
+                              <span className="ml-2 text-xs text-gray-500 capitalize">
+                                ({coupon.discount_type})
                               </span>
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
-                              {formatDate(coupon.start_date)}
-                            </div>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                            {formatDate(coupon.start_date)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                            {formatDate(coupon.end_date)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
-                              {formatDate(coupon.end_date)}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`text-sm font-medium ${color}`}>
+                            <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${colorClass}`}>
                               {status}
                             </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <div className="flex space-x-2">
-                              <Link className="text-blue-600 cursor-pointer hover:text-blue-800" href={`/admin/coupons/create?id=${coupon.id}`}>
-                                  <Edit className="w-4 h-4" />
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <div className="flex items-center space-x-3">
+                              <Link
+                                href={`/admin/coupons/create?id=${coupon.id}`}
+                                className="text-blue-600 hover:text-blue-800 transition-colors duration-200"
+                                title="Edit Coupon"
+                              >
+                                <Edit className="w-5 h-5" />
                               </Link>
+                              <button
+                                onClick={() => handleDeleteCoupon(coupon.id)}
+                                className="text-red-600 hover:text-red-800 transition-colors duration-200"
+                                title="Delete Coupon"
+                              >
+                                <Trash2 className="w-5 h-5" /> {/* Delete icon */}
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -202,14 +251,19 @@ export default function CouponListPage() {
                     })
                   ) : (
                     <tr>
-                      <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
-                        No coupons found
+                      <td colSpan={6} className="px-6 py-10 text-center text-gray-500"> {/* Adjusted colSpan */}
+                        <Info className="w-10 h-10 text-gray-400 mx-auto mb-3" />
+                        <p className="text-lg">No coupons found.</p>
+                        <Link href="/admin/coupons/create" className="block mt-4 text-[var(--color-primary-950)] hover:underline">
+                          Click here to add a new coupon.
+                        </Link>
                       </td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
+            {/* Pagination is omitted as per original component logic (fetches all data) */}
           </>
         )}
       </div>

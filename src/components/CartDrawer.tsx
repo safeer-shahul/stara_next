@@ -152,7 +152,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                 <X size={22} />
               </button>
             </div>
-            <div className="bg-[#175e7a] py-1 text-center">
+            <div className="bg-[var(--color-primary-950)] py-1 text-center">
               <p className="text-white text-[12px]">BUY 1 GET 1 FREE | USE CODE : B1G1</p>
             </div>
             <div className="flex-1 overflow-y-auto">
@@ -228,7 +228,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                 <div className="flex gap-2">
                   {cartItems.length > 0 && (
                     <button
-                      className="px-3 py-3 border border-[#175e7a] text-[14px] text-[#175e7a] font-medium hover:bg-gray-100 cursor-pointer transition-colors rounded"
+                      className="px-3 py-3 border border-[var(--color-primary-950)] text-[14px] text-[var(--color-primary-950)] font-medium hover:bg-gray-100 cursor-pointer transition-colors rounded"
                       onClick={clearCart}
                     >
                       Clear Cart
@@ -236,7 +236,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                   )}
                   <button
                     className={`flex-1 text-[14px] text-white font-medium py-3 cursor-pointer transition-colors shadow-sm rounded flex items-center justify-center ${
-                      hasOutOfStockItems() ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#175e7a] hover:bg-[#0f4c67]'
+                      hasOutOfStockItems() ? 'bg-gray-400 cursor-not-allowed' : 'bg-[var(--color-primary-950)] hover:bg-[#0f4c67]'
                     }`}
                     onClick={hasOutOfStockItems() ? undefined : handleProceedToCheckout}
                     disabled={hasOutOfStockItems()}

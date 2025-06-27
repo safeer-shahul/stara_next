@@ -363,14 +363,14 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       ? handleBackToBillSummary
                       : undefined
                 }
-                className={`mr-3 text-[#175E7A] hover:text-gray-700 transition-colors ${
+                className={`mr-3 text-[var(--color-primary-950)] hover:text-gray-700 transition-colors ${
                   currentStep === CheckoutStep.ORDER_CONFIRMATION ? 'hidden' : ''
                 }`}
               >
                 <ArrowLeft size={20} />
               </button>
             )}
-            <h3 className="text-lg text-[#175E7A] font-medium">
+            <h3 className="text-lg text-[var(--color-primary-950)] font-medium">
               {currentStep === CheckoutStep.ADDRESS_SELECTION && 'Checkout'}
               {currentStep === CheckoutStep.BILL_SUMMARY && 'Order Summary'}
               {currentStep === CheckoutStep.PAYMENT_PROCESSING && 'Processing Payment'}
@@ -379,7 +379,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
           </div>
           <button
             onClick={handleClose}
-            className="text-[#175E7A] hover:text-gray-700 transition-colors cursor-pointer"
+            className="text-[var(--color-primary-950)] hover:text-gray-700 transition-colors cursor-pointer"
             disabled={currentStep === CheckoutStep.PAYMENT_PROCESSING && !error}
           >
             <X size={20} />
@@ -403,7 +403,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
                   {loading ? (
                     <div className="flex justify-center items-center h-40">
-                      <div className="w-8 h-8 border-4 border-gray-200 border-t-[#175e7a] rounded-full animate-spin mr-2"></div>
+                      <div className="w-8 h-8 border-4 border-gray-200 border-t-[var(--color-primary-950)] rounded-full animate-spin mr-2"></div>
                       <p>Loading addresses...</p>
                     </div>
                   ) : showAddressForm ? (
@@ -418,7 +418,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                           <h4 className="font-medium text-[15px] text-[#494949]">Select Delivery Address</h4>
                           <button
                             onClick={() => setShowAddressForm(true)}
-                            className="text-[13px] text-[#175e7a] cursor-pointer hover:text-blue-800 font-medium transition-colors"
+                            className="text-[13px] text-[var(--color-primary-950)] cursor-pointer hover:text-blue-800 font-medium transition-colors"
                           >
                             Add New Address
                           </button>
@@ -429,7 +429,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                             <p className="text-gray-500">No addresses found. Please add a new address.</p>
                             <button
                               onClick={() => setShowAddressForm(true)}
-                              className="mt-2 text-[13px] text-[#175e7a] cursor-pointer hover:text-blue-800 font-medium transition-colors"
+                              className="mt-2 text-[13px] text-[var(--color-primary-950)] cursor-pointer hover:text-blue-800 font-medium transition-colors"
                             >
                               Add New Address
                             </button>
@@ -441,17 +441,17 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                                 key={address.id}
                                 className={`p-4 border rounded-lg cursor-pointer transition-all ${
                                   selectedAddressId === address.id
-                                    ? 'border-[#175e7a] bg-blue-50'
+                                    ? 'border-[var(--color-primary-950)] bg-blue-50'
                                     : 'border-gray-200 hover:border-gray-300'
                                 }`}
                                 onClick={() => handleAddressSelection(address.id)}
                               >
                                 <div className="flex items-start">
                                   <div className={`w-5 h-5 mt-1 mr-3 rounded-full border flex items-center justify-center ${
-                                    selectedAddressId === address.id ? 'border-[#175e7a]' : 'border-gray-300'
+                                    selectedAddressId === address.id ? 'border-[var(--color-primary-950)]' : 'border-gray-300'
                                   }`}>
                                     {selectedAddressId === address.id && (
-                                      <div className="w-3 h-3 rounded-full bg-[#175e7a]"></div>
+                                      <div className="w-3 h-3 rounded-full bg-[var(--color-primary-950)]"></div>
                                     )}
                                   </div>
                                   <div className='mt-[-5px] text-[14px]'>
@@ -517,7 +517,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         {currentStep === CheckoutStep.ADDRESS_SELECTION && addresses.length > 0 && !showAddressForm && (
           <div className="p-4 border-t border-gray-200 bg-gray-50 rounded-b-lg">
             <button
-              className="w-full bg-[#175e7a] text-[14px] text-white font-medium py-3 rounded-md hover:bg-[#0f4c67] cursor-pointer transition-colors shadow-sm"
+              className="w-full bg-[var(--color-primary-950)] text-[14px] text-white font-medium py-3 rounded-md hover:bg-[#0f4c67] cursor-pointer transition-colors shadow-sm"
               onClick={handleProceedToPayment}
               disabled={!selectedAddressId}
             >

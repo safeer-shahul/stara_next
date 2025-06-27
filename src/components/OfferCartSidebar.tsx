@@ -263,7 +263,7 @@ export default function OfferCartSidebar({
                     <button
                         className={`w-full mt-4 py-3 rounded-lg font-medium transition-colors ${
                             isOfferComplete()
-                                ? 'bg-[#175e7a] cursor-pointer text-white hover:bg-[#0f4c67]'
+                                ? 'bg-[var(--color-primary-950)] cursor-pointer text-white hover:bg-[#0f4c67]'
                                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                         }`}
                         disabled={!isOfferComplete()}
