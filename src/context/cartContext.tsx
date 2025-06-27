@@ -118,12 +118,15 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
     case 'SET_CART_ITEMS':
       {
         console.log('Reducer: SET_CART_ITEMS action received. Payload:', action.payload);
-        const serializedPayload = JSON.stringify(action.payload);
-        if (JSON.stringify(state.cartItems) !== serializedPayload) {
-          localStorage.setItem('cartItems', serializedPayload);
-          console.log('Reducer: SET_CART_ITEMS: localStorage updated.');
-        } else {
-          console.log('Reducer: SET_CART_ITEMS: No change in cart items, localStorage not updated.');
+        // Only update localStorage if on client and there's a change
+        if (typeof window !== 'undefined') {
+          const serializedPayload = JSON.stringify(action.payload);
+          if (JSON.stringify(state.cartItems) !== serializedPayload) {
+            localStorage.setItem('cartItems', serializedPayload);
+            console.log('Reducer: SET_CART_ITEMS: localStorage updated.');
+          } else {
+            console.log('Reducer: SET_CART_ITEMS: No change in cart items, localStorage not updated.');
+          }
         }
         return { ...state, cartItems: action.payload };
       }
@@ -136,7 +139,7 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
           isSynced: false,
         };
         const newItems = [...state.cartItems, newOfferSet];
-        if (!localStorage.getItem('accessToken')) {
+        if (typeof window !== 'undefined' && !localStorage.getItem('accessToken')) {
             localStorage.setItem('cartItems', JSON.stringify(newItems));
         }
         return { ...state, cartItems: newItems };
@@ -167,7 +170,7 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
           newItems = [...state.cartItems, newNormalItem];
           console.log('Reducer: ADD_NORMAL_ITEM: Added new normal item with guaranteed ID.');
         }
-        if (!localStorage.getItem('accessToken')) {
+        if (typeof window !== 'undefined' && !localStorage.getItem('accessToken')) {
             localStorage.setItem('cartItems', JSON.stringify(newItems));
         }
         return { ...state, cartItems: newItems };
@@ -176,12 +179,10 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
       {
         console.log('Reducer: REMOVE_ITEM action received. Item ID to remove:', action.payload);
         const filteredItems = state.cartItems.filter((item) => item.id !== action.payload);
-        // if (!localStorage.getItem('accessToken')) {
+        if (typeof window !== 'undefined') {
             localStorage.setItem('cartItems', JSON.stringify(filteredItems));
             console.log('Reducer: REMOVE_ITEM: localStorage updated for guest user.');
-        // } else {
-            // console.log('Reducer: REMOVE_ITEM: Optimistically removed item locally for authenticated user.');
-        // }
+        }
         return { ...state, cartItems: filteredItems };
       }
     case 'UPDATE_ITEM_QUANTITY':
@@ -197,7 +198,7 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
           }
           return item;
         });
-        if (!localStorage.getItem('accessToken')) {
+        if (typeof window !== 'undefined' && !localStorage.getItem('accessToken')) {
             localStorage.setItem('cartItems', JSON.stringify(updatedItems));
         }
         return { ...state, cartItems: updatedItems };
@@ -252,81 +253,88 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   const customDispatch: React.Dispatch<CartAction> = useCallback(async (action) => {
     console.log(`Custom Dispatch: Processing action type: ${action.type}`);
 
-    const currentTokenAtDispatch = localStorage.getItem('accessToken');
+    // Only attempt backend calls if on the client side
+    if (typeof window !== 'undefined') {
+      const currentTokenAtDispatch = localStorage.getItem('accessToken');
 
-    if (currentTokenAtDispatch) {
-        try {
-            if (action.type === 'REMOVE_ITEM') {
-                console.log(`Custom Dispatch: Authenticated REMOVE_ITEM - Sending backend delete for cart item ID: ${action.payload}`);
-                // Backend still needs item_id for deletion
-                await cartService.addToCart({
-                    item_id: action.payload.replace(/-/g, ''),
-                    mode: 'delete'
-                });
-                console.log(`Custom Dispatch: Backend removal sent for ${action.payload}.`);
-            } else if (action.type === 'UPDATE_ITEM_QUANTITY') {
-                const itemToUpdate = state.cartItems.find(item => item.id === action.payload.id) as CartNormalItem;
-                if (itemToUpdate) {
-                    const currentQuantity = itemToUpdate.quantity;
-                    const newQuantity = action.payload.quantity;
-                    const quantityChange = newQuantity - currentQuantity;
+      if (currentTokenAtDispatch) {
+          try {
+              if (action.type === 'REMOVE_ITEM') {
+                  console.log(`Custom Dispatch: Authenticated REMOVE_ITEM - Sending backend delete for cart item ID: ${action.payload}`);
+                  await cartService.addToCart({
+                      item_id: action.payload.replace(/-/g, ''),
+                      mode: 'delete'
+                  });
+                  console.log(`Custom Dispatch: Backend removal sent for ${action.payload}.`);
+              } else if (action.type === 'UPDATE_ITEM_QUANTITY') {
+                  const itemToUpdate = state.cartItems.find(item => item.id === action.payload.id) as CartNormalItem;
+                  if (itemToUpdate) {
+                      const currentQuantity = itemToUpdate.quantity;
+                      const newQuantity = action.payload.quantity;
+                      const quantityChange = newQuantity - currentQuantity;
 
-                    if (quantityChange > 0) {
-                        // Backend only needs product_id for increment, it handles which item
-                        // No item_id is sent here based on your backend clarification.
-                        await cartService.addToCart({
-                            product_id: itemToUpdate.product_id.replace(/-/g, ''),
-                            mode: '+'
-                        });
-                    } else if (quantityChange < 0) {
-                        // Backend only needs product_id for decrement, it handles which item
-                        // No item_id is sent here based on your backend clarification.
-                        await cartService.addToCart({
-                            product_id: itemToUpdate.product_id.replace(/-/g, ''),
-                            mode: '-'
-                        });
-                    }
-                    console.log(`Custom Dispatch: Backend quantity update sent for ${itemToUpdate.product_id}.`);
-                } else {
-                    console.warn(`Custom Dispatch: UPDATE_ITEM_QUANTITY: Item ${action.payload.id} not found in state.`);
-                }
-            } else if (action.type === 'ADD_NORMAL_ITEM') {
-                const productToAdd = action.payload.product_id;
-                console.log(`Custom Dispatch: Sending backend add for product ID: ${productToAdd}`);
-                await cartService.addToCart({ product_id: productToAdd.replace(/-/g, ''), mode: '+' });
-                console.log(`Custom Dispatch: Backend add sent for ${productToAdd}.`);
-            } else if (action.type === 'ADD_OFFER_SET') {
-                const offerItem = action.payload as CartOfferItem;
-                const productIdsForBackend: string[] = [];
-                offerItem.offer_items.forEach(p => { for (let q = 0; q < p.quantity; q++) { productIdsForBackend.push(p.id.replace(/-/g, '')); } });
-                console.log(`Custom Dispatch: Sending backend add offer for offer ID: ${offerItem.offer}`);
-                await apiService.addToCartOffer({
-                    offer_id: offerItem.offer.replace(/-/g, ''),
-                    product_ids: productIdsForBackend,
-                });
-                console.log(`Custom Dispatch: Backend add offer sent for ${offerItem.offer}.`);
-            }
-        } catch (error) {
-            console.error(`Custom Dispatch: Error during direct backend operation for ${action.type}:`, error);
-        }
+                      if (quantityChange > 0) {
+                          await cartService.addToCart({
+                              product_id: itemToUpdate.product_id.replace(/-/g, ''),
+                              mode: '+'
+                          });
+                      } else if (quantityChange < 0) {
+                          await cartService.addToCart({
+                              product_id: itemToUpdate.product_id.replace(/-/g, ''),
+                              mode: '-'
+                          });
+                      }
+                      console.log(`Custom Dispatch: Backend quantity update sent for ${itemToUpdate.product_id}.`);
+                  } else {
+                      console.warn(`Custom Dispatch: UPDATE_ITEM_QUANTITY: Item ${action.payload.id} not found in state.`);
+                  }
+              } else if (action.type === 'ADD_NORMAL_ITEM') {
+                  const productToAdd = action.payload.product_id;
+                  console.log(`Custom Dispatch: Sending backend add for product ID: ${productToAdd}`);
+                  await cartService.addToCart({ product_id: productToAdd.replace(/-/g, ''), mode: '+' });
+                  console.log(`Custom Dispatch: Backend add sent for ${productToAdd}.`);
+              } else if (action.type === 'ADD_OFFER_SET') {
+                  const offerItem = action.payload as CartOfferItem;
+                  const productIdsForBackend: string[] = [];
+                  offerItem.offer_items.forEach(p => { for (let q = 0; q < p.quantity; q++) { productIdsForBackend.push(p.id.replace(/-/g, '')); } });
+                  console.log(`Custom Dispatch: Sending backend add offer for offer ID: ${offerItem.offer}`);
+                  await apiService.addToCartOffer({
+                      offer_id: offerItem.offer.replace(/-/g, ''),
+                      product_ids: productIdsForBackend,
+                  });
+                  console.log(`Custom Dispatch: Backend add offer sent for ${offerItem.offer}.`);
+              }
+          } catch (error) {
+              console.error(`Custom Dispatch: Error during direct backend operation for ${action.type}:`, error);
+          }
+      }
     }
+
 
     dispatch(action);
 
-    if (currentTokenAtDispatch || action.type === 'TRIGGER_SYNC' ||
-        action.type === 'ADD_NORMAL_ITEM' || action.type === 'ADD_OFFER_SET' ||
-        action.type === 'UPDATE_ITEM_QUANTITY' || action.type === 'REMOVE_ITEM') {
-      console.log(`Custom Dispatch: Authenticated or major action (${action.type}) - Requesting general sync.`);
-      setSyncRequested(true);
+    // Request sync if authenticated or specific actions occur
+    if (typeof window !== 'undefined') { // Only set syncRequested if on client
+      const currentToken = localStorage.getItem('accessToken');
+      if (currentToken || action.type === 'TRIGGER_SYNC' ||
+          action.type === 'ADD_NORMAL_ITEM' || action.type === 'ADD_OFFER_SET' ||
+          action.type === 'UPDATE_ITEM_QUANTITY' || action.type === 'REMOVE_ITEM') {
+        console.log(`Custom Dispatch: Authenticated or major action (${action.type}) - Requesting general sync.`);
+        setSyncRequested(true);
+      }
     }
   }, [state.cartItems]);
 
 
   // Initial Load Effect (runs once on mount)
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined') {
+      console.log('CartProvider Init Effect: Running on server, skipping localStorage access.');
+      isInitialLoadComplete.current = true; // Mark as complete even on server, as client will re-run
+      return;
+    }
 
-    console.log('CartProvider Init Effect: Running on mount.');
+    console.log('CartProvider Init Effect: Running on client, attempting localStorage load.');
     const storedCartItemsString = localStorage.getItem('cartItems');
     const currentAccessToken = localStorage.getItem('accessToken');
 
@@ -361,11 +369,12 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
 
   // NEW EFFECT: To explicitly trigger guestCartMergePending on token change (login/register)
   useEffect(() => {
-    if (!isInitialLoadComplete.current) return; // Only run after initial cart load
-    
+    if (typeof window === 'undefined') return; // Only run after initial cart load
+    if (!isInitialLoadComplete.current) return;
+
     const currentAccessToken = localStorage.getItem('accessToken');
     const hasLocalCartItems = state.cartItems.length > 0;
-    
+
     // Check if token status changed from guest to authenticated
     const wasGuest = !prevAccessTokenRef.current; // Was previously null or empty
     const isNowAuthenticated = !!currentAccessToken; // Is now a non-null token
@@ -374,12 +383,16 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       console.log("CartProvider: Detected transition from guest to authenticated with existing local cart. Setting guestCartMergePending to true.");
       setGuestCartMergePending(true);
     }
-    
+
     // Update prevAccessTokenRef.current for the next evaluation
     // This is crucial for correctly detecting token changes on subsequent runs.
     prevAccessTokenRef.current = currentAccessToken;
 
-  }, [localStorage.getItem('accessToken'), state.cartItems.length, isInitialLoadComplete.current]); // Watch relevant values for this specific trigger
+  }, [
+    typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null, // Conditionally access
+    state.cartItems.length,
+    isInitialLoadComplete.current
+  ]);
 
 
   // Effect for handling guest cart merge after login/register
@@ -396,11 +409,9 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
 
       try {
         const localUnsyncedItems = state.cartItems.filter(item => !item.isSynced);
-        
+
         if (localUnsyncedItems.length > 0) {
           console.log("CartProvider: Attempting to push local unsynced items to backend for merge:", localUnsyncedItems);
-          // This will re-send all unsynced items (normal and offers) to backend.
-          // Backend should handle idempotency: adding existing item increments, not duplicates.
           await cartService.pushLocalCartToBackend(localUnsyncedItems);
           console.log("CartProvider: Successfully pushed local items to backend.");
         } else {
@@ -508,7 +519,13 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
         }
     };
 
-  }, [state.cartItems, syncRequested, guestCartMergePending, localStorage.getItem('accessToken')]); // Keeping localStorage.getItem here as a dependency to ensure reactivity to token changes, even if handled by separate effect.
+  }, [
+    state.cartItems,
+    syncRequested,
+    guestCartMergePending,
+    // Conditionally access localStorage.getItem in dependency array
+    typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
+  ]);
 
 
   const contextValue = useMemo(() => ({
