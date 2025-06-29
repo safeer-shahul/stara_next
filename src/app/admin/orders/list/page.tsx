@@ -219,6 +219,7 @@ export default function OrderListPage() {
     setError(null);
     try {
       // The API now expects a boolean `packing_status`
+      console.log('currentPackingStatus',orderId)
       await apiService.markOrderAsPacked(orderId, !currentPackingStatus);
       alert(`Order ${orderId.substring(0, 8)}... packing status updated!`);
       fetchOrders(); // Refresh the list

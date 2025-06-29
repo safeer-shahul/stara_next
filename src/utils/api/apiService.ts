@@ -647,11 +647,11 @@ class ApiService {
   }
 
   public async markOrderAsPacked(orderId: string,packing_status:boolean): Promise<any> {
-    return this.post('/order/update_order_packing_status/${order_id}', { packing_status: packing_status });
+    return this.post(`/order/update_order_packing_status/${orderId}`, { packing_status: packing_status });
   }
 
   public async updateOrderStatus(orderId: string,packing_status:any): Promise<any> {
-    return this.post('/order/update_order_packing_status/${order_id}', { packing_status: packing_status });
+    return this.post(`/order/update_order_packing_status/${orderId}`, { packing_status: packing_status });
   }
 
   public async getOrderById(id: any): Promise<any> {
