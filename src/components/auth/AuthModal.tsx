@@ -5,10 +5,8 @@ import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import Login from './Login';
 import Register from './Register';
-import ForgotPassword from './ForgotPassword'; // Make sure this import is correct
+import ForgotPassword from './ForgotPassword';
 
-// Define the UserProfile type expected from apiService.getUserProfile
-// This should match the UserProfile interface in your apiService.ts
 interface AuthUserProfile {
   id?: string;
   name?: string;
@@ -23,9 +21,8 @@ interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialView?: 'login' | 'register' | 'forgot-password';
-  // Add the missing props here:
-  userProfile?: AuthUserProfile | null; // Make it optional and allow null
-  isAdminOrStaff?: boolean; // Make it optional and boolean
+  userProfile?: AuthUserProfile | null;
+  isAdminOrStaff?: boolean;
 }
 
 const AuthModal = ({ isOpen, onClose, initialView = 'login', userProfile, isAdminOrStaff }: AuthModalProps) => {
@@ -47,7 +44,7 @@ const AuthModal = ({ isOpen, onClose, initialView = 'login', userProfile, isAdmi
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
-      setView(initialView); // Reset view to initial when modal opens
+      setView(initialView);
     } else {
       document.body.style.overflow = 'auto';
     }
@@ -57,12 +54,8 @@ const AuthModal = ({ isOpen, onClose, initialView = 'login', userProfile, isAdmi
     };
   }, [isOpen, initialView]);
 
-  // This function will be called by Login/Register/ForgotPassword upon successful authentication/reset
   const handleAuthSuccess = () => {
-    // Dispatch a custom event that Header component (and potentially others) listens for.
-    // This allows Header to update its login status and user profile without direct prop passing.
     window.dispatchEvent(new Event('userLoggedIn'));
-    // Close the modal after successful login/registration
     onClose();
   };
 
@@ -70,12 +63,12 @@ const AuthModal = ({ isOpen, onClose, initialView = 'login', userProfile, isAdmi
 
   return (
     <div 
-      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black bg-opacity-50 transition-opacity duration-300"
-      onClick={onClose} // Allows clicking outside the modal to close it
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 transition-opacity duration-300"
+      onClick={onClose}
     >
       <div 
         className="bg-white rounded-lg w-full max-w-md mx-4 relative overflow-hidden shadow-xl transform transition-all duration-300 scale-100 opacity-100"
-        onClick={(e) => e.stopPropagation()} // Prevent clicks inside modal from closing it
+        onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-labelledby="auth-modal-title"
@@ -89,11 +82,10 @@ const AuthModal = ({ isOpen, onClose, initialView = 'login', userProfile, isAdmi
         </button>
         
         <div className="p-6 sm:p-8">
-          {/* Tabs for Login / Create Account (Forgot Password is not a tab) */}
           {view !== 'forgot-password' && (
             <div className="flex border-b border-gray-200 mb-6">
               <button
-                id="auth-modal-title" // Added ID for aria-labelledby
+                id="auth-modal-title"
                 className={`flex-1 py-3 px-4 text-center text-lg focus:outline-none transition-colors duration-200
                   ${view === 'login' 
                     ? 'border-b-2 border-[var(--color-primary-950)] text-[var(--color-primary-950)] font-semibold' 
@@ -116,24 +108,23 @@ const AuthModal = ({ isOpen, onClose, initialView = 'login', userProfile, isAdmi
             </div>
           )}
           
-          {/* Render appropriate component based on 'view' state */}
           {view === 'login' ? (
             <Login 
               onClose={onClose} 
               switchToRegister={() => setView('register')} 
-              onLoginSuccess={handleAuthSuccess} // Pass the common success handler
-              switchToForgotPassword={() => setView('forgot-password')} // Allows switching to forgot password
+              onLoginSuccess={handleAuthSuccess}
+              switchToForgotPassword={() => setView('forgot-password')}
             />
           ) : view === 'register' ? (
             <Register 
               onClose={onClose} 
               switchToLogin={() => setView('login')}
-              onRegisterSuccess={handleAuthSuccess} // Pass the common success handler
+              onRegisterSuccess={handleAuthSuccess}
             />
-          ) : ( // view === 'forgot-password'
+          ) : (
             <ForgotPassword
               onClose={onClose}
-              switchToLogin={() => setView('login')} // Allows going back to login from forgot password
+              switchToLogin={() => setView('login')}
             />
           )}
         </div>

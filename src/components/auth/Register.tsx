@@ -2,8 +2,10 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-// Removed direct import of apiService here as we're using fetch for direct register
-import { useCart } from '@/context/cartContext'; // Still needed for cart synchronization
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth'; // NEW: Import for Firebase Google Auth
+import { auth } from './firebase/config'; // NEW: Import Firebase auth instance
+import apiService from '@/utils/api/apiService';
+import { useCart } from '@/context/cartContext';
 
 interface RegisterProps {
   onClose: () => void;
@@ -24,30 +26,42 @@ const Register = ({ onClose, switchToLogin, onRegisterSuccess }: RegisterProps) 
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [passwordsMatchError, setPasswordsMatchError] = useState(''); // NEW: State for real-time password match error
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormData((prev) => {
+      const newFormData = {
+        ...prev,
+        [name]: value,
+      };
+
+      // NEW: Real-time password matching check
+      if (name === 'password' || name === 'confirmPassword') {
+        if (newFormData.password && newFormData.confirmPassword && newFormData.password !== newFormData.confirmPassword) {
+          setPasswordsMatchError('Passwords do not match.');
+        } else {
+          setPasswordsMatchError(''); // Clear error if they match or one is empty
+        }
+      }
+      return newFormData;
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    // Basic client-side password validation
+    // Final check for password match before submitting
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match.');
+      setError('Passwords do not match. Please correct them.');
       return;
     }
 
     setIsLoading(true);
 
     try {
-      // Direct fetch call for user registration, similar to your 'old code' structure
-      // Adjust the endpoint '/api/auth/register' to your actual backend registration endpoint
+      // Direct fetch call for user registration
       const response = await fetch('/api/auth/register', { // Assuming this is your API route or proxy
         method: 'POST',
         headers: {
@@ -64,13 +78,9 @@ const Register = ({ onClose, switchToLogin, onRegisterSuccess }: RegisterProps) 
       const data = await response.json();
 
       if (!response.ok) {
-        // Handle non-2xx responses from your API
-        // Your backend might return errors in 'data.detail', 'data.message', or specific field errors
         throw new Error(data.message || data.detail || 'Registration failed.');
       }
 
-      // Assuming your backend's registration endpoint also returns tokens for immediate login
-      // Adjust 'access' and 'refresh' based on your actual API response structure
       if (data.access) {
         localStorage.setItem('accessToken', data.access);
       }
@@ -78,10 +88,8 @@ const Register = ({ onClose, switchToLogin, onRegisterSuccess }: RegisterProps) 
         localStorage.setItem('refreshToken', data.refresh);
       }
 
-      // Trigger cart synchronization after successful registration
       dispatchCart({ type: 'TRIGGER_SYNC' });
-
-      onRegisterSuccess(); // Call the success handler passed from AuthModal
+      onRegisterSuccess();
 
     } catch (err: any) {
       console.error('Registration failed:', err);
@@ -91,20 +99,51 @@ const Register = ({ onClose, switchToLogin, onRegisterSuccess }: RegisterProps) 
     }
   };
 
+  // NEW: handleGoogleSignup now mirrors Login's handleGoogleLogin
   const handleGoogleSignup = async () => {
     setIsLoading(true);
     setError('');
+
     try {
-      // Redirect to your Django backend's Google OAuth URL for social signup
-      // Ensure this URL is correct for initiating Google OAuth on your backend
-      window.location.href = `${process.env.NEXT_PUBLIC_API_BASE_URL}/social-auth/google-oauth2/`;
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' }); // Always prompt account selection
+
+      const result = await signInWithPopup(auth, provider);
+      const idToken = await result.user.getIdToken();
+
+      // Verify Firebase ID token with your Django backend
+      const response = await apiService.googleKeyVerify({ idToken });
+
+      // Save tokens from Django API response
+      localStorage.setItem('accessToken', response.access_token);
+      localStorage.setItem('refreshToken', response.refresh_token);
+
+      // Fetch user profile if needed (though onLoginSuccess might handle this globally)
+      const userProfile = await apiService.getUserProfile();
+      localStorage.setItem('me', JSON.stringify(userProfile));
+
+      // Trigger cart synchronization after successful Google signup
+      dispatchCart({ type: 'TRIGGER_SYNC' });
+
+      onRegisterSuccess();
     } catch (err) {
       console.error('Google signup error:', err);
-      setError('Failed to initialize Google signup');
+      let errorMessage = 'Failed to sign up with Google.';
+      if (err instanceof Error) {
+        if ((err as any).code === 'auth/popup-closed-by-user') {
+          errorMessage = 'Google signup window closed or cancelled.';
+        } else {
+          errorMessage = err.message;
+        }
+      }
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
   };
+
+  // Determine if the submit button should be disabled
+  const isSubmitDisabled = isLoading || passwordsMatchError !== '';
 
   return (
     <div>
@@ -177,7 +216,7 @@ const Register = ({ onClose, switchToLogin, onRegisterSuccess }: RegisterProps) 
           <input
             id="mobile"
             name="mobile"
-            type="tel" // Use type="tel" for mobile numbers
+            type="tel"
             value={formData.mobile}
             onChange={handleChange}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200"
@@ -210,15 +249,19 @@ const Register = ({ onClose, switchToLogin, onRegisterSuccess }: RegisterProps) 
             type="password"
             value={formData.confirmPassword}
             onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200"
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200 ${passwordsMatchError ? 'border-red-500' : 'border-gray-300'}`} // NEW: Apply red border on error
             required
           />
+          {/* NEW: Display real-time password match error */}
+          {passwordsMatchError && (
+            <p className="text-red-500 text-xs mt-1">{passwordsMatchError}</p>
+          )}
         </div>
 
         <button
           type="submit"
-          disabled={isLoading}
-          className="w-full bg-[var(--color-primary-950)] text-white py-2 px-4 rounded-md hover:bg-[#124a62] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:ring-opacity-50 transition duration-200 flex items-center justify-center"
+          disabled={isSubmitDisabled} 
+          className={`w-full text-white py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:ring-opacity-50 transition duration-200 flex items-center justify-center ${isSubmitDisabled ? 'bg-gray-400 cursor-not-allowed' : 'bg-[var(--color-primary-950)] hover:bg-[#124a62]'}`}
         >
           {isLoading ? (
             <>
