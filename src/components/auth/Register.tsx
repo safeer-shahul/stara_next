@@ -1,109 +1,149 @@
-// src/components/auth/Register.tsx
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth'; // NEW: Import for Firebase Google Auth
+import { auth } from './firebase/config'; // NEW: Import Firebase auth instance
 import apiService from '@/utils/api/apiService';
 import { useCart } from '@/context/cartContext';
 
 interface RegisterProps {
   onClose: () => void;
   switchToLogin: () => void;
-  // ADD THIS LINE:
-  onRegisterSuccess: () => void; // New prop for success callback
+  onRegisterSuccess: () => void;
 }
 
 const Register = ({ onClose, switchToLogin, onRegisterSuccess }: RegisterProps) => {
   const router = useRouter();
   const { dispatchCart } = useCart();
 
-  const [step, setStep] = useState(1); // 1: Email/Mobile, 2: OTP, 3: Set Password
-  const [emailOrMobile, setEmailOrMobile] = useState('');
-  const [otp, setOtp] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [username, setUsername] = useState(''); // Will be returned from OTP verification
-  
+  const [formData, setFormData] = useState({
+    username: '',
+    email: '',
+    mobile: '',
+    password: '',
+    confirmPassword: '',
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
+  const [passwordsMatchError, setPasswordsMatchError] = useState(''); // NEW: State for real-time password match error
 
-  const handleStep1Submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setSuccessMessage('');
-    setIsLoading(true);
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => {
+      const newFormData = {
+        ...prev,
+        [name]: value,
+      };
 
-    try {
-      const response = await apiService.sendOtp({ contact: emailOrMobile }); 
-      setSuccessMessage(response.message || 'OTP sent successfully to your email/mobile.');
-      setStep(2);
-    } catch (err: any) {
-      setError(err.detail || err.message || 'Failed to send OTP. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
+      // NEW: Real-time password matching check
+      if (name === 'password' || name === 'confirmPassword') {
+        if (newFormData.password && newFormData.confirmPassword && newFormData.password !== newFormData.confirmPassword) {
+          setPasswordsMatchError('Passwords do not match.');
+        } else {
+          setPasswordsMatchError(''); // Clear error if they match or one is empty
+        }
+      }
+      return newFormData;
+    });
   };
 
-  const handleStep2Submit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setSuccessMessage('');
-    setIsLoading(true);
 
-    try {
-      const response = await apiService.verifyOtp({ contact: emailOrMobile, otp: otp });
-      setUsername(response.username); // Assuming the response gives a username
-      setSuccessMessage(response.message || 'OTP verified successfully. Please set your password.');
-      setStep(3);
-    } catch (err: any) {
-      setError(err.detail || err.message || 'OTP verification failed. Please check the OTP.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleStep3Submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setSuccessMessage('');
-    setIsLoading(true);
-
-    if (password !== confirmPassword) {
-      setError('Passwords do not match.');
-      setIsLoading(false);
+    // Final check for password match before submitting
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match. Please correct them.');
       return;
     }
 
+    setIsLoading(true);
+
     try {
-      const response = await apiService.setPassword({ username: username, password: password }); 
-      
-      localStorage.setItem('accessToken', response.access);
-      if (response.refresh) {
-        localStorage.setItem('refreshToken', response.refresh);
+      // Direct fetch call for user registration
+      const response = await fetch('/api/auth/register', { // Assuming this is your API route or proxy
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: formData.username,
+          email: formData.email,
+          mobile: formData.mobile,
+          password: formData.password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || data.detail || 'Registration failed.');
       }
-      
-      onRegisterSuccess(); // Call the success handler passed from AuthModal
-      
-      // No explicit router.push here; Header will handle the eventual redirect
-      // based on the updated login status and user profile.
-      
+
+      if (data.access) {
+        localStorage.setItem('accessToken', data.access);
+      }
+      if (data.refresh) {
+        localStorage.setItem('refreshToken', data.refresh);
+      }
+
+      dispatchCart({ type: 'TRIGGER_SYNC' });
+      onRegisterSuccess();
+
     } catch (err: any) {
-      setError(err.detail || err.message || 'Failed to set password. Please try again.');
+      console.error('Registration failed:', err);
+      setError(err.message || 'An unexpected error occurred during registration.');
     } finally {
       setIsLoading(false);
     }
   };
 
+  // NEW: handleGoogleSignup now mirrors Login's handleGoogleLogin
   const handleGoogleSignup = async () => {
     setIsLoading(true);
+    setError('');
+
     try {
-      window.location.href = `${process.env.NEXT_PUBLIC_API_BASE_URL}/social-auth/google-oauth2/`;
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' }); // Always prompt account selection
+
+      const result = await signInWithPopup(auth, provider);
+      const idToken = await result.user.getIdToken();
+
+      // Verify Firebase ID token with your Django backend
+      const response = await apiService.googleKeyVerify({ idToken });
+
+      // Save tokens from Django API response
+      localStorage.setItem('accessToken', response.access_token);
+      localStorage.setItem('refreshToken', response.refresh_token);
+
+      // Fetch user profile if needed (though onLoginSuccess might handle this globally)
+      const userProfile = await apiService.getUserProfile();
+      localStorage.setItem('me', JSON.stringify(userProfile));
+
+      // Trigger cart synchronization after successful Google signup
+      dispatchCart({ type: 'TRIGGER_SYNC' });
+
+      onRegisterSuccess();
     } catch (err) {
-      setError('Failed to initialize Google signup');
+      console.error('Google signup error:', err);
+      let errorMessage = 'Failed to sign up with Google.';
+      if (err instanceof Error) {
+        if ((err as any).code === 'auth/popup-closed-by-user') {
+          errorMessage = 'Google signup window closed or cancelled.';
+        } else {
+          errorMessage = err.message;
+        }
+      }
+      setError(errorMessage);
+    } finally {
       setIsLoading(false);
     }
   };
+
+  // Determine if the submit button should be disabled
+  const isSubmitDisabled = isLoading || passwordsMatchError !== '';
 
   return (
     <div>
@@ -112,176 +152,133 @@ const Register = ({ onClose, switchToLogin, onRegisterSuccess }: RegisterProps) 
           {error}
         </div>
       )}
-      {successMessage && (
-        <div className="mb-4 p-3 bg-green-50 text-green-700 rounded-md text-sm">
-          {successMessage}
+
+      <button
+        onClick={handleGoogleSignup}
+        disabled={isLoading}
+        className="w-full flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-50 mb-4 transition duration-200"
+      >
+        <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
+          <g transform="matrix(1, 0, 0, 1, 27.009001, -39.238998)">
+            <path fill="#4285F4" d="M -3.264 51.509 C -3.264 50.719 -3.334 49.969 -3.454 49.239 L -14.754 49.239 L -14.754 53.749 L -8.284 53.749 C -8.574 55.229 -9.424 56.479 -10.684 57.329 L -10.684 60.329 L -6.824 60.329 C -4.564 58.239 -3.264 55.159 -3.264 51.509 Z" />
+            <path fill="#34A853" d="M -14.754 63.239 C -11.514 63.239 -8.804 62.159 -6.824 60.329 L -10.684 57.329 C -11.764 58.049 -13.134 58.489 -14.754 58.489 C -17.884 58.489 -20.534 56.379 -21.484 53.529 L -25.464 53.529 L -25.464 56.619 C -23.494 60.539 -19.444 63.239 -14.754 63.239 Z" />
+            <path fill="#FBBC05" d="M -21.484 53.529 C -21.734 52.809 -21.864 52.039 -21.864 51.239 C -21.864 50.439 -21.724 49.669 -21.484 48.949 L -21.484 45.859 L -25.464 45.859 C -26.284 47.479 -26.754 49.299 -26.754 51.239 C -26.754 53.179 -26.284 54.999 -25.464 56.619 L -21.484 53.529 Z" />
+            <path fill="#EA4335" d="M -14.754 43.989 C -12.984 43.989 -11.404 44.599 -10.154 45.789 L -6.734 42.369 C -8.804 40.429 -11.514 39.239 -14.754 39.239 C -19.444 39.239 -23.494 41.939 -25.464 45.859 L -21.484 48.949 C -20.534 46.099 -17.884 43.989 -14.754 43.989 Z" />
+          </g>
+        </svg>
+        Sign up with Google
+      </button>
+
+      <div className="relative my-4">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-gray-300"></div>
         </div>
-      )}
+        <div className="relative flex justify-center text-sm">
+          <span className="px-2 bg-white text-gray-500">Or sign up with email/mobile</span>
+        </div>
+      </div>
 
-      {step === 1 && (
-        <form onSubmit={handleStep1Submit}>
-          <button
-            onClick={handleGoogleSignup}
-            disabled={isLoading}
-            className="w-full flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-50 mb-4 transition duration-200"
-          >
-            <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
-              <g transform="matrix(1, 0, 0, 1, 27.009001, -39.238998)">
-                <path fill="#4285F4" d="M -3.264 51.509 C -3.264 50.719 -3.334 49.969 -3.454 49.239 L -14.754 49.239 L -14.754 53.749 L -8.284 53.749 C -8.574 55.229 -9.424 56.479 -10.684 57.329 L -10.684 60.329 L -6.824 60.329 C -4.564 58.239 -3.264 55.159 -3.264 51.509 Z" />
-                <path fill="#34A853" d="M -14.754 63.239 C -11.514 63.239 -8.804 62.159 -6.824 60.329 L -10.684 57.329 C -11.764 58.049 -13.134 58.489 -14.754 58.489 C -17.884 58.489 -20.534 56.379 -21.484 53.529 L -25.464 53.529 L -25.464 56.619 C -23.494 60.539 -19.444 63.239 -14.754 63.239 Z" />
-                <path fill="#FBBC05" d="M -21.484 53.529 C -21.734 52.809 -21.864 52.039 -21.864 51.239 C -21.864 50.439 -21.724 49.669 -21.484 48.949 L -21.484 45.859 L -25.464 45.859 C -26.284 47.479 -26.754 49.299 -26.754 51.239 C -26.754 53.179 -26.284 54.999 -25.464 56.619 L -21.484 53.529 Z" />
-                <path fill="#EA4335" d="M -14.754 43.989 C -12.984 43.989 -11.404 44.599 -10.154 45.789 L -6.734 42.369 C -8.804 40.429 -11.514 39.239 -14.754 39.239 C -19.444 39.239 -23.494 41.939 -25.464 45.859 L -21.484 48.949 C -20.534 46.099 -17.884 43.989 -14.754 43.989 Z" />
-              </g>
-            </svg>
-            Sign up with Google
-          </button>
+      <form onSubmit={handleSubmit}>
+        <div className="mb-4">
+          <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
+            Username
+          </label>
+          <input
+            id="username"
+            name="username"
+            type="text"
+            value={formData.username}
+            onChange={handleChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200"
+            required
+          />
+        </div>
 
-          <div className="relative my-4">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500">Or sign up with email/mobile</span>
-            </div>
-          </div>
+        <div className="mb-4">
+          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+            Email Address
+          </label>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            value={formData.email}
+            onChange={handleChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200"
+            required
+          />
+        </div>
 
-          <div className="mb-4">
-            <label htmlFor="emailOrMobile" className="block text-sm font-medium text-gray-700 mb-1">
-              Email Address or Mobile Number
-            </label>
-            <input
-              id="emailOrMobile"
-              name="emailOrMobile"
-              type="text"
-              value={emailOrMobile}
-              onChange={(e) => setEmailOrMobile(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200"
-              placeholder="e.g., user@example.com or +919876543210"
-              required
-            />
-          </div>
+        <div className="mb-4">
+          <label htmlFor="mobile" className="block text-sm font-medium text-gray-700 mb-1">
+            Mobile Number
+          </label>
+          <input
+            id="mobile"
+            name="mobile"
+            type="tel"
+            value={formData.mobile}
+            onChange={handleChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200"
+            required
+          />
+        </div>
 
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full bg-[var(--color-primary-950)] text-white py-2 px-4 rounded-md hover:bg-[#124a62] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:ring-opacity-50 transition duration-200 flex items-center justify-center"
-          >
-            {isLoading ? (
-              <>
-                <svg className="animate-spin h-5 w-5 text-white mr-3" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Sending OTP...
-              </>
-            ) : (
-              'Send OTP'
-            )}
-          </button>
-        </form>
-      )}
+        <div className="mb-4">
+          <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+            Password
+          </label>
+          <input
+            id="password"
+            name="password"
+            type="password"
+            value={formData.password}
+            onChange={handleChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200"
+            required
+          />
+        </div>
 
-      {step === 2 && (
-        <form onSubmit={handleStep2Submit}>
-          <p className="text-center text-sm text-gray-600 mb-4">
-            An OTP has been sent to {emailOrMobile}. Please enter it below.
-          </p>
-          <div className="mb-4">
-            <label htmlFor="otp" className="block text-sm font-medium text-gray-700 mb-1">
-              Enter OTP
-            </label>
-            <input
-              id="otp"
-              name="otp"
-              type="text"
-              value={otp}
-              onChange={(e) => setOtp(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200"
-              required
-            />
-          </div>
+        <div className="mb-6">
+          <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
+            Confirm Password
+          </label>
+          <input
+            id="confirmPassword"
+            name="confirmPassword"
+            type="password"
+            value={formData.confirmPassword}
+            onChange={handleChange}
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200 ${passwordsMatchError ? 'border-red-500' : 'border-gray-300'}`} // NEW: Apply red border on error
+            required
+          />
+          {/* NEW: Display real-time password match error */}
+          {passwordsMatchError && (
+            <p className="text-red-500 text-xs mt-1">{passwordsMatchError}</p>
+          )}
+        </div>
 
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full bg-[var(--color-primary-950)] text-white py-2 px-4 rounded-md hover:bg-[#124a62] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:ring-opacity-50 transition duration-200 flex items-center justify-center"
-          >
-            {isLoading ? (
-              <>
-                <svg className="animate-spin h-5 w-5 text-white mr-3" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Verifying OTP...
-              </>
-            ) : (
-              'Verify OTP'
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={() => { setStep(1); setError(''); setSuccessMessage(''); }}
-            className="w-full mt-2 text-sm text-[var(--color-primary-950)] hover:underline"
-          >
-            Change Email/Mobile
-          </button>
-        </form>
-      )}
-
-      {step === 3 && (
-        <form onSubmit={handleStep3Submit}>
-          <div className="mb-4">
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-              New Password
-            </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200"
-              required
-            />
-          </div>
-
-          <div className="mb-6">
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
-              Confirm New Password
-            </label>
-            <input
-              id="confirmPassword"
-              name="confirmPassword"
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200"
-              required
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full bg-[var(--color-primary-950)] text-white py-2 px-4 rounded-md hover:bg-[#124a62] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:ring-opacity-50 transition duration-200 flex items-center justify-center"
-          >
-            {isLoading ? (
-              <>
-                <svg className="animate-spin h-5 w-5 text-white mr-3" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Setting Password...
-              </>
-            ) : (
-              'Set Password & Register'
-            )}
-          </button>
-        </form>
-      )}
+        <button
+          type="submit"
+          disabled={isSubmitDisabled} 
+          className={`w-full text-white py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:ring-opacity-50 transition duration-200 flex items-center justify-center ${isSubmitDisabled ? 'bg-gray-400 cursor-not-allowed' : 'bg-[var(--color-primary-950)] hover:bg-[#124a62]'}`}
+        >
+          {isLoading ? (
+            <>
+              <svg className="animate-spin h-5 w-5 text-white mr-3" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Creating Account...
+            </>
+          ) : (
+            'Create Account'
+          )}
+        </button>
+      </form>
 
       <p className="mt-6 text-center text-sm text-gray-600">
-        {step === 1 ? 'Already have an account?' : 'Remember your password?'}{' '}
+        Already have an account?{' '}
         <button
           onClick={switchToLogin}
           className="text-[var(--color-primary-950)] hover:underline focus:outline-none font-medium"

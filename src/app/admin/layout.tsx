@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import apiService from '@/utils/api/apiService';
 import { Menu, X, LogOut, LayoutDashboard, Package, ShoppingCart, Percent, Tag, Users, Settings, Eye } from 'lucide-react';
+import { AdminUserProvider } from './context/AdminUserContext'; // Import the provider
 
 // Define the structure for an admin user, including staff-specific properties
 interface AdminUser {
@@ -40,52 +41,52 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
   // Enhanced navigation items with permission-based access control
   const navigationItems = useMemo<NavigationItem[]>(() => [
-    { 
-      href: '/admin', 
-      label: 'Dashboard', 
-      exact: true, 
+    {
+      href: '/admin',
+      label: 'Dashboard',
+      exact: true,
       icon: LayoutDashboard,
       // Dashboard is accessible to all authenticated admin users
     },
-    { 
-      href: '/admin/products', 
-      label: 'Products', 
-      startsWith: true, 
+    {
+      href: '/admin/products',
+      label: 'Products',
+      startsWith: true,
       icon: Package,
       superuserOnly: true, // Only superusers can access products
     },
-    { 
-      href: '/admin/orders/list', 
-      label: 'Orders', 
-      startsWith: '/admin/orders', 
+    {
+      href: '/admin/orders/list',
+      label: 'Orders',
+      startsWith: '/admin/orders',
       icon: ShoppingCart,
       requiredPermissions: ['/admin/orders'], // Staff with orders permission can access
     },
-    { 
-      href: '/admin/offers/list', 
-      label: 'Offers', 
-      startsWith: '/admin/offers', 
+    {
+      href: '/admin/offers/list',
+      label: 'Offers',
+      startsWith: '/admin/offers',
       icon: Percent,
       superuserOnly: true, // Only superusers can manage offers
     },
-    { 
-      href: '/admin/coupons/list', 
-      label: 'Coupons', 
-      startsWith: true, 
+    {
+      href: '/admin/coupons/list',
+      label: 'Coupons',
+      startsWith: true,
       icon: Tag,
       superuserOnly: true, // Only superusers can manage coupons
     },
-    { 
-      href: '/admin/staff/list', 
-      label: 'Staffs', 
-      startsWith: true, 
+    {
+      href: '/admin/staff/list',
+      label: 'Staffs',
+      startsWith: true,
       icon: Users,
       superuserOnly: true, // Only superusers can manage staff
     },
-    // { 
-    //   href: '/admin/settings', 
-    //   label: 'Settings', 
-    //   startsWith: true, 
+    // {
+    //   href: '/admin/settings',
+    //   label: 'Settings',
+    //   startsWith: true,
     //   icon: Settings,
     //   superuserOnly: true, // Only superusers can access settings
     // },
@@ -111,7 +112,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     if (userProfile.staff_role === 'order_manager') {
       staffPermissions.push('/admin/orders');
     }
-    
+
     // Add more role-based permissions as needed
     // if (userProfile.staff_role === 'inventory_manager') {
     //   staffPermissions.push('/admin/products');
@@ -153,7 +154,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         } else if (userProfile.is_staff) {
           // Get staff permissions dynamically
           const staffPermissions = getStaffPermissions(userProfile);
-          
+
           currentUser = {
             name: userProfile.first_name || userProfile.email || userProfile.username || 'Staff User',
             username: userProfile.username,
@@ -213,7 +214,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
         // If item has required permissions, check if staff has them
         if (item.requiredPermissions && item.requiredPermissions.length > 0) {
-          return item.requiredPermissions.some(permission => 
+          return item.requiredPermissions.some(permission =>
             adminUser.allowedRoutes?.some(allowedPath => {
               return allowedPath === permission || allowedPath.startsWith(permission + '/') || permission.startsWith(allowedPath + '/');
             })
@@ -226,9 +227,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             if (item.exact && item.href === allowedPath) return true;
             // Check if the item href matches or starts with the allowed path
             // Also check if the allowed path covers the item path
-            return item.href === allowedPath || 
-                   item.href.startsWith(allowedPath + '/') || 
-                   allowedPath.startsWith(item.href.split('/').slice(0, -1).join('/'));
+            return item.href === allowedPath ||
+                           item.href.startsWith(allowedPath + '/') ||
+                           allowedPath.startsWith(item.href.split('/').slice(0, -1).join('/'));
           });
         }
       }
@@ -242,15 +243,15 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     if (item.exact) {
       return pathname === item.href;
     }
-    
+
     if (typeof item.startsWith === 'string') {
       return pathname.startsWith(item.startsWith);
     }
-    
+
     if (item.startsWith === true) {
       return pathname.startsWith(item.href);
     }
-    
+
     return pathname.startsWith(item.href);
   }, [pathname]);
 
@@ -296,7 +297,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   if (adminUser.isStaff) {
     const isCurrentPathAllowed = adminUser.allowedRoutes?.some(allowedPath => {
       if (pathname === allowedPath) return true;
-      if (pathname.startsWith(allowedPath) && 
+      if (pathname.startsWith(allowedPath) &&
           (pathname.length === allowedPath.length || pathname[allowedPath.length] === '/')) {
         return true;
       }
@@ -312,105 +313,107 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
   // Main layout render
   return (
-    <div className="flex h-screen bg-gray-50 text-gray-800">
-      {/* Mobile sidebar overlay */}
-      {isSidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black opacity-50 z-30 lg:hidden"
-          onClick={() => setIsSidebarOpen(false)}
-        ></div>
-      )}
-
-      {/* Sidebar */}
-      <aside
-        className={`fixed inset-y-0 left-0 w-64 bg-white shadow-xl transform transition-transform duration-300 ease-in-out z-40
-          ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-          lg:relative lg:translate-x-0 lg:flex-shrink-0 lg:shadow-none lg:border-r border-gray-200
-        `}
-      >
-        <div className="p-5 text-2xl font-extrabold text-primary-950 border-b border-[var(--color-primary-950)] flex justify-between items-center">
-          STARA Admin
-          <button
-            className="lg:hidden text-gray-600 hover:text-gray-800"
+    <AdminUserProvider adminUser={adminUser}> {/* Wrap with AdminUserProvider */}
+      <div className="flex h-screen bg-gray-50 text-gray-800">
+        {/* Mobile sidebar overlay */}
+        {isSidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black opacity-50 z-30 lg:hidden"
             onClick={() => setIsSidebarOpen(false)}
-            aria-label="Close sidebar"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
+          ></div>
+        )}
 
-        <nav className="mt-6 px-4">
-          <ul>
-            {/* Render filtered navigation items */}
-            {filteredNavigationItems.map(renderNavLink)}
-
-            {/* Show "View Site" only for superusers */}
-            {adminUser && adminUser.is_superuser && (
-              <li className="mt-8 pt-4 border-t border-gray-200">
-                <Link
-                  href="/"
-                  className="flex items-center py-2 px-4 rounded-lg text-gray-700 hover:bg-gray-200 transition-colors duration-150"
-                  prefetch={true}
-                  onClick={() => setIsSidebarOpen(false)}
-                >
-                  <Eye className="w-5 h-5 mr-3" />
-                  <span>View Site</span>
-                </Link>
-              </li>
-            )}
-
-            {/* Logout button - always visible */}
-            <li>
-              <button
-                onClick={handleLogout}
-                className="flex items-center w-full text-left py-2 px-4 rounded-lg text-red-600 hover:bg-red-100 transition-colors duration-150 mt-2"
-              >
-                <LogOut className="w-5 h-5 mr-3" />
-                <span>Logout</span>
-              </button>
-            </li>
-          </ul>
-        </nav>
-      </aside>
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="bg-white shadow-sm border-b border-gray-200 flex-shrink-0">
-          <div className="p-4 flex justify-between items-center">
+        {/* Sidebar */}
+        <aside
+          className={`fixed inset-y-0 left-0 w-64 bg-white shadow-xl transform transition-transform duration-300 ease-in-out z-40
+            ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+            lg:relative lg:translate-x-0 lg:flex-shrink-0 lg:shadow-none lg:border-r border-gray-200
+          `}
+        >
+          <div className="p-5 text-2xl font-extrabold text-primary-950 border-b border-[var(--color-primary-950)] flex justify-between items-center">
+            STARA Admin
             <button
               className="lg:hidden text-gray-600 hover:text-gray-800"
-              onClick={() => setIsSidebarOpen(true)}
-              aria-label="Open sidebar"
+              onClick={() => setIsSidebarOpen(false)}
+              aria-label="Close sidebar"
             >
-              <Menu className="w-6 h-6" />
+              <X className="w-6 h-6" />
             </button>
-            <h1 className="text-xl font-bold text-primary-950 ml-4 lg:ml-0">
-              Admin Dashboard
-            </h1>
-            <div className="flex items-center space-x-4">
-              <span className="text-gray-700 font-medium">
-                Welcome, {adminUser.name || adminUser.username}
-                {adminUser.isStaff && (
-                  <span className="ml-2 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
-                    Staff
-                  </span>
-                )}
-                {adminUser.is_superuser && (
-                  <span className="ml-2 px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full">
-                    Super Admin
-                  </span>
-                )}
-              </span>
-            </div>
           </div>
-        </header>
 
-        <main className="flex-1 overflow-y-auto p-6 bg-gray-100">
-          <div className="bg-white rounded-lg shadow p-6 min-h-full">
-            {children}
-          </div>
-        </main>
+          <nav className="mt-6 px-4">
+            <ul>
+              {/* Render filtered navigation items */}
+              {filteredNavigationItems.map(renderNavLink)}
+
+              {/* Show "View Site" only for superusers */}
+              {adminUser && adminUser.is_superuser && (
+                <li className="mt-8 pt-4 border-t border-gray-200">
+                  <Link
+                    href="/"
+                    className="flex items-center py-2 px-4 rounded-lg text-gray-700 hover:bg-gray-200 transition-colors duration-150"
+                    prefetch={true}
+                    onClick={() => setIsSidebarOpen(false)}
+                  >
+                    <Eye className="w-5 h-5 mr-3" />
+                    <span>View Site</span>
+                  </Link>
+                </li>
+              )}
+
+              {/* Logout button - always visible */}
+              <li>
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center w-full text-left py-2 px-4 rounded-lg text-red-600 hover:bg-red-100 transition-colors duration-150 mt-2"
+                >
+                  <LogOut className="w-5 h-5 mr-3" />
+                  <span>Logout</span>
+                </button>
+              </li>
+            </ul>
+          </nav>
+        </aside>
+
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <header className="bg-white shadow-sm border-b border-gray-200 flex-shrink-0">
+            <div className="p-4 flex justify-between items-center">
+              <button
+                className="lg:hidden text-gray-600 hover:text-gray-800"
+                onClick={() => setIsSidebarOpen(true)}
+                aria-label="Open sidebar"
+              >
+                <Menu className="w-6 h-6" />
+              </button>
+              <h1 className="text-xl font-bold text-primary-950 ml-4 lg:ml-0">
+                Admin Dashboard
+              </h1>
+              <div className="flex items-center space-x-4">
+                <span className="text-gray-700 font-medium">
+                  Welcome, {adminUser.name || adminUser.username}
+                  {adminUser.isStaff && (
+                    <span className="ml-2 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                      Staff
+                    </span>
+                  )}
+                  {adminUser.is_superuser && (
+                    <span className="ml-2 px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full">
+                      Super Admin
+                    </span>
+                  )}
+                </span>
+              </div>
+            </div>
+          </header>
+
+          <main className="flex-1 overflow-y-auto p-6 bg-gray-100">
+            <div className="bg-white rounded-lg shadow p-6 min-h-full">
+              {children}
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
+    </AdminUserProvider> // Close the provider
   );
 }

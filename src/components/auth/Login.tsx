@@ -1,17 +1,16 @@
-// src/components/auth/Login.tsx
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { auth } from './firebase/config'; // Adjust this path to match your project structure
 import apiService from '@/utils/api/apiService';
 import { useCart } from '@/context/cartContext';
-import Link from 'next/link';
 
 interface LoginProps {
   onClose: () => void;
   switchToRegister: () => void;
   onLoginSuccess: () => void;
-  // New prop to switch to forgot password view in AuthModal
   switchToForgotPassword: () => void;
 }
 
@@ -20,7 +19,7 @@ const Login = ({ onClose, switchToRegister, onLoginSuccess, switchToForgotPasswo
   const { dispatchCart } = useCart();
 
   const [formData, setFormData] = useState({
-    username: '',
+    username: '', // Or 'email' if your direct login uses email instead of username
     password: '',
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -45,9 +44,11 @@ const Login = ({ onClose, switchToRegister, onLoginSuccess, switchToForgotPasswo
       if (data.refresh) {
         localStorage.setItem('refreshToken', data.refresh);
       }
-      
+
+      // Trigger cart synchronization after successful login
+      dispatchCart({ type: 'TRIGGER_SYNC' });
+
       onLoginSuccess();
-      
     } catch (err: any) {
       console.error('Login failed:', err);
       setError(err.detail || err.message || 'Login failed. Please check your username and password.');
@@ -58,10 +59,40 @@ const Login = ({ onClose, switchToRegister, onLoginSuccess, switchToForgotPasswo
 
   const handleGoogleLogin = async () => {
     setIsLoading(true);
+    setError('');
+
     try {
-      window.location.href = `${process.env.NEXT_PUBLIC_API_BASE_URL}/social-auth/google-oauth2/`;
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+
+      const result = await signInWithPopup(auth, provider);
+      const idToken = await result.user.getIdToken();
+
+      const response = await apiService.googleKeyVerify({ idToken });
+
+      localStorage.setItem('accessToken', response.access_token);
+      localStorage.setItem('refreshToken', response.refresh_token);
+
+      // Fetch user profile after storing tokens, as per original logic
+      const userProfile = await apiService.getUserProfile();
+      localStorage.setItem('me', JSON.stringify(userProfile));
+
+      // Trigger cart synchronization after successful Google login
+      dispatchCart({ type: 'TRIGGER_SYNC' });
+
+      onLoginSuccess();
     } catch (err) {
-      setError('Failed to initialize Google login');
+      console.error('Google login error:', err);
+      let errorMessage = 'Failed to login with Google.';
+      if (err instanceof Error) {
+        if ((err as any).code === 'auth/popup-closed-by-user') {
+          errorMessage = 'Google login window closed.';
+        } else {
+          errorMessage = err.message;
+        }
+      }
+      setError(errorMessage);
+    } finally {
       setIsLoading(false);
     }
   };
@@ -129,7 +160,7 @@ const Login = ({ onClose, switchToRegister, onLoginSuccess, switchToForgotPasswo
             required
           />
           <button
-            type="button" // Important: set type to button to prevent form submission
+            type="button"
             onClick={switchToForgotPassword}
             className="text-sm text-[var(--color-primary-950)] hover:underline mt-1 block text-right focus:outline-none"
           >

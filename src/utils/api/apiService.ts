@@ -612,20 +612,54 @@ class ApiService {
   public async getPaginatedOrders(
     page: number = 1,
     pageSize: number = 10,
-    filters?: {
-      sort_by?: string
+    options?: {
+      order_mode?: string; // New: for staff/admin filters
+      sort_order?: 'asc' | 'desc'; // New: 'asc' or 'desc'
+      start_date?: string; // New: YYYY-MM-DD
+      end_date?: string; // New: YYYY-MM-DD
+      order_id?: string; // New: for search
+      phone_number?: string; // New: for search
     }
   ): Promise<any> {
     try {
       let url = `/order/get_all_orders?page=${page}&page_size=${pageSize}`;
-      if (filters && filters.sort_by) {
-        url += `&sort_by=${filters.sort_by}`;
+
+      if (options?.order_mode) {
+        url += `&order_mode=${options.order_mode}`;
       }
+      if (options?.sort_order) {
+        url += `&sort_order=${options.sort_order}`;
+      }
+      if (options?.start_date) {
+        url += `&start_date=${options.start_date}`;
+      }
+      if (options?.end_date) {
+        url += `&end_date=${options.end_date}`;
+      }
+      if (options?.order_id) {
+        url += `&order_id=${options.order_id}`;
+      }
+      if (options?.phone_number) {
+        url += `&phone_number=${options.phone_number}`;
+      }
+
       return await this.get<any>(url);
     } catch (error) {
       console.error('Error fetching paginated orders:', error);
       throw error;
     }
+  }
+
+  public async assignOrdersToMe(orderIds: string[]): Promise<any> {
+    return this.post('/order/claim_orders', { order_ids: orderIds });
+  }
+
+  public async markOrderAsPacked(orderId: string,packing_status:boolean): Promise<any> {
+    return this.post(`/order/update_order_packing_status/${orderId}`, { packing_status: packing_status });
+  }
+
+  public async updateOrderStatus(orderId: string,packing_status:any): Promise<any> {
+    return this.put(`/order/order_status_update/${orderId}`, { status: packing_status.status });
   }
 
   public async getOrderById(id: any): Promise<any> {
