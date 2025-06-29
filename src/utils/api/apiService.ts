@@ -617,6 +617,8 @@ class ApiService {
       sort_order?: 'asc' | 'desc'; // New: 'asc' or 'desc'
       start_date?: string; // New: YYYY-MM-DD
       end_date?: string; // New: YYYY-MM-DD
+      order_id?: string; // New: for search
+      phone_number?: string; // New: for search
     }
   ): Promise<any> {
     try {
@@ -633,6 +635,12 @@ class ApiService {
       }
       if (options?.end_date) {
         url += `&end_date=${options.end_date}`;
+      }
+      if (options?.order_id) {
+        url += `&order_id=${options.order_id}`;
+      }
+      if (options?.phone_number) {
+        url += `&phone_number=${options.phone_number}`;
       }
 
       return await this.get<any>(url);
@@ -651,7 +659,7 @@ class ApiService {
   }
 
   public async updateOrderStatus(orderId: string,packing_status:any): Promise<any> {
-    return this.post(`/order/update_order_packing_status/${orderId}`, { packing_status: packing_status });
+    return this.put(`/order/order_status_update/${orderId}`, { status: packing_status.status });
   }
 
   public async getOrderById(id: any): Promise<any> {

@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import {
   Package, Eye, ChevronLeft, ChevronRight, Search, ShoppingCart, Info,
-  Box, UserRound, CheckCircle, Clock, CalendarDays, ArrowUpWideNarrow, ArrowDownWideNarrow, Edit
+  Box, UserRound, CheckCircle, Clock, CalendarDays, ArrowUpWideNarrow, ArrowDownWideNarrow, Edit, Copy, RotateCcw
 } from 'lucide-react';
 import apiService from '@/utils/api/apiService';
 import { useAdminUser } from '../../context/AdminUserContext'; // Import the custom hook
@@ -35,6 +35,7 @@ interface Order {
   is_returned: boolean; // New from backend
   is_refunded: boolean; // New from backend
   is_paid: boolean; // New from backend
+  phone_number: string; // Assuming phone number is part of the order details
 }
 
 // Define the order modes for the UI cards
@@ -58,15 +59,25 @@ export default function OrderListPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [pageSize] = useState(10); // Page size remains constant
 
-  // New state variables for filters and selections
+  // State variables for filters and selections
   const [selectedOrderMode, setSelectedOrderMode] = useState<OrderMode>('all');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc'); // Default to descending
-  const [startDate, setStartDate] = useState<any>(null);
+  const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]); // For checkboxes
 
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const [newDeliveryStatus, setNewDeliveryStatus] = useState<DeliveryStatus>('Pending');
+
+  // State for search inputs
+  const [searchOrderId, setSearchOrderId] = useState('');
+  const [searchPhoneNumber, setSearchPhoneNumber] = useState('');
+
+  // State for copy dropdown
+  const [showCopyDropdown, setShowCopyDropdown] = useState<string | null>(null);
+
+  // Use a state to explicitly trigger fetches when reset/search is clicked
+  const [triggerFetch, setTriggerFetch] = useState(0);
 
 
   // Determine available order modes based on user type
@@ -91,12 +102,12 @@ export default function OrderListPage() {
     return modes;
   }, [adminUser]);
 
-  // Effect to fetch orders whenever relevant filters/pagination change
+  // Effect to fetch orders whenever relevant filters/pagination/triggerFetch change
   useEffect(() => {
     if (adminUser) { // Only fetch if user data is loaded
       fetchOrders();
     }
-  }, [currentPage, selectedOrderMode, sortOrder, startDate, endDate, adminUser]); // Add all filter dependencies
+  }, [currentPage, selectedOrderMode, sortOrder, startDate, endDate, adminUser, triggerFetch]); // Now triggerFetch is a dependency
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -110,6 +121,8 @@ export default function OrderListPage() {
         sort_order?: 'asc' | 'desc';
         start_date?: string;
         end_date?: string;
+        order_id?: string; // New: for search
+        phone_number?: string; // New: for search
       } = { sort_order: sortOrder };
 
       if (selectedOrderMode !== 'all') { // Only send order_mode if it's not 'all'
@@ -120,6 +133,14 @@ export default function OrderListPage() {
       }
       if (endDate) {
         options.end_date = endDate.toISOString().split('T')[0]; // Format to YYYY-MM-DD
+      }
+
+      // Always include search parameters if they are present in state
+      if (searchOrderId) {
+        options.order_id = searchOrderId;
+      }
+      if (searchPhoneNumber) {
+        options.phone_number = searchPhoneNumber;
       }
 
       const response = await apiService.getPaginatedOrders(currentPage, pageSize, options);
@@ -143,7 +164,7 @@ export default function OrderListPage() {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, pageSize, selectedOrderMode, sortOrder, startDate, endDate, adminUser]);
+  }, [currentPage, pageSize, selectedOrderMode, sortOrder, startDate, endDate, adminUser, searchOrderId, searchPhoneNumber]); // Keep all dependencies for useCallback to be correct
 
   const handleNextPage = useCallback(() => {
     if (currentPage < totalPages) {
@@ -161,21 +182,49 @@ export default function OrderListPage() {
     setSelectedOrderMode(mode);
     setCurrentPage(1); // Reset to first page on mode change
     setSelectedOrderIds([]); // Clear selections
+    setSearchOrderId(''); // Clear search fields
+    setSearchPhoneNumber('');
+    setTriggerFetch(prev => prev + 1); // Trigger a fetch
   }, []);
 
   const handleSortOrderChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
     setSortOrder(event.target.value as 'asc' | 'desc');
     setCurrentPage(1); // Reset to first page on sort change
+    setTriggerFetch(prev => prev + 1); // Trigger a fetch
   }, []);
 
   const handleStartDateChange = useCallback((date: Date | null) => {
     setStartDate(date);
     setCurrentPage(1); // Reset to first page on date change
+    setTriggerFetch(prev => prev + 1); // Trigger a fetch
   }, []);
 
   const handleEndDateChange = useCallback((date: Date | null) => {
     setEndDate(date);
     setCurrentPage(1); // Reset to first page on date change
+    setTriggerFetch(prev => prev + 1); // Trigger a fetch
+  }, []);
+
+  // Modified handleSearch to explicitly trigger fetch
+  const handleSearch = useCallback(() => {
+    setCurrentPage(1); // Reset to first page on search
+    setTriggerFetch(prev => prev + 1); // Trigger a fetch
+  }, []);
+
+  const handleResetFilters = useCallback(() => {
+    // Reset all filter states
+    setSelectedOrderMode('all');
+    setSortOrder('desc');
+    setStartDate(null);
+    setEndDate(null);
+    setSearchOrderId('');
+    setSearchPhoneNumber('');
+    setSelectedOrderIds([]);
+    setEditingOrderId(null);
+    setCurrentPage(1); // Reset current page to 1
+
+    // Increment triggerFetch to force useEffect to re-run
+    setTriggerFetch(prev => prev + 1);
   }, []);
 
   const handleSelectAllOrders = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
@@ -205,31 +254,31 @@ export default function OrderListPage() {
     try {
       await apiService.assignOrdersToMe(selectedOrderIds);
       alert('Selected orders assigned successfully!');
-      fetchOrders(); // Refresh the list
+      setTriggerFetch(prev => prev + 1); // Trigger a fetch after assignment
     } catch (err) {
       console.error('Failed to assign orders:', err);
       setError('Failed to assign orders. Please try again.');
     } finally {
       setLoading(false);
     }
-  }, [selectedOrderIds, fetchOrders]);
+  }, [selectedOrderIds]);
 
   const handleTogglePackedStatus = useCallback(async (orderId: string, currentPackingStatus: boolean) => {
     setLoading(true);
     setError(null);
     try {
       // The API now expects a boolean `packing_status`
-      console.log('currentPackingStatus',orderId)
+      console.log('currentPackingStatus', orderId)
       await apiService.markOrderAsPacked(orderId, !currentPackingStatus);
       alert(`Order ${orderId.substring(0, 8)}... packing status updated!`);
-      fetchOrders(); // Refresh the list
+      setTriggerFetch(prev => prev + 1); // Trigger a fetch after status update
     } catch (err) {
       console.error(`Failed to update packing status for order ${orderId}:`, err);
       setError('Failed to update packing status. Please try again.');
     } finally {
       setLoading(false);
     }
-  }, [fetchOrders]);
+  }, []);
 
   const handleEditDeliveryStatus = useCallback((orderId: string, currentStatus: string) => {
     setEditingOrderId(orderId);
@@ -243,14 +292,14 @@ export default function OrderListPage() {
       await apiService.updateOrderStatus(orderId, { status: newDeliveryStatus });
       alert(`Delivery status for order ${orderId.substring(0, 8)}... updated to ${newDeliveryStatus}!`);
       setEditingOrderId(null); // Exit editing mode
-      fetchOrders(); // Refresh the list
+      setTriggerFetch(prev => prev + 1); // Trigger a fetch after status update
     } catch (err) {
       console.error(`Failed to update delivery status for order ${orderId}:`, err);
       setError('Failed to update delivery status. Please try again.');
     } finally {
       setLoading(false);
     }
-  }, [newDeliveryStatus, fetchOrders]);
+  }, [newDeliveryStatus]);
 
   // Function to format date string
   const formatDate = (dateString: string) => {
@@ -308,6 +357,16 @@ export default function OrderListPage() {
     return unassignedOrders.length > 0 && unassignedOrders.every(order => selectedOrderIds.includes(order.order_id));
   }, [orders, selectedOrderIds]);
 
+  // Handle copying to clipboard
+  const copyToClipboard = useCallback((text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      alert('Copied to clipboard!');
+      setShowCopyDropdown(null); // Hide dropdown after copying
+    }).catch(err => {
+      console.error('Failed to copy: ', err);
+      alert('Failed to copy to clipboard.');
+    });
+  }, []);
 
   return (
     <div className="space-y-8">
@@ -342,71 +401,113 @@ export default function OrderListPage() {
 
       {/* Main Content Area: Orders Table */}
       <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
+
         {/* Table Header/Toolbar - Filters and Actions */}
-        <div className="p-5 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4">
-          <div className="flex items-center flex-wrap gap-4">
+        <div className="p-5 border-b border-gray-200 flex flex-col gap-4"> {/* Changed to flex-col */}
+          {/* Top Row: Title and Assign Button */}
+          <div className="flex justify-between items-center flex-wrap gap-4">
             <h3 className="font-semibold text-lg text-gray-800 flex items-center">
               <Package className="w-6 h-6 text-[var(--color-primary-950)] mr-3" />
               {availableOrderModes.find(m => m.value === selectedOrderMode)?.label || 'All Customer Orders'}
             </h3>
 
-            {/* Sort Dropdown */}
-            <div className="relative">
-              <select
-                value={sortOrder}
-                onChange={handleSortOrderChange}
-                className="block appearance-none w-full bg-white border border-gray-300 text-gray-700 py-2 px-4 pr-8 rounded-md leading-tight focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent"
+            {/* Conditional "Assign to Me" button - MOVED HERE */}
+            {selectedOrderMode === 'un_assigned_order' && selectedOrderIds.length > 0 && (
+              <button
+                onClick={handleAssignSelectedOrders}
+                className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200 flex items-center"
+                disabled={loading}
               >
-                <option value="desc">Newest First</option>
-                <option value="asc">Oldest First</option>
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 6.757 7.586 5.343 9z" /></svg>
-              </div>
-            </div>
-
-            {/* Date Pickers */}
-            <div className="flex flex-col sm:flex-row items-center gap-2">
-              <div className="relative">
-                <DatePicker
-                  selected={startDate}
-                  onChange={handleStartDateChange}
-                  selectsStart
-                  startDate={startDate}
-                  endDate={endDate}
-                  placeholderText="From Date"
-                  dateFormat="yyyy-MM-dd"
-                  className="w-full sm:w-36 border border-gray-300 rounded-md py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)]"
-                />
-                <CalendarDays className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-              </div>
-              <div className="relative">
-                <DatePicker
-                  selected={endDate}
-                  onChange={handleEndDateChange}
-                  selectsEnd
-                  startDate={startDate}
-                  endDate={endDate}
-                  minDate={startDate}
-                  placeholderText="To Date"
-                  dateFormat="yyyy-MM-dd"
-                  className="w-full sm:w-36 border border-gray-300 rounded-md py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)]"
-                />
-                <CalendarDays className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-              </div>
-            </div>
+                <UserRound className="w-5 h-5 mr-2" /> Assign Selected to Me
+              </button>
+            )}
           </div>
 
-          {/* Conditional "Assign to Me" button */}
-          {selectedOrderMode === 'un_assigned_order' && selectedOrderIds.length > 0 && (
-            <button
-              onClick={handleAssignSelectedOrders}
-              className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200 flex items-center"
-              disabled={loading}
-            >
-              <UserRound className="w-5 h-5 mr-2" /> Assign Selected to Me
-            </button>
-          )}
+          {/* Second Row: Filter Controls */}
+          <div className="flex flex-col sm:flex-row flex-wrap items-center justify-between gap-4">
+            {/* Left side filters: Sort Dropdown, Date Pickers */}
+            <div className="flex items-center flex-wrap gap-2">
+              {/* Sort Dropdown */}
+              <div className="relative">
+                <select
+                  value={sortOrder}
+                  onChange={handleSortOrderChange}
+                  className="block appearance-none w-full bg-white border border-gray-300 text-gray-700 py-2 px-4 pr-8 rounded-md leading-tight focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent"
+                >
+                  <option value="desc">Newest First</option>
+                  <option value="asc">Oldest First</option>
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                  <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 6.757 7.586 5.343 9z" /></svg>
+                </div>
+              </div>
+
+              {/* Date Pickers */}
+              <div className="flex flex-col sm:flex-row items-center gap-2">
+                <div className="relative">
+                  <DatePicker
+                    selected={startDate}
+                    onChange={handleStartDateChange}
+                    selectsStart
+                    startDate={startDate}
+                    endDate={endDate}
+                    placeholderText="From Date"
+                    dateFormat="yyyy-MM-dd"
+                    className="w-full sm:w-36 border border-gray-300 rounded-md py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)]"
+                  />
+                  <CalendarDays className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                </div>
+                <div className="relative">
+                  <DatePicker
+                    selected={endDate}
+                    onChange={handleEndDateChange}
+                    selectsEnd
+                    startDate={startDate}
+                    endDate={endDate}
+                    minDate={startDate || undefined}
+                    placeholderText="To Date"
+                    dateFormat="yyyy-MM-dd"
+                    className="w-full sm:w-36 border border-gray-300 rounded-md py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)]"
+                  />
+                  <CalendarDays className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                </div>
+              </div>
+            </div>
+
+            {/* Right side filters: Search Inputs and Buttons */}
+            <div className="flex items-center flex-wrap gap-2"> {/* Added flex-wrap for responsiveness */}
+              <input
+                type="text"
+                placeholder="Search by Order ID"
+                value={searchOrderId}
+                onChange={(e) => setSearchOrderId(e.target.value)}
+                className="w-full sm:w-48 border border-gray-300 rounded-md py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)]"
+              />
+              <input
+                type="text"
+                placeholder="Search by Phone No."
+                value={searchPhoneNumber}
+                onChange={(e) => setSearchPhoneNumber(e.target.value)}
+                className="w-full sm:w-48 border border-gray-300 rounded-md py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)]"
+              />
+              <button
+                onClick={handleSearch}
+                className={`px-4 py-2 rounded-md transition-colors duration-200 flex items-center justify-center
+                  ${(searchOrderId || searchPhoneNumber) ? 'bg-[var(--color-primary-950)] text-white hover:bg-[var(--color-primary-800)]' : 'bg-gray-300 text-gray-600 cursor-not-allowed'}`}
+                disabled={!(searchOrderId || searchPhoneNumber) || loading}
+                title="Search Orders"
+              >
+                <Search className="w-5 h-5" />
+              </button>
+              <button
+                onClick={handleResetFilters}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors duration-200 flex items-center justify-center"
+                title="Reset Filters"
+              >
+                <RotateCcw className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Error Message */}
@@ -478,8 +579,35 @@ export default function OrderListPage() {
                           </td>
                         )}
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-base font-medium text-gray-900">
+                          <div className="text-base font-medium text-gray-900 flex items-center gap-2">
                             #{order.order_id.substring(0, 8)}...
+                            <div className="relative">
+                              <button
+                                onClick={() => setShowCopyDropdown(showCopyDropdown === order.order_id ? null : order.order_id)}
+                                className="text-gray-500 hover:text-gray-700"
+                                title="Copy ID"
+                              >
+                                <Copy className="w-4 h-4" />
+                              </button>
+                              {showCopyDropdown === order.order_id && (
+                                <div className="absolute z-10 bg-white shadow-lg rounded-md mt-2 w-32 left-0 -ml-16"> {/* Adjust positioning */}
+                                  <button
+                                    onClick={() => copyToClipboard(order.order_id)}
+                                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                  >
+                                    Copy Order ID
+                                  </button>
+                                  {order.razorpay_order_id && (
+                                    <button
+                                      onClick={() => copyToClipboard(order.razorpay_order_id)}
+                                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                    >
+                                      Copy Transaction ID
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </div>
                           <div className="text-xs text-gray-500 mt-1">
                             {order.razorpay_order_id ? `Txn: ${order.razorpay_order_id.substring(0, 10)}...` : 'N/A'}
@@ -495,48 +623,49 @@ export default function OrderListPage() {
                           ₹{order.actual_price}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                            {editingOrderId === order.order_id && (adminUser?.is_superuser || selectedOrderMode === 'packed_order_by_me') && !order.is_delivered ? (
-                              <div className="flex items-center space-x-2">
-                                <select
-                                  value={newDeliveryStatus}
-                                  onChange={(e) => setNewDeliveryStatus(e.target.value as DeliveryStatus)}
-                                  className="block w-full bg-white border border-gray-300 text-gray-700 py-1 px-2 rounded-md focus:outline-none focus:ring-1 focus:ring-[var(--color-primary-950)]"
-                                >
-                                  {DeliveryStatuses.map(status => (
-                                    <option key={status} value={status}>{status}</option>
-                                  ))}
-                                </select>
+                          {editingOrderId === order.order_id && (adminUser?.is_superuser || selectedOrderMode === 'packed_order_by_me') && !['Delivered', 'Cancelled'].includes(order.status) ? ( // Hide edit if delivered/cancelled
+                            <div className="flex items-center space-x-2">
+                              <select
+                                value={newDeliveryStatus}
+                                onChange={(e) => setNewDeliveryStatus(e.target.value as DeliveryStatus)}
+                                className="block w-full bg-white border border-gray-300 text-gray-700 py-1 px-2 rounded-md focus:outline-none focus:ring-1 focus:ring-[var(--color-primary-950)]"
+                              >
+                                {DeliveryStatuses.map(status => (
+                                  <option key={status} value={status}>{status}</option>
+                                ))}
+                              </select>
+                              <button
+                                onClick={() => handleUpdateDeliveryStatus(order.order_id)}
+                                className="px-3 py-1 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm"
+                                disabled={loading}
+                              >
+                                Update
+                              </button>
+                              <button
+                                onClick={() => setEditingOrderId(null)} // Cancel editing
+                                className="px-3 py-1 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 text-sm"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <span className={`px-3 py-1 inline-flex text-sm leading-5 font-semibold rounded-full ${getStatusBadgeClasses(order.status)}`}>
+                                {order.status}
+                              </span>
+                              {/* The key conditional logic for showing/hiding the Edit button */}
+                              {((adminUser?.is_superuser || selectedOrderMode === 'packed_order_by_me') && !['Delivered', 'Cancelled'].includes(order.status)) ? (
                                 <button
-                                  onClick={() => handleUpdateDeliveryStatus(order.order_id)}
-                                  className="px-3 py-1 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm"
-                                  disabled={loading}
+                                  onClick={() => handleEditDeliveryStatus(order.order_id, order.status)}
+                                  className="text-gray-500 hover:text-gray-700"
+                                  title="Edit Delivery Status"
                                 >
-                                  Update
+                                  <Edit className="w-4 h-4" />
                                 </button>
-                                <button
-                                  onClick={() => setEditingOrderId(null)} // Cancel editing
-                                  className="px-3 py-1 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 text-sm"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-2">
-                                <span className={`px-3 py-1 inline-flex text-sm leading-5 font-semibold rounded-full ${getStatusBadgeClasses(order.status)}`}>
-                                  {order.status}
-                                </span>
-                                {(adminUser?.is_superuser && !order.is_delivered) || (selectedOrderMode === 'packed_order_by_me' && !order.is_delivered) ? (
-                                  <button
-                                    onClick={() => handleEditDeliveryStatus(order.order_id, order.status)}
-                                    className="text-gray-500 hover:text-gray-700"
-                                    title="Edit Delivery Status"
-                                  >
-                                    <Edit className="w-4 h-4" />
-                                  </button>
-                                ) : null}
-                              </div>
-                            )}
-                          </td>
+                              ) : null}
+                            </div>
+                          )}
+                        </td>
 
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`px-3 py-1 inline-flex text-sm leading-5 font-semibold rounded-full ${getPaymentStatusBadgeClasses(order.payment_status)}`}>
