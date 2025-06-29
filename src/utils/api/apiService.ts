@@ -1,4 +1,4 @@
-import axios, { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig, AxiosError } from 'axios';
 import Swal from 'sweetalert2';
 
 // Configuration
@@ -7,30 +7,51 @@ const API_CONFIG = {
   TIMEOUT: 30000,
 };
 
-// User profile interface
+// User profile interface (updated for is_superuser and is_staff)
 interface UserProfile {
   id?: string;
   name?: string;
   email?: string;
   username?: string;
-  is_admin: boolean;
+  is_superuser?: boolean; // Reflects Django's is_superuser
+  is_staff?: boolean;     // Reflects Django's is_staff
   [key: string]: any;
+}
+
+// Interfaces for new auth flows
+interface TokenResponse {
+  refresh: string;
+  access: string;
+}
+
+interface MessageResponse {
+  message: string;
 }
 
 class ApiService {
   private static instance: ApiService;
   private apiClient: AxiosInstance;
-  private publicApiClient: AxiosInstance;
+  private publicApiClient: AxiosInstance; // For unauthenticated requests
+  private isRefreshing = false;
+  private failedQueue: { resolve: (value: unknown) => void; reject: (reason?: any) => void; config: InternalAxiosRequestConfig }[] = [];
 
   private constructor() {
     this.apiClient = axios.create({
       baseURL: API_CONFIG.BASE_URL,
       timeout: API_CONFIG.TIMEOUT,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+      },
     });
 
     this.publicApiClient = axios.create({
       baseURL: API_CONFIG.BASE_URL,
       timeout: API_CONFIG.TIMEOUT,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+      },
     });
 
     this.setupInterceptors();
@@ -45,179 +66,170 @@ class ApiService {
 
   private getAccessToken(): string | null {
     if (typeof window !== 'undefined') {
-      const token = window.localStorage.getItem('accessToken');
-      // console.log('Retrieved access token from localStorage:', token ? `${token.substring(0, 10)}...` : 'null');
-      return token;
+      return window.localStorage.getItem('accessToken');
     }
     return null;
   }
 
+  private getRefreshToken(): string | null {
+    if (typeof window !== 'undefined') {
+      return window.localStorage.getItem('refreshToken');
+    }
+    return null;
+  }
+
+  private processQueue(error: any | null = null): void {
+    while (this.failedQueue.length) {
+      const promise = this.failedQueue.shift();
+      if (promise) {
+        if (error) {
+          promise.reject(error);
+        } else {
+          // If no error, resolve with the new token or re-run the request
+          promise.resolve(null); // This 'null' will eventually be replaced by the retried request's response
+        }
+      }
+    }
+  }
+
   private setupInterceptors(): void {
-    // Request interceptor for authenticated requests
+    // Request interceptor for authenticated requests (apiClient)
     this.apiClient.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
         const accessToken = this.getAccessToken();
-        
-        // Only add authorization header if token exists
         if (accessToken && config.headers) {
-          // console.log('Adding token to request:', config.url);
           config.headers['Authorization'] = `Bearer ${accessToken}`;
-        } else {
-          console.log('No token available for request:', config.url);
         }
-  
-        if (config.headers) {
-          config.headers['X-Requested-With'] = 'XMLHttpRequest';
-          
-          // Don't set content-type for FormData
-          if (!config.headers['Content-Type'] && !(config.data instanceof FormData)) {
-            config.headers['Content-Type'] = 'application/json';
-          }
+        // Handle FormData specific headers if not already set by Axios
+        if (config.data instanceof FormData && config.headers) {
+          delete config.headers['Content-Type']; // Browser sets this automatically for FormData
         }
-  
         return config;
       },
       (error) => Promise.reject(error)
     );
-  
+
+    // Response interceptor for authenticated requests (apiClient)
     this.apiClient.interceptors.response.use(
       (response: AxiosResponse) => response,
-      async (error) => {
-        if (error.config) {
-          const started = Date.now();
-          const elapsed = Date.now() - started;
-          console.log(`Request for ${error.config?.url} failed after ${elapsed} ms.`);
-        }
-    
-        const status = error.response?.status;
-    
-        if (status === 401 || status === 403) {
+      async (error: AxiosError) => {
+        const originalRequest = error.config;
 
-          this.handleAuthError();
-          return Promise.resolve(null);
+        // If no response or no config, reject
+        if (!error.response || !originalRequest) {
+          return Promise.reject(error);
         }
-    
+
+        const status = error.response.status;
+        const refreshToken = this.getRefreshToken();
+
+        // Handle 401 Unauthorized for token refresh
+        if (status === 401 && originalRequest.url !== '/api/token/refresh/') {
+          if (this.isRefreshing) {
+            // Add original request to queue if a refresh is already in progress
+            return new Promise((resolve, reject) => {
+              this.failedQueue.push({ config: originalRequest, resolve, reject });
+            })
+            .then(() => axios.request(originalRequest)) // Re-attempt original request
+            .catch((err) => Promise.reject(err));
+          }
+
+          this.isRefreshing = true; // Mark refresh in progress
+
+          return new Promise(async (resolve, reject) => {
+            if (refreshToken) {
+              try {
+                // Attempt to refresh the token
+                const refreshResponse = await this.publicApiClient.post<TokenResponse>('/api/token/refresh/', { refresh: refreshToken });
+                const newAccessToken = refreshResponse.data.access;
+                localStorage.setItem('accessToken', newAccessToken);
+
+                // Update original request with new token and retry
+                originalRequest.headers = originalRequest.headers || {};
+                originalRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
+
+                this.processQueue(null); // Resolve all pending requests
+                resolve(axios.request(originalRequest)); // Resolve with the retried original request
+              } catch (refreshError: any) {
+                console.error('Token refresh failed:', refreshError);
+                this.logout(true); // Forced logout without Swal, triggered by error
+                this.processQueue(refreshError); // Reject all pending requests
+                reject(refreshError); // Reject the current request
+              } finally {
+                this.isRefreshing = false; // Reset refresh flag
+              }
+            } else {
+              // No refresh token available, logout the user
+              this.logout(true); // Forced logout without Swal
+              this.processQueue(error); // Reject all pending requests with the original error
+              reject(error); // Reject the current request
+            }
+          });
+        }
+        // Handle other 401s or 403s if not related to token expiration or for other specific cases
+        else if (status === 403) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Access Denied',
+                text: 'You do not have permission to perform this action.',
+                showConfirmButton: true,
+            });
+            // If it's a 403 and not a token issue, just reject the promise
+            return Promise.reject(error);
+        }
+        // For other errors, just reject the promise
         return Promise.reject(error);
       }
     );
-    
 
+    // Request interceptor for public requests (publicApiClient)
     this.publicApiClient.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
-        if (config.headers) {
-          config.headers['X-Requested-With'] = 'XMLHttpRequest';
-          
-          if (!config.headers['Content-Type'] && !(config.data instanceof FormData)) {
-            config.headers['Content-Type'] = 'application/json';
-          }
+        if (config.data instanceof FormData && config.headers) {
+          delete config.headers['Content-Type'];
         }
         return config;
       },
       (error) => Promise.reject(error)
     );
+    // No response interceptor for publicApiClient needed for token refresh
   }
 
-  public async handleAuthError(): Promise<void> {
-      try {
-        const submitData = {
-          refresh: localStorage.getItem('refreshToken'),
-        };
-
-        const result:any = await this.postPublic(`/api/token/refresh/`, submitData);
-        localStorage.removeItem('accessToken');
-        localStorage.setItem('accessToken',result.access);
-      }  catch (error) {
-        this.logouterror()
-        console.log('err',error)
-      }
-  }
-
-  public async logout(): Promise<void> {
+  // Unified logout method
+  public async logout(silent: boolean = false): Promise<void> {
     if (typeof window !== 'undefined') {
-      if (window.location.pathname.startsWith('/admin') && 
-          window.location.pathname !== '/admin/login') {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        window.location.href = '/admin/login';
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      // Dispatch a custom event for other components (e.g., Header) to react to logout
+      window.dispatchEvent(new Event('userLoggedOut'));
+
+      const currentPath = window.location.pathname;
+
+      if (currentPath.startsWith('/admin') && currentPath !== '/admin/login') {
+        window.location.href = '/admin/login'; // Hard redirect for admin if not already on login page
       } else {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        window.location.reload();
+        // For regular users, attempt soft navigation or reload
+        // A simple reload is often sufficient and reliable after full logout
+        window.location.href = '/'; // Redirect to home page
       }
     }
-    await Swal.fire({
-      icon: 'success',
-      title: 'Successfully Logged Out!',
-      showConfirmButton: false,
-      timer: 1500
-    });
-  }
 
-  public async logouterror(): Promise<void> {
-    if (typeof window !== 'undefined') {
-      if (window.location.pathname.startsWith('/admin') && 
-          window.location.pathname !== '/admin/login') {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-      } else {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-      }
+    if (!silent) {
+      await Swal.fire({
+        icon: 'success',
+        title: 'Successfully Logged Out!',
+        showConfirmButton: false,
+        timer: 1500,
+      });
     }
   }
 
-  private getHeaders(isFormData: boolean = false, propagation: number = 0): Record<string, string> {
-    const headers: Record<string, string> = {
-      'X-Requested-With': 'XMLHttpRequest',
-    };
+  // --- Core API Request Methods ---
 
-    if (propagation > 0) {
-      headers['propagation'] = propagation.toString();
-    }
-
-    if (!isFormData) {
-      headers['Content-Type'] = 'application/json';
-    }
-
-    const accessToken = this.getAccessToken();
-    if (accessToken) {
-      headers['Authorization'] = `Bearer ${accessToken}`;
-    }
-    
-    return headers;
-  }
-
-  private getPublicHeaders(isFormData: boolean = false, propagation: number = 0): Record<string, string> {
-    const headers: Record<string, string> = {
-      'X-Requested-With': 'XMLHttpRequest',
-    };
-
-    if (propagation > 0) {
-      headers['propagation'] = propagation.toString();
-    }
-
-    if (!isFormData) {
-      headers['Content-Type'] = 'application/json';
-    }
-    
-    return headers;
-  }
-
-  public async getAuthorizationToken(username: string, password: string): Promise<{ refresh: string, access: string }> {
+  public async getAuthorizationToken(username: string, password: string): Promise<TokenResponse> {
     try {
-      const payload = {
-        username: username,
-        password: password
-      };
-      
-      // console.log('Requesting token with payload:', { username });
-      
-      const response = await this.publicApiClient.post<{ refresh: string, access: string }>(
-        '/api/token/', 
-        payload
-      );
-      
-      // console.log('Token response received:', response.data);
+      const payload = { username, password };
+      const response = await this.publicApiClient.post<TokenResponse>('/api/token/', payload);
       return response.data;
     } catch (error) {
       console.error('Error in getAuthorizationToken:', error);
@@ -245,9 +257,8 @@ class ApiService {
 
   public async get<T>(url: string, propagation: number = 0): Promise<T> {
     try {
-      // console.log(`Making GET request to ${url}`);
       const response = await this.apiClient.get<T>(url, {
-        headers: this.getHeaders(false, propagation),
+        headers: propagation > 0 ? { propagation: propagation.toString() } : undefined,
       });
       return response.data;
     } catch (error) {
@@ -258,9 +269,8 @@ class ApiService {
 
   public async getPublic<T>(url: string, propagation: number = 0): Promise<T> {
     try {
-      // console.log(`Making public GET request to ${url}`);
       const response = await this.publicApiClient.get<T>(url, {
-        headers: this.getPublicHeaders(false, propagation),
+        headers: propagation > 0 ? { propagation: propagation.toString() } : undefined,
       });
       return response.data;
     } catch (error) {
@@ -271,9 +281,14 @@ class ApiService {
 
   public async post<T>(url: string, data: any, isFormData: boolean = false): Promise<T> {
     try {
-      const response = await this.apiClient.post<T>(url, data, {
-        headers: this.getHeaders(isFormData),
-      });
+      const headers: Record<string, string> = {};
+      if (isFormData) {
+        // Axios sets Content-Type for FormData automatically
+      } else {
+        headers['Content-Type'] = 'application/json';
+      }
+
+      const response = await this.apiClient.post<T>(url, data, { headers });
       return response.data;
     } catch (error) {
       console.error('Error in POST request:', error);
@@ -281,11 +296,16 @@ class ApiService {
     }
   }
 
-  public async postPublic<T>(url: string, data: any, propagation: number = 0, isFormData: boolean = false): Promise<T> {
+  public async postPublic<T>(url: string, data: any, isFormData: boolean = false): Promise<T> {
     try {
-      const response = await this.publicApiClient.post<T>(url, data, {
-        headers: this.getPublicHeaders(isFormData, propagation),
-      });
+      const headers: Record<string, string> = {};
+      if (isFormData) {
+        // Axios sets Content-Type for FormData automatically
+      } else {
+        headers['Content-Type'] = 'application/json';
+      }
+
+      const response = await this.publicApiClient.post<T>(url, data, { headers });
       return response.data;
     } catch (error) {
       console.error('Error in public POST request:', error);
@@ -296,7 +316,7 @@ class ApiService {
   public async put<T>(url: string, data: any, propagation: number = 0): Promise<T> {
     try {
       const response = await this.apiClient.put<T>(url, data, {
-        headers: this.getHeaders(false, propagation),
+        headers: propagation > 0 ? { propagation: propagation.toString() } : undefined,
       });
       return response.data;
     } catch (error) {
@@ -308,7 +328,7 @@ class ApiService {
   public async delete<T>(url: string, propagation: number = 0): Promise<T> {
     try {
       const response = await this.apiClient.delete<T>(url, {
-        headers: this.getHeaders(false, propagation),
+        headers: propagation > 0 ? { propagation: propagation.toString() } : undefined,
       });
       return response.data;
     } catch (error) {
@@ -317,56 +337,82 @@ class ApiService {
     }
   }
 
-  public async createCategory(categoryName: string, categoryImage: any,categoryId:any): Promise<any> {
+  // --- New User Authentication/Registration/Password Reset Methods ---
+
+  // Login (renamed for clarity with getAuthorizationToken)
+  public async login(username: string, password: string): Promise<TokenResponse> {
+    return this.getAuthorizationToken(username, password);
+  }
+
+  // Registration: Send OTP
+  public async sendOtp(data: { contact: string }): Promise<MessageResponse> {
+    const response = await this.postPublic<MessageResponse>('/user/send-otp/', data);
+    return response;
+  }
+
+  // Registration: Verify OTP
+  public async verifyOtp(data: { contact: string; otp: string }): Promise<{ username: string } & MessageResponse> {
+    const response = await this.postPublic<{ username: string } & MessageResponse>('/user/verify-otp/', data);
+    return response;
+  }
+
+  // Registration: Set Password (final step, also logs in)
+  public async setPassword(data: { username: string; password: string }): Promise<TokenResponse> {
+    const response = await this.postPublic<TokenResponse>('/user/set-password/', data);
+    return response;
+  }
+
+  // Password Reset: Request OTP
+  public async requestPasswordResetOtp(data: { email_or_username: string }): Promise<MessageResponse> {
+    const response = await this.postPublic<MessageResponse>('/user/request-password-reset-otp/', data); // Use public as unauthenticated
+    return response;
+  }
+
+  // Password Reset: Verify OTP
+  public async verifyPasswordResetOtp(data: { email_or_username: string; otp: string }): Promise<MessageResponse> {
+    const response = await this.postPublic<MessageResponse>('/user/verify-password-reset-otp/', data); // Use public as unauthenticated
+    return response;
+  }
+
+  // Password Reset: Confirm New Password
+  public async confirmPasswordReset(data: { email_or_username: string; otp: string; new_password: string }): Promise<MessageResponse> {
+    const response = await this.postPublic<MessageResponse>('/user/confirm-password-reset/', data); // Use public as unauthenticated
+    return response;
+  }
+
+  // --- Existing Methods ---
+
+  public async createCategory(categoryName: string, categoryImage: File, categoryId?: string): Promise<any> {
     try {
       const formData = new FormData();
       formData.append('category_name', categoryName);
       formData.append('category_image', categoryImage);
-      if(categoryId){
-        formData.append('id',categoryId)
+      if (categoryId) {
+        formData.append('id', categoryId);
       }
-      
-      const response = await this.post<any>('/category/create_category', formData, true);
-      return response;
+      return await this.post<any>('/category/create_category', formData, true);
     } catch (error) {
       console.error('Error creating category:', error);
       throw error;
     }
   }
 
-  // In your apiService.ts file (or wherever getPaginatedCategories is defined)
-
-public async getPaginatedCategories(
-  page: number = 1,
-  pageSize: number = 10,
-  searchQuery?: string // <--- Add this optional parameter
-): Promise<{
-  results: Array<{
-    id: string;
-    category_name: string;
-    category_image: string | null;
-    slug: string;
-  }>;
-  count: number;
-  next: string | null;
-  previous: string | null;
-}> {
-  try {
-    // Construct the base URL
-    let url = `/category/get_paginated_category?page=${page}&page_size=${pageSize}`;
-
-    // Add search query if provided and not empty
-    if (searchQuery) { // Check if searchQuery is provided and truthy
-      url += `&search=${encodeURIComponent(searchQuery)}`; // <--- Add search parameter
+  public async getPaginatedCategories(
+    page: number = 1,
+    pageSize: number = 10,
+    searchQuery?: string
+  ): Promise<any> {
+    try {
+      let url = `/category/get_paginated_category?page=${page}&page_size=${pageSize}`;
+      if (searchQuery) {
+        url += `&search=${encodeURIComponent(searchQuery)}`;
+      }
+      return await this.get<any>(url);
+    } catch (error) {
+      console.error('Error fetching paginated categories:', error);
+      throw error;
     }
-
-    const response = await this.get<any>(url); // Use the constructed URL
-    return response;
-  } catch (error) {
-    console.error('Error fetching paginated categories:', error);
-    throw error;
   }
-}
 
   public async getAllCategories(): Promise<Array<{
     sub_categories?: any;
@@ -389,7 +435,7 @@ public async getPaginatedCategories(
     category_name: string;
     category_image: string | null;
     slug: string;
-    sub_categories:any[]
+    sub_categories: any[]
   }>> {
     try {
       const response = await this.getPublic<any>(`/category/get_paginated_category?page=1&page_size=1000&get_sub_category=true`);
@@ -402,59 +448,49 @@ public async getPaginatedCategories(
 
 
   public async getPaginatedProducts(
-  page: number = 1,
-  pageSize: number = 10,
-  searchQuery?: string, // <--- Add this new optional parameter
-  productIds?: string[],
-  filters?: {
-    subcategory_id?: string | number,
-    min_price?: number,
-    max_price?: number,
-    sort_by?: string
+    page: number = 1,
+    pageSize: number = 10,
+    searchQuery?: string,
+    productIds?: string[],
+    filters?: {
+      subcategory_id?: string | number,
+      min_price?: number,
+      max_price?: number,
+      sort_by?: string
+    }
+  ): Promise<any> {
+    try {
+      let url = `/products/get_all_products?page=${page}&page_size=${pageSize}`;
+      if (searchQuery) {
+        url += `&search=${encodeURIComponent(searchQuery)}`;
+      }
+      if (productIds && productIds.length > 0) {
+        url += `&ids=${productIds.join(',')}`;
+      }
+      if (filters) {
+        if (filters.subcategory_id) {
+          url += `&sub_category=${filters.subcategory_id}`;
+        }
+        if (filters.min_price) {
+          url += `&min_price=${filters.min_price}`;
+        }
+        if (filters.max_price) {
+          url += `&max_price=${filters.max_price}`;
+        }
+        if (filters.sort_by) {
+          url += `&sort_by=${filters.sort_by}`;
+        }
+      }
+      return await this.getPublic<any>(url);
+    } catch (error) {
+      console.error('Error fetching paginated products:', error);
+      throw error;
+    }
   }
-): Promise<any> { // Consider making 'any' more specific with an interface if possible
-  try {
-    let url = `/products/get_all_products?page=${page}&page_size=${pageSize}`;
-
-    // Add search query if provided and not empty
-    if (searchQuery) {
-      url += `&search=${encodeURIComponent(searchQuery)}`; // <--- Add search parameter to URL
-    }
-
-    if (productIds && productIds.length > 0) {
-      url += `&ids=${productIds.join(',')}`; // It's common for IDs arrays to be comma-separated
-    }
-
-    if (filters) {
-      if (filters.subcategory_id) {
-        url += `&sub_category=${filters.subcategory_id}`;
-      }
-
-      if (filters.min_price) {
-        url += `&min_price=${filters.min_price}`;
-      }
-
-      if (filters.max_price) {
-        url += `&max_price=${filters.max_price}`;
-      }
-
-      if (filters.sort_by) {
-        url += `&sort_by=${filters.sort_by}`;
-      }
-    }
-
-    const response = await this.getPublic<any>(url); // Assuming getPublic is your method for public endpoints
-    return response;
-  } catch (error) {
-    console.error('Error fetching paginated products:', error);
-    throw error;
-  }
-}
 
   public async createHomeCategory(data: any): Promise<any> {
-    try {      
-      const response = await this.post<any>('/home_category/create', data);
-      return response;
+    try {
+      return await this.post<any>('/home_category/create', data);
     } catch (error) {
       throw error;
     }
@@ -462,26 +498,23 @@ public async getPaginatedCategories(
 
   public async getHomeCategories(): Promise<any> {
     try {
-      const response = await this.getPublic<any>(`/home_category/get_all_product`);
-      return response;
+      return await this.getPublic<any>(`/home_category/get_all_product`);
     } catch (error) {
       throw error;
     }
   }
 
-  public async getProductByID(id:any): Promise<any> {
+  public async getProductByID(id: any): Promise<any> {
     try {
-      const response = await this.getPublic<any>(`/products/get_by_id/${id}`);
-      return response;
+      return await this.getPublic<any>(`/products/get_by_id/${id}`);
     } catch (error) {
       throw error;
     }
   }
 
-  public async googleKeyVerify(data:any): Promise<any> {
+  public async googleKeyVerify(data: any): Promise<any> {
     try {
-      const response = await this.post<any>('/user/firebase-login', data);
-      return response;
+      return await this.post<any>('/user/firebase-login', data);
     } catch (error) {
       throw error;
     }
@@ -490,17 +523,15 @@ public async getPaginatedCategories(
 
   public async getAddresses(): Promise<any> {
     try {
-      const response = await this.get<any>(`/address/get_address`);
-      return response;
+      return await this.get<any>(`/address/get_address`);
     } catch (error) {
       throw error;
     }
   }
 
-  public async addAddress(data:any): Promise<any> {
+  public async addAddress(data: any): Promise<any> {
     try {
-      const response = await this.post<any>('/address/add_address', data);
-      return response;
+      return await this.post<any>('/address/add_address', data);
     } catch (error) {
       throw error;
     }
@@ -508,44 +539,39 @@ public async getPaginatedCategories(
 
   public async getUserCart(): Promise<any> {
     try {
-      const response = await this.get<any>(`/cart/get_my_cart`);
-      return response;
+      return await this.get<any>(`/cart/get_my_cart`);
     } catch (error) {
       throw error;
     }
   }
 
-  public async addToCart(data:any): Promise<any> {
+  public async addToCart(data: any): Promise<any> {
     try {
-      const response = await this.post<any>('/cart/add_to_cart', data);
-      return response;
+      return await this.post<any>('/cart/add_to_cart', data);
     } catch (error) {
       throw error;
     }
   }
 
-  public async getProductAmountDetailed(data:any): Promise<any> {
+  public async getProductAmountDetailed(data: any): Promise<any> {
     try {
-      const response = await this.post<any>('/products/get_product_amount', data);
-      return response;
+      return await this.post<any>('/products/get_product_amount', data);
     } catch (error) {
       throw error;
     }
   }
 
-  public async createProductsOrder(data:any): Promise<any> {
+  public async createProductsOrder(data: any): Promise<any> {
     try {
-      const response = await this.post<any>('/order/place_order', data);
-      return response;
+      return await this.post<any>('/order/place_order', data);
     } catch (error) {
       throw error;
     }
   }
 
-  public async verifyPayment(data:any): Promise<any> {
+  public async verifyPayment(data: any): Promise<any> {
     try {
-      const response = await this.post<any>('/order/verify_payment', data);
-      return response;
+      return await this.post<any>('/order/verify_payment', data);
     } catch (error) {
       throw error;
     }
@@ -553,17 +579,15 @@ public async getPaginatedCategories(
 
   public async getMyOrders(): Promise<any> {
     try {
-      const response = await this.get<any>(`/order/get_my_orders`);
-      return response;
+      return await this.get<any>(`/order/get_my_orders`);
     } catch (error) {
       throw error;
     }
   }
 
-  public async addToWishlist(data:any): Promise<any> {
+  public async addToWishlist(data: any): Promise<any> {
     try {
-      const response = await this.post<any>('/wishlist/create_wishlist', data);
-      return response;
+      return await this.post<any>('/wishlist/create_wishlist', data);
     } catch (error) {
       throw error;
     }
@@ -571,17 +595,15 @@ public async getPaginatedCategories(
 
   public async getWishlist(): Promise<any> {
     try {
-      const response = await this.get<any>(`/wishlist/get_all_wishlist_on_product`);
-      return response;
+      return await this.get<any>(`/wishlist/get_all_wishlist_on_product`);
     } catch (error) {
       throw error;
     }
   }
 
-  public async homeCategoryByID(id:any): Promise<any> {
+  public async homeCategoryByID(id: any): Promise<any> {
     try {
-      const response = await this.get<any>(`/home_category/get_home_category_by_id/${id}`);
-      return response;
+      return await this.get<any>(`/home_category/get_home_category_by_id/${id}`);
     } catch (error) {
       throw error;
     }
@@ -596,26 +618,19 @@ public async getPaginatedCategories(
   ): Promise<any> {
     try {
       let url = `/order/get_all_orders?page=${page}&page_size=${pageSize}`;
-      
-      if (filters) {
-        
-        if (filters.sort_by) {
-          url += `&sort_by=${filters.sort_by}`;
-        }
+      if (filters && filters.sort_by) {
+        url += `&sort_by=${filters.sort_by}`;
       }
-      
-      const response = await this.get<any>(url);
-      return response;
+      return await this.get<any>(url);
     } catch (error) {
-      console.error('Error fetching paginated products:', error);
+      console.error('Error fetching paginated orders:', error);
       throw error;
     }
   }
 
-  public async getOrderById(id:any): Promise<any> {
+  public async getOrderById(id: any): Promise<any> {
     try {
-      const response = await this.get<any>(`/order/get_order_by_id/${id}`);
-      return response;
+      return await this.get<any>(`/order/get_order_by_id/${id}`);
     } catch (error) {
       throw error;
     }
@@ -623,26 +638,23 @@ public async getPaginatedCategories(
 
   public async getHeroBanners(): Promise<any> {
     try {
-      const response = await this.getPublic<any>(`/hero/get_hero`);
-      return response;
+      return await this.getPublic<any>(`/hero/get_hero`);
     } catch (error) {
       throw error;
     }
   }
 
-  public async createHeroBanner(data:any): Promise<any> {
+  public async createHeroBanner(data: any): Promise<any> {
     try {
-      const response = await this.post<any>('/hero/create_hero', data,true);
-      return response;
+      return await this.post<any>('/hero/create_hero', data, true);
     } catch (error) {
       throw error;
     }
   }
 
-  public async getHeroBannerById(id:any): Promise<any> {
+  public async getHeroBannerById(id: any): Promise<any> {
     try {
-      const response = await this.get<any>(`/hero/get_hero_by_id/${id}`);
-      return response;
+      return await this.get<any>(`/hero/get_hero_by_id/${id}`);
     } catch (error) {
       throw error;
     }
@@ -650,17 +662,15 @@ public async getPaginatedCategories(
 
   public async getMyWishlist(): Promise<any> {
     try {
-      const response = await this.get<any>(`/wishlist/get_all_wishlist`);
-      return response;
+      return await this.get<any>(`/wishlist/get_all_wishlist`);
     } catch (error) {
       throw error;
     }
   }
 
-  public async getCategoryById(id:any): Promise<any> {
+  public async getCategoryById(id: any): Promise<any> {
     try {
-      const response = await this.get<any>(`/category/get_category/${id}`);
-      return response;
+      return await this.get<any>(`/category/get_category/${id}`);
     } catch (error) {
       throw error;
     }
@@ -668,8 +678,7 @@ public async getPaginatedCategories(
 
   public async getAllOffers(): Promise<any> {
     try {
-      const response = await this.get<any>(`/offers/offers/all`);
-      return response;
+      return await this.get<any>(`/offers/offers/all`);
     } catch (error) {
       throw error;
     }
@@ -677,26 +686,23 @@ public async getPaginatedCategories(
 
   public async getValidOffers(): Promise<any> {
     try {
-      const response = await this.get<any>(`/offers/offers/valid`);
-      return response;
+      return await this.get<any>(`/offers/offers/valid`);
     } catch (error) {
       throw error;
     }
   }
 
-  public async offerByID(id:any): Promise<any> {
+  public async offerByID(id: any): Promise<any> {
     try {
-      const response = await this.get<any>(`/offers/get_offers/${id}`);
-      return response;
+      return await this.get<any>(`/offers/get_offers/${id}`);
     } catch (error) {
       throw error;
     }
   }
 
-  public async createOffer(data:any): Promise<any> {
+  public async createOffer(data: any): Promise<any> {
     try {
-      const response = await this.post<any>('/offers/create_offer', data,true);
-      return response;
+      return await this.post<any>('/offers/create_offer', data, true);
     } catch (error) {
       throw error;
     }
@@ -704,35 +710,31 @@ public async getPaginatedCategories(
 
   public async getAllCoupons(): Promise<any> {
     try {
-      const response = await this.get<any>(`/coupon/get_all_coupons`);
-      return response;
+      return await this.get<any>(`/coupon/get_all_coupons`);
     } catch (error) {
       throw error;
     }
   }
 
-  public async createCoupon(data:any): Promise<any> {
+  public async createCoupon(data: any): Promise<any> {
     try {
-      const response = await this.post<any>('/coupon/add_coupon', data,true);
-      return response;
+      return await this.post<any>('/coupon/add_coupon', data, true);
     } catch (error) {
       throw error;
     }
   }
 
-  public async couponByID(id:any): Promise<any> {
+  public async couponByID(id: any): Promise<any> {
     try {
-      const response = await this.get<any>(`/coupon/get_coupon/${id}`);
-      return response;
+      return await this.get<any>(`/coupon/get_coupon/${id}`);
     } catch (error) {
       throw error;
     }
   }
 
-  public async addToCartOffer(data:any): Promise<any> {
+  public async addToCartOffer(data: any): Promise<any> {
     try {
-      const response = await this.post<any>('/cart/add_to_cart_by_offer', data);
-      return response;
+      return await this.post<any>('/cart/add_to_cart_by_offer', data);
     } catch (error) {
       throw error;
     }
@@ -740,40 +742,36 @@ public async getPaginatedCategories(
 
   public async getAllStaffes(): Promise<any> {
     try {
-      const response = await this.get<any>(`/user/get_all_staff_users`);
-      return response;
+      return await this.get<any>(`/user/get_all_staff_users`);
     } catch (error) {
       throw error;
     }
   }
 
-  public async saveStaff(data:any): Promise<any> {
+  public async saveStaff(data: any): Promise<any> {
     try {
-      const response = await this.post<any>('/user/create_staff_user', data);
-      return response;
+      return await this.post<any>('/user/create_staff_user', data);
     } catch (error) {
       throw error;
     }
   }
 
-  public async getStaffById(id:any): Promise<any> {
+  public async getStaffById(id: any): Promise<any> {
     try {
-      const response = await this.get<any>(`/user/get_staff_user_by_id/${id}`);
-      return response;
+      return await this.get<any>(`/user/get_staff_user_by_id/${id}`);
     } catch (error) {
       throw error;
     }
   }
 
-  public async updateStaffStatus(id:any,data:any): Promise<any> {
+  public async updateStaffStatus(id: any, data: any): Promise<any> {
     try {
-      const response = await this.put<any>('/user/update_user_is_active/${id}', data);
-      return response;
+      // Corrected URL: Use template literal for ID
+      return await this.put<any>(`/user/update_user_is_active/${id}`, data);
     } catch (error) {
       throw error;
     }
   }
-
 }
 
 const apiService = ApiService.getInstance();

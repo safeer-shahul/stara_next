@@ -7,34 +7,120 @@ import { useRouter, usePathname } from 'next/navigation';
 import apiService from '@/utils/api/apiService';
 import { Menu, X, LogOut, LayoutDashboard, Package, ShoppingCart, Percent, Tag, Users, Settings, Eye } from 'lucide-react';
 
+// Define the structure for an admin user, including staff-specific properties
 interface AdminUser {
   name: string;
-  username: string;
+  username: string | undefined;
+  isStaff: boolean;
+  allowedRoutes?: string[];
+  is_superuser?: boolean;
 }
 
+// Define navigation item structure
+interface NavigationItem {
+  href: string;
+  label: string;
+  exact?: boolean;
+  startsWith?: boolean | string;
+  icon: any;
+  requiredPermissions?: string[]; // New: Define required permissions for each menu item
+  staffOnly?: boolean; // New: If true, only staff can see this item
+  superuserOnly?: boolean; // New: If true, only superusers can see this item
+}
+
+// Main Admin Layout component
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+
   const [isLoading, setIsLoading] = useState(true);
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  const navigationItems = useMemo(() => [
-    { href: '/admin', label: 'Dashboard', exact: true, icon: LayoutDashboard },
-    { href: '/admin/products', label: 'Products', startsWith: true, icon: Package },
-    { href: '/admin/orders/list', label: 'Orders', startsWith: '/admin/orders', icon: ShoppingCart },
-    { href: '/admin/offers/list', label: 'Offers', startsWith: '/admin/offers', icon: Percent },
-    { href: '/admin/coupons/list', label: 'Coupons', startsWith: '/admin/coupons', icon: Tag },
-    { href: '/admin/staff/list', label: 'Staffs', startsWith: true, icon: Users },
-    // { href: '/admin/settings', label: 'Settings', startsWith: true, icon: Settings },
+  // Enhanced navigation items with permission-based access control
+  const navigationItems = useMemo<NavigationItem[]>(() => [
+    { 
+      href: '/admin', 
+      label: 'Dashboard', 
+      exact: true, 
+      icon: LayoutDashboard,
+      // Dashboard is accessible to all authenticated admin users
+    },
+    { 
+      href: '/admin/products', 
+      label: 'Products', 
+      startsWith: true, 
+      icon: Package,
+      superuserOnly: true, // Only superusers can access products
+    },
+    { 
+      href: '/admin/orders/list', 
+      label: 'Orders', 
+      startsWith: '/admin/orders', 
+      icon: ShoppingCart,
+      requiredPermissions: ['/admin/orders'], // Staff with orders permission can access
+    },
+    { 
+      href: '/admin/offers/list', 
+      label: 'Offers', 
+      startsWith: '/admin/offers', 
+      icon: Percent,
+      superuserOnly: true, // Only superusers can manage offers
+    },
+    { 
+      href: '/admin/coupons/list', 
+      label: 'Coupons', 
+      startsWith: true, 
+      icon: Tag,
+      superuserOnly: true, // Only superusers can manage coupons
+    },
+    { 
+      href: '/admin/staff/list', 
+      label: 'Staffs', 
+      startsWith: true, 
+      icon: Users,
+      superuserOnly: true, // Only superusers can manage staff
+    },
+    // { 
+    //   href: '/admin/settings', 
+    //   label: 'Settings', 
+    //   startsWith: true, 
+    //   icon: Settings,
+    //   superuserOnly: true, // Only superusers can access settings
+    // },
   ], []);
 
+  // Effect to prefetch navigation links
   useEffect(() => {
     navigationItems.forEach(item => router.prefetch(item.href));
     router.prefetch('/');
   }, [router, navigationItems]);
 
+  // Enhanced staff permissions - you can expand this based on your needs
+  const getStaffPermissions = useCallback((userProfile: any): string[] => {
+    // This should ideally come from your backend API
+    // For now, we'll define basic staff permissions
+    const staffPermissions: string[] = [
+      '/admin', // Dashboard access
+      '/admin/orders', // Orders access - giving all staff access to orders for now
+    ];
+
+    // You can add logic here to assign different permissions based on staff roles
+    // For example, if you have different types of staff:
+    if (userProfile.staff_role === 'order_manager') {
+      staffPermissions.push('/admin/orders');
+    }
+    
+    // Add more role-based permissions as needed
+    // if (userProfile.staff_role === 'inventory_manager') {
+    //   staffPermissions.push('/admin/products');
+    // }
+
+    return staffPermissions;
+  }, []);
+
+  // Enhanced authentication check
   const checkAuth = useCallback(async () => {
     if (pathname === '/admin/login') {
       setIsLoading(false);
@@ -55,15 +141,31 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
       if (!adminUser) {
         const userProfile = await apiService.getUserProfile();
+        let currentUser: AdminUser | null = null;
 
-        if (!userProfile.is_superuser) {
-          throw new Error('User is not an admin');
+        if (userProfile.is_superuser) {
+          currentUser = {
+            name: userProfile.first_name || userProfile.email || userProfile.username || 'Admin User',
+            username: userProfile.username,
+            isStaff: false,
+            is_superuser: true,
+          };
+        } else if (userProfile.is_staff) {
+          // Get staff permissions dynamically
+          const staffPermissions = getStaffPermissions(userProfile);
+          
+          currentUser = {
+            name: userProfile.first_name || userProfile.email || userProfile.username || 'Staff User',
+            username: userProfile.username,
+            isStaff: true,
+            is_superuser: false,
+            allowedRoutes: staffPermissions,
+          };
+        } else {
+          throw new Error('User is not authorized to access admin panel');
         }
 
-        setAdminUser({
-          name: userProfile.name || 'Admin User',
-          username: userProfile.email || userProfile.username || 'Admin'
-        });
+        setAdminUser(currentUser);
       }
 
       setAuthChecked(true);
@@ -75,7 +177,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [pathname, adminUser, authChecked, router]);
+  }, [pathname, adminUser, authChecked, router, getStaffPermissions]);
 
   useEffect(() => {
     if ((pathname === '/admin/login' && authChecked) || (adminUser && authChecked)) {
@@ -92,13 +194,68 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     router.push('/admin/login');
   }, [router]);
 
-  const renderNavLink = useCallback((item: typeof navigationItems[0]) => {
-    const isActive = item.exact
-      ? pathname === item.href
-      : typeof item.startsWith === 'string'
-        ? pathname.startsWith(item.startsWith)
-        : pathname.startsWith(item.href);
+  // Enhanced navigation filtering with better permission checking
+  const filteredNavigationItems = useMemo(() => {
+    if (!adminUser) return [];
 
+    return navigationItems.filter(item => {
+      // Superusers can see everything (unless staffOnly is true)
+      if (adminUser.is_superuser) {
+        return !item.staffOnly; // Exclude items marked as staff-only
+      }
+
+      // Staff members have restricted access
+      if (adminUser.isStaff) {
+        // If item is marked as superuser-only, staff cannot see it
+        if (item.superuserOnly) {
+          return false;
+        }
+
+        // If item has required permissions, check if staff has them
+        if (item.requiredPermissions && item.requiredPermissions.length > 0) {
+          return item.requiredPermissions.some(permission => 
+            adminUser.allowedRoutes?.some(allowedPath => {
+              return allowedPath === permission || allowedPath.startsWith(permission + '/') || permission.startsWith(allowedPath + '/');
+            })
+          );
+        }
+
+        // If no specific permissions required, check against allowedRoutes
+        if (adminUser.allowedRoutes) {
+          return adminUser.allowedRoutes.some(allowedPath => {
+            if (item.exact && item.href === allowedPath) return true;
+            // Check if the item href matches or starts with the allowed path
+            // Also check if the allowed path covers the item path
+            return item.href === allowedPath || 
+                   item.href.startsWith(allowedPath + '/') || 
+                   allowedPath.startsWith(item.href.split('/').slice(0, -1).join('/'));
+          });
+        }
+      }
+
+      return false; // Default to not showing the item
+    });
+  }, [adminUser, navigationItems]);
+
+  // Enhanced active link detection
+  const isNavItemActive = useCallback((item: NavigationItem): boolean => {
+    if (item.exact) {
+      return pathname === item.href;
+    }
+    
+    if (typeof item.startsWith === 'string') {
+      return pathname.startsWith(item.startsWith);
+    }
+    
+    if (item.startsWith === true) {
+      return pathname.startsWith(item.href);
+    }
+    
+    return pathname.startsWith(item.href);
+  }, [pathname]);
+
+  const renderNavLink = useCallback((item: NavigationItem) => {
+    const isActive = isNavItemActive(item);
     const Icon = item.icon;
 
     return (
@@ -116,8 +273,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         </Link>
       </li>
     );
-  }, [pathname]);
+  }, [isNavItemActive]);
 
+  // Loading state
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50">
@@ -129,12 +287,33 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     );
   }
 
+  // Login page or unauthenticated
   if (pathname === '/admin/login' || !adminUser) {
     return <>{children}</>;
   }
 
+  // Enhanced route protection for staff
+  if (adminUser.isStaff) {
+    const isCurrentPathAllowed = adminUser.allowedRoutes?.some(allowedPath => {
+      if (pathname === allowedPath) return true;
+      if (pathname.startsWith(allowedPath) && 
+          (pathname.length === allowedPath.length || pathname[allowedPath.length] === '/')) {
+        return true;
+      }
+      return false;
+    });
+
+    if (!isCurrentPathAllowed) {
+      console.warn(`Staff user '${adminUser.username}' attempted to access unauthorized path: '${pathname}'. Redirecting to dashboard.`);
+      router.push('/admin');
+      return null;
+    }
+  }
+
+  // Main layout render
   return (
     <div className="flex h-screen bg-gray-50 text-gray-800">
+      {/* Mobile sidebar overlay */}
       {isSidebarOpen && (
         <div
           className="fixed inset-0 bg-black opacity-50 z-30 lg:hidden"
@@ -142,6 +321,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         ></div>
       )}
 
+      {/* Sidebar */}
       <aside
         className={`fixed inset-y-0 left-0 w-64 bg-white shadow-xl transform transition-transform duration-300 ease-in-out z-40
           ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
@@ -153,6 +333,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           <button
             className="lg:hidden text-gray-600 hover:text-gray-800"
             onClick={() => setIsSidebarOpen(false)}
+            aria-label="Close sidebar"
           >
             <X className="w-6 h-6" />
           </button>
@@ -160,19 +341,25 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
         <nav className="mt-6 px-4">
           <ul>
-            {navigationItems.map(renderNavLink)}
+            {/* Render filtered navigation items */}
+            {filteredNavigationItems.map(renderNavLink)}
 
-            <li className="mt-8 pt-4 border-t border-gray-200">
-              <Link
-                href="/"
-                className="flex items-center py-2 px-4 rounded-lg text-gray-700 hover:bg-gray-200 transition-colors duration-150"
-                prefetch={true}
-                onClick={() => setIsSidebarOpen(false)}
-              >
-                <Eye className="w-5 h-5 mr-3" />
-                <span>View Site</span>
-              </Link>
-            </li>
+            {/* Show "View Site" only for superusers */}
+            {adminUser && adminUser.is_superuser && (
+              <li className="mt-8 pt-4 border-t border-gray-200">
+                <Link
+                  href="/"
+                  className="flex items-center py-2 px-4 rounded-lg text-gray-700 hover:bg-gray-200 transition-colors duration-150"
+                  prefetch={true}
+                  onClick={() => setIsSidebarOpen(false)}
+                >
+                  <Eye className="w-5 h-5 mr-3" />
+                  <span>View Site</span>
+                </Link>
+              </li>
+            )}
+
+            {/* Logout button - always visible */}
             <li>
               <button
                 onClick={handleLogout}
@@ -186,12 +373,14 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         </nav>
       </aside>
 
+      {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="bg-white shadow-sm border-b border-gray-200 flex-shrink-0">
           <div className="p-4 flex justify-between items-center">
             <button
               className="lg:hidden text-gray-600 hover:text-gray-800"
               onClick={() => setIsSidebarOpen(true)}
+              aria-label="Open sidebar"
             >
               <Menu className="w-6 h-6" />
             </button>
@@ -201,6 +390,16 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             <div className="flex items-center space-x-4">
               <span className="text-gray-700 font-medium">
                 Welcome, {adminUser.name || adminUser.username}
+                {adminUser.isStaff && (
+                  <span className="ml-2 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                    Staff
+                  </span>
+                )}
+                {adminUser.is_superuser && (
+                  <span className="ml-2 px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full">
+                    Super Admin
+                  </span>
+                )}
               </span>
             </div>
           </div>

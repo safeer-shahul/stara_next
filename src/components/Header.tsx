@@ -4,47 +4,44 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Search, User, Heart, Menu, X, LogOut, ShoppingCart } from 'lucide-react';
+import { Search, User, Heart, Menu, X, LogOut, ShoppingCart, LayoutDashboard } from 'lucide-react'; // Added LayoutDashboard icon
 import CartDrawer from './CartDrawer';
-import UserDropdown from './auth/UserDropdown';
+import UserDropdown from './auth/UserDropdown'; // Assuming this component exists and handles regular user dropdown
 import AuthModal from './auth/AuthModal';
 import apiService from '@/utils/api/apiService';
-import { useCart, CartItemType } from '@/context/cartContext'; // Import useCart and CartItemType
+import { useCart, CartItemType } from '@/context/cartContext';
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
-  const [userProfile, setUserProfile] = useState<any>(null);
+  const [userProfile, setUserProfile] = useState<any>(null); // This will hold is_superuser, is_staff etc.
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
   const [categories, setCategories] = useState<any[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+  const [loadingCategories, setLoadingCategories] = useState<boolean>(false);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
   const [wishlistCount, setWishlistCount] = useState<number>(0);
-  // Remove local cartCount state, use cart context instead
-  // const [cartCount, setCartCount] = useState<number>(0); 
 
   const { cartItems } = useCart(); // Access cartItems from global context
 
   // Derive cartCount directly from cartItems from context
   const totalCartUnits = cartItems.reduce((total: number, item: CartItemType) => {
-    if (item.type === 'normal') {
-      return total + item.quantity;
-    } else { // item.type === 'offer'
-      // Sum the quantities of all products within the offer_items array
-      return total + item.offer_items.reduce((offerTotal, p) => offerTotal + p.quantity, 0);
-    }
-  }, 0);
-
+  if (item.type === 'normal') {
+    return total + item.quantity;
+  } else { // item.type === 'offer'
+    // Sum the quantities of all products within the offer_items array
+    // CORRECTED LINE: access p.quantity
+    return total + item.offer_items.reduce((offerTotal, p) => offerTotal + p.quantity, 0); 
+  }
+}, 0);
 
   // Fetch categories for header menu
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        setLoading(true);
+        setLoadingCategories(true);
         const categoryData = await apiService.getAllCategoriesPublic();
-        console.log(categoryData, 'categoryData');
         
         const formattedCategories: any = categoryData.map(category => ({
           image: `${process.env.NEXT_PUBLIC_API_BASE_URL}${category.category_image}`,
@@ -54,20 +51,18 @@ export default function Header() {
         }));
         
         setCategories(formattedCategories);
-        setError(null);
+        setCategoryError(null);
       } catch (err) {
         console.error('Failed to fetch categories:', err);
-        setError('Failed to load categories');
-        console.log(error)
+        setCategoryError('Failed to load categories');
       } finally {
-        setLoading(false);
+        setLoadingCategories(false);
       }
     };
     
     fetchCategories();
   }, []);
   
-
   // Function to get wishlist count from localStorage (still used if no dedicated context)
   const getWishlistCountFromLocalStorage = () => {
     try {
@@ -89,16 +84,11 @@ export default function Header() {
       const token = localStorage.getItem('accessToken');
       
       if (token) {
-        console.log('testtttt token')
         setIsLoggedIn(true);
-        fetchUserProfile();
-        // Cart count now comes from useCart context, not directly from API/localStorage in this useEffect.
-        // Wishlist count will be fetched in fetchUserProfile for logged in users.
+        fetchUserProfile(); // Fetch user profile including is_superuser/is_staff
       } else {
-        console.log('testtttt noooo token')
         setIsLoggedIn(false);
         setUserProfile(null);
-        // For non-logged-in users, get wishlist count from localStorage
         setWishlistCount(getWishlistCountFromLocalStorage());
       }
     };
@@ -111,64 +101,46 @@ export default function Header() {
       if (e.key === 'accessToken') {
         checkAuthStatus();
       } 
-      // cartItems changes are now handled by useCart context, no need for direct Header listener
-      else if (e.key === 'wishlist') { // Only listen for wishlist if no dedicated context
-        if (!isLoggedIn) {
+      else if (e.key === 'wishlist') {
+        if (!isLoggedIn) { // Only update from local storage if not logged in
           setWishlistCount(getWishlistCountFromLocalStorage());
         }
       }
     };
 
-    // Add listener for login events from AuthModal
+    // Add listener for user login event (dispatched from AuthModal)
     const handleUserLogin = () => {
       setIsLoggedIn(true);
       const token = localStorage.getItem('accessToken');
       if (token) {
-        fetchUserProfile();
+        fetchUserProfile(); // Re-fetch profile on login
       }
     };
     
     window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('userLoggedIn', handleUserLogin);
+    window.addEventListener('userLoggedIn', handleUserLogin); // Custom event listener
     
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('userLoggedIn', handleUserLogin);
     };
-  }, [isLoggedIn]); // Removed cartCount and wishlistCount from dependencies as they are derived/updated elsewhere
-
-  // Removed useEffect for setInterval polling as useCart context handles reactivity
-  // useEffect(() => {
-  //   if (!isLoggedIn) {
-  //     const interval = setInterval(() => {
-  //       setCartCount(getCartCountFromLocalStorage());
-  //       setWishlistCount(getWishlistCountFromLocalStorage());
-  //     }, 1000); // Check every second for local changes
-      
-  //     return () => clearInterval(interval);
-  //   }
-  // }, [isLoggedIn]);
+  }, [isLoggedIn]); // isLoggedIn is a dependency to re-run effect when login status changes
 
   const fetchUserProfile = async () => {
     try {
       const response = await apiService.getUserProfile();
-      console.log(response, 'getmecustomer');
       setUserProfile(response);
       
-      // For logged in users, get counts from API
-      // cart_items_count and wishlist_item_count from API (if backend provides total units)
-      // Otherwise, the useCart context will eventually reflect the backend state correctly
-      // For wishlist, update if provided by API
       if (response?.wishlist_item_count !== undefined) {
         setWishlistCount(response.wishlist_item_count);
       } else {
-        setWishlistCount(getWishlistCountFromLocalStorage()); // Fallback for wishlist
+        setWishlistCount(getWishlistCountFromLocalStorage()); // Fallback
       }
-      // No need to set cartCount here, as useCart already manages it globally based on backend/localStorage.
     } catch (error) {
       console.error('Failed to fetch user profile:', error);
-      // Fallback to localStorage for wishlist if API fails
-      setWishlistCount(getWishlistCountFromLocalStorage());
+      setUserProfile(null); // Clear profile if fetching fails
+      setIsLoggedIn(false); // Consider user logged out if profile fetch fails
+      setWishlistCount(getWishlistCountFromLocalStorage()); // Fallback for wishlist
     }
   };
 
@@ -184,13 +156,20 @@ export default function Header() {
     }
   };
 
-  const handleLogout = () => {
-    console.log('hello')
+  const handleLogout = useCallback(() => {
     setIsLoggedIn(false);
     setUserProfile(null);
     setIsMenuOpen(false);
-    apiService.logout()
-  };
+    apiService.logout(); // Call your logout API service
+    // Dispatch a custom event for other components to react to logout
+    window.dispatchEvent(new Event('userLoggedOut')); 
+    // Optionally redirect to home page or login page
+    // router.push('/'); 
+  }, []);
+
+  const isAdminOrStaff = userProfile?.is_superuser || userProfile?.is_staff;
+  const accountLink = isAdminOrStaff ? '/admin' : '/account';
+  const AccountIcon = isAdminOrStaff ? LayoutDashboard : User; // Use dashboard icon for admin/staff
 
   return (
     <>
@@ -223,32 +202,40 @@ export default function Header() {
           </div>
 
           <div className="flex space-x-4">
-            <button className="md:hidden" onClick={() => setIsMenuOpen(!isMenuOpen)}>
+            <button className="md:hidden" onClick={() => setIsMenuOpen(!isMenuOpen)} aria-label="Toggle menu">
               {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
             
             {/* User account icon - conditionally render dropdown or open auth modal */}
             <div className="hidden md:block cursor-pointer">
               {isLoggedIn ? (
-                <UserDropdown userProfile={userProfile} />
+                // If logged in, show admin/staff dashboard link or regular user dropdown
+                isAdminOrStaff ? (
+                  <Link href={accountLink} className="flex items-center" title="Admin/Staff Dashboard">
+                    <AccountIcon size={22} />
+                  </Link>
+                ) : (
+                  <UserDropdown userProfile={userProfile} />
+                )
               ) : (
-                <a href="#" onClick={handleUserClick}>
+                // If not logged in, show login/register button
+                <a href="#" onClick={handleUserClick} title="Login / Register">
                   <User size={22} />
                 </a>
               )}
             </div>
             
-            <Link href="/account/wishlist" className="hidden md:block relative">
+            <Link href="/account/wishlist" className="hidden md:block relative" title="Wishlist">
               <Heart size={22} />
-              <span className={`absolute ${isLoggedIn ? 'bottom-[-1px]' : 'bottom-[-11px]'} left-1/2 transform -translate-x-1/2 bg-[#F0FBFF] text-[var(--color-primary-950)] text-[11px] h-3 w-6 flex items-center justify-center`}>
+              <span className={`absolute ${isLoggedIn ? 'bottom-[-1px]' : 'bottom-[-11px]'} left-1/2 transform -translate-x-1/2 bg-[#F0FBFF] text-[var(--color-primary-950)] text-[11px] h-3 w-6 flex items-center justify-center rounded-full`}>
                 {wishlistCount}
               </span>
             </Link>
 
             {/* Shopping Cart Icon */}
-            <a href="#" className="relative" onClick={handleCartClick}>
+            <a href="#" className="relative" onClick={handleCartClick} title="Shopping Cart">
               <ShoppingCart size={22} />
-              <span className={`absolute ${isLoggedIn ? 'bottom-[-1px]' : 'bottom-[-11px]'} left-1/2 transform -translate-x-1/2 bg-[#F0FBFF] text-[var(--color-primary-950)] text-[11px] h-3 w-6 flex items-center justify-center`}>
+              <span className={`absolute ${isLoggedIn ? 'bottom-[-1px]' : 'bottom-[-11px]'} left-1/2 transform -translate-x-1/2 bg-[#F0FBFF] text-[var(--color-primary-950)] text-[11px] h-3 w-6 flex items-center justify-center rounded-full`}>
                 {totalCartUnits} {/* Use totalCartUnits from context */}
               </span>
             </a>
@@ -258,23 +245,28 @@ export default function Header() {
         <nav className="hidden md:block border-t border-gray-100 relative">
           <div className="container mx-auto px-4">
             <ul className="flex justify-center space-x-8 py-3">
-              {/* Display dynamically loaded categories */}
-              {!loading && categories.map((category, index) => (
-                <li 
-                  key={index} 
-                  className="relative"
-                >
-                  <Link href={category.link || '#'} className="hover:text-gray-600 flex items-center text-[14px]">
-                    {category.title}
-                  </Link>
-                </li>
-              ))}
+              {loadingCategories ? (
+                <li className="text-gray-500">Loading categories...</li>
+              ) : categoryError ? (
+                <li className="text-red-500">Error loading categories.</li>
+              ) : (
+                categories.map((category, index) => (
+                  <li 
+                    key={index} 
+                    className="relative group" // Added group for potential hover effects
+                  >
+                    <Link href={category.link || '#'} className="hover:text-gray-600 flex items-center text-[14px]">
+                      {category.title}
+                    </Link>
+                  </li>
+                ))
+              )}
             </ul>
           </div>
         </nav>
 
         {isMenuOpen && (
-          <div className="md:hidden bg-white absolute w-full z-50 border-t border-gray-200">
+          <div className="md:hidden bg-white absolute w-full z-50 border-t border-gray-200 shadow-lg">
             <div className="p-4">
               <input
                 type="text"
@@ -288,39 +280,53 @@ export default function Header() {
               {isLoggedIn ? (
                 <div className="flex items-center py-2 border-b border-gray-100 mb-2">
                   <div className="w-8 h-8 rounded-full bg-[var(--color-primary-950)] text-white flex items-center justify-center mr-2">
-                    {userProfile?.first_name?.charAt(0) || 'U'}
+                    {userProfile?.first_name?.charAt(0) || userProfile?.username?.charAt(0) || 'U'}
                   </div>
                   <div>
-                    <p className="text-sm font-medium">{userProfile?.first_name || 'User'}</p>
-                    <Link href="/account" className="text-xs text-[var(--color-primary-950)]">View Profile</Link>
+                    <p className="text-sm font-medium">{userProfile?.first_name || userProfile?.username || 'User'}</p>
+                    {isAdminOrStaff ? (
+                      <Link href={accountLink} className="text-xs text-[var(--color-primary-950)]" onClick={() => setIsMenuOpen(false)}>
+                        Go to Admin Dashboard
+                      </Link>
+                    ) : (
+                      <Link href="/account" className="text-xs text-[var(--color-primary-950)]" onClick={() => setIsMenuOpen(false)}>
+                        View Profile
+                      </Link>
+                    )}
                   </div>
                 </div>
               ) : (
                 <button 
                   className="w-full py-2 px-4 mb-4 rounded-md border border-[var(--color-primary-950)] text-[var(--color-primary-950)] flex items-center justify-center"
-                  onClick={() => setIsAuthModalOpen(true)}
+                  onClick={() => { setIsAuthModalOpen(true); setIsMenuOpen(false); }}
                 >
                   <User size={16} className="mr-2" />
                   Login / Register
                 </button>
               )}
 
-              <Link href="/account/wishlist" className="flex items-center justify-between py-2 border-b border-gray-100">
+              <Link href="/account/wishlist" className="flex items-center justify-between py-2 border-b border-gray-100" onClick={() => setIsMenuOpen(false)}>
                 <span>My Wishlist</span>
                 <span className="bg-[#F0FBFF] text-[var(--color-primary-950)] text-xs px-2 py-0.5 rounded-full">
                   {wishlistCount}
                 </span>
               </Link>
               
-              <ul className="space-y-2">
+              <ul className="space-y-2 mt-2">
                 {/* Display dynamically loaded categories for mobile */}
-                {!loading && categories.map((category, index) => (
-                  <li key={index}>
-                    <Link href={category.link || '#'} className="block py-2 hover:text-gray-600 flex items-center">
-                      {category.title}
-                    </Link>
-                  </li>
-                ))}
+                {loadingCategories ? (
+                  <li className="text-gray-500 py-2">Loading categories...</li>
+                ) : categoryError ? (
+                  <li className="text-red-500 py-2">Error loading categories.</li>
+                ) : (
+                  categories.map((category, index) => (
+                    <li key={index}>
+                      <Link href={category.link || '#'} className="block py-2 hover:text-gray-600 flex items-center" onClick={() => setIsMenuOpen(false)}>
+                        {category.title}
+                      </Link>
+                    </li>
+                  ))
+                )}
               </ul>
               
               {/* Mobile logout button if logged in */}
@@ -345,6 +351,9 @@ export default function Header() {
       <AuthModal 
         isOpen={isAuthModalOpen} 
         onClose={() => setIsAuthModalOpen(false)}
+        // Pass userProfile and isAdminOrStaff to AuthModal for redirection logic after login
+        userProfile={userProfile}
+        isAdminOrStaff={isAdminOrStaff}
       />
     </>
   );
