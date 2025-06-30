@@ -12,33 +12,11 @@ import 'swiper/css/autoplay';
 import { isMobile } from 'react-device-detect';
 import WishlistButton from '@/components/WishlistButton';
 import CartDrawer from '@/components/CartDrawer';
-import { useCart, CartNormalItem } from '@/context/cartContext'; // FIX: Import useCart and CartNormalItem
-import { v4 as uuidv4 } from 'uuid'; // FIX: Import uuidv4 for temporary local IDs
+import { useCart, CartNormalItem, ProductItemDetails, ProductVariant } from '@/context/cartContext';
+import { v4 as uuidv4 } from 'uuid';
+import VariantSelectionModal from '@/components/VariantSelectionModal';
 
-interface ProductImage {
-  id: string;
-  product_image: string;
-  product: string;
-}
-
-interface Product {
-  id: string;
-  images: ProductImage[];
-  product_code: string;
-  product_name: string;
-  product_description: string;
-  product_price: string;
-  strike_price: string;
-  quantity: number; // This is stock quantity from the API response
-  product_status: boolean;
-  created_at: string;
-  updated_at: string;
-  sub_category: string;
-  // It's good practice to align this with ProductItemDetails if possible
-  isInStock?: boolean; 
-  product_weight?: string;
-  product_box_weight?: string;
-}
+interface Product extends ProductItemDetails {}
 
 interface ProductSliderProps {
   title: string;
@@ -54,104 +32,107 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [isNavigating, setIsNavigating] = useState<string | null>(null);
-  
-  // FIX: Access dispatchCart from useCart context
-  const { dispatchCart } = useCart();
+
+  // NEW STATES FOR VARIANT SELECTION POPUP
+  const [isVariantModalOpen, setIsVariantModalOpen] = useState(false);
+  const [productForVariantSelection, setProductForVariantSelection] = useState<ProductItemDetails | null>(null);
+
+
+  const { dispatchCart, getEffectiveProductStock } = useCart();
 
   useEffect(() => {
     const handleResize = () => {
       setWindowWidth(window.innerWidth);
     };
-    
-    // Set initial width
+
     handleResize();
-    
-    // Add event listener
+
     window.addEventListener('resize', handleResize);
-    
-    // Clean up
+
     return () => {
       window.removeEventListener('resize', handleResize);
     };
   }, []);
-  
-  // Effect to reinitialize swiper when window size changes significantly
+
   useEffect(() => {
     if (swiperInstance) {
       swiperInstance.update();
     }
   }, [windowWidth, swiperInstance]);
 
-  // Optimized product click handler with loading state
   const handleProductClick = useCallback(async (productId: string): Promise<void> => {
     try {
       setIsNavigating(productId);
-      
-      // Use replace for faster navigation and avoid back button issues
       await router.push(`/shop/products/${productId}`);
     } catch (error) {
       console.error('Navigation error:', error);
     } finally {
-      // Reset loading state after a delay to prevent flashing
       setTimeout(() => setIsNavigating(null), 100);
     }
   }, [router]);
 
-  // Prefetch product pages on hover for better UX
   const handleProductHover = useCallback((productId: string) => {
     setHoveredProduct(productId);
-    
-    // Prefetch the product page for faster navigation
     router.prefetch(`/shop/products/${productId}`);
   }, [router]);
 
-  // FIX: Updated handleAddToBag function to use cartContext dispatch
-  const handleAddToBag = useCallback((e: React.MouseEvent, productId: string): void => {
-    e.stopPropagation();
-    
-    // Find the product details from the `products` prop
-    const productToAdd = products.find(p => p.id === productId);
-
-    if (!productToAdd) {
-      console.error(`Product with ID ${productId} not found in slider data.`);
-      return;
+  // NEW: handleAddProductToCart (handles both simple and variant products)
+  const handleAddProductToCart = useCallback((productToAdd: ProductItemDetails, selectedVariantToAdd: ProductVariant | null = null): void => {
+    const effectiveStock = getEffectiveProductStock(productToAdd, selectedVariantToAdd?.id);
+    if (effectiveStock <= 0) {
+        alert('This item is currently out of stock or you have reached the maximum quantity allowed in your cart.');
+        return;
     }
 
-    setSelectedProductId(productId);
-    
-    // FIX: Assign a new UUID to the `id` field for local identification.
-    const tempCartItemId = uuidv4(); 
+    setSelectedProductId(productToAdd.id);
 
-    // Dispatch ADD_NORMAL_ITEM action to update cart context and local storage
+    const tempCartItemId = uuidv4();
+
     dispatchCart({
       type: 'ADD_NORMAL_ITEM',
       payload: {
-        id: tempCartItemId, // Use the temporary UUID here
+        id: tempCartItemId,
         product_id: productToAdd.id,
-        quantity: 1, // Always add 1 at a time from this button
+        quantity: 1,
         type: 'normal',
-        isSynced: false, // Mark as unsynced
+        isSynced: false,
         product_name: productToAdd.product_name,
         product_price: productToAdd.product_price,
         strike_price: productToAdd.strike_price,
         images: productToAdd.images,
-        // Ensure isInStock and stock_quantity are populated from fetched product data
-        isInStock: productToAdd.product_status && productToAdd.quantity > 0, 
-        stock_quantity: productToAdd.quantity, 
-      } as CartNormalItem, 
+        isInStock: selectedVariantToAdd ? selectedVariantToAdd.quantity > 0 : productToAdd.isInStock,
+        stock_quantity: selectedVariantToAdd?.quantity ?? productToAdd.quantity,
+        ...(selectedVariantToAdd && { selectedVariant: selectedVariantToAdd }),
+        productDetails: productToAdd,
+        created_at: new Date().toISOString(), // Add timestamps
+        updated_at: new Date().toISOString(),
+      } as CartNormalItem,
     });
-    
-    setIsCartOpen(true); // Open the cart drawer
-  }, [products, dispatchCart]); // Depend on products (to find productToAdd) and dispatchCart
 
-  // Handle cart drawer close
+    setIsCartOpen(true);
+    setIsVariantModalOpen(false);
+    setProductForVariantSelection(null);
+  }, [dispatchCart, getEffectiveProductStock]);
+
+
+  // UPDATED: handleAddToBag to check for variants
+  const handleAddToBag = useCallback((e: React.MouseEvent, product: Product): void => {
+    e.stopPropagation();
+
+    if (product.have_variants && product.product_variant && product.product_variant.length > 0) {
+      setProductForVariantSelection(product);
+      setIsVariantModalOpen(true);
+    } else {
+      handleAddProductToCart(product);
+    }
+  }, [handleAddProductToCart]);
+
+
   const handleCartClose = useCallback(() => {
     setIsCartOpen(false);
-    // Reset selected product ID when cart is closed
     setSelectedProductId(null);
   }, []);
 
-  // Navigation handlers for manual control
   const goNext = useCallback(() => {
     if (swiperInstance) {
       swiperInstance.slideNext();
@@ -164,20 +145,18 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
     }
   }, [swiperInstance]);
 
-  // Calculate discount percentage
   const calculateDiscount = useCallback((price: string, strikePrice: string): string => {
     if (!strikePrice || parseFloat(strikePrice) <= 0) return '';
-    
+
     const currentPrice = parseFloat(price);
     const originalPrice = parseFloat(strikePrice);
-    
+
     if (currentPrice >= originalPrice) return '';
-    
+
     const discount = ((originalPrice - currentPrice) / originalPrice) * 100;
     return `${Math.round(discount)}% OFF`;
   }, []);
 
-  // Check if products exist and have length
   if (!products || products.length === 0) {
     return null;
   }
@@ -187,16 +166,16 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
       <h2 className="text-2xl md:text-3xl font-medium text-center mb-8">
         {title}
       </h2>
-      
+
       <div className="relative">
         <Swiper
           spaceBetween={20}
           slidesPerView={2}
           slidesPerGroup={1}
           loop={products.length > 4}
-          autoplay={{ 
-            delay: 3500, 
-            disableOnInteraction: false 
+          autoplay={{
+            delay: 3500,
+            disableOnInteraction: false
           }}
           modules={[Autoplay, Navigation]}
           navigation={{
@@ -241,31 +220,28 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
             const discount = calculateDiscount(product.product_price, product.strike_price);
             const mainImage = product.images[0]?.product_image || "";
             const hoverImage = product.images[1]?.product_image || product.images[0]?.product_image || "";
-            const inStock = product.quantity > 0;
+            const inStock = product.isInStock;
             const isCurrentlyNavigating = isNavigating === product.id;
-            
+
             return (
               <SwiperSlide key={product.id}>
-                <div 
+                <div
                   className="relative group"
                   onMouseEnter={() => handleProductHover(product.id)}
                   onMouseLeave={() => setHoveredProduct(null)}
                 >
-                  {/* Product Image Container */}
-                  <div 
+                  <div
                     className={`relative w-full aspect-square cursor-pointer overflow-hidden transition-opacity duration-200 ${
                       isCurrentlyNavigating ? 'opacity-75' : 'opacity-100'
                     }`}
                     onClick={() => handleProductClick(product.id)}
                   >
-                    {/* Loading overlay */}
                     {isCurrentlyNavigating && (
                       <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-20">
                         <div className="w-6 h-6 border-2 border-gray-300 border-t-gray-800 rounded-full animate-spin"></div>
                       </div>
                     )}
-                    
-                    {/* Main image */}
+
                     <Image
                       src={`${process.env.NEXT_PUBLIC_API_BASE_URL}${mainImage}`}
                       alt={product.product_name}
@@ -277,8 +253,7 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
                       priority={false}
                       loading="lazy"
                     />
-                    
-                    {/* Hover image */}
+
                     <Image
                       src={`${process.env.NEXT_PUBLIC_API_BASE_URL}${hoverImage}`}
                       alt={`${product.product_name} - model view`}
@@ -289,50 +264,45 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
                       }`}
                       loading="lazy"
                     />
-                    
-                    {/* Stock badge */}
+
                     {!inStock && (
                       <div className="absolute top-2 left-2 bg-red-100 text-red-800 px-2 py-1 text-xs font-medium z-10">
                         Out of Stock
                       </div>
                     )}
-                    
-                    {/* Discount badge */}
+
                     {discount && inStock && (
                       <div className="absolute top-2 left-2 bg-green-100 text-green-800 px-2 py-1 text-xs font-medium z-10">
                         {discount}
                       </div>
                     )}
-                    
-                    {/* Wishlist button */}
+
                     <div
                       className={`absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-white/90 shadow-sm transition-opacity ${
                         hoveredProduct === product.id ? 'opacity-100' : 'opacity-0'
                       }`}
                     >
-                      <WishlistButton 
-                        productId={product.id} 
-                        size={16} 
+                      <WishlistButton
+                        productId={product.id}
+                        size={16}
                       />
                     </div>
-                    
-                    {/* Add to Bag button - Only show for in-stock items */}
+
                     {inStock && (
                       <button
                         className={`absolute bottom-3 cursor-pointer right-3 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 text-white shadow-sm transition-opacity ${
                           hoveredProduct === product.id ? 'opacity-100' : 'opacity-0'
                         }`}
-                        onClick={(e) => handleAddToBag(e, product.id)}
+                        onClick={(e) => handleAddToBag(e, product)}
                         aria-label="Add to bag"
                       >
                         <ShoppingCart size={18} />
                       </button>
                     )}
                   </div>
-                  
-                  {/* Product Info */}
+
                   <div className="mt-4">
-                    <h3 
+                    <h3
                       className={`text-sm md:text-base font-medium cursor-pointer hover:text-blue-500 transition-colors ${
                         isCurrentlyNavigating ? 'text-gray-500' : ''
                       }`}
@@ -358,27 +328,31 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
             );
           })}
         </Swiper>
-        
-        {/* Navigation Buttons - Each slider gets unique class names based on categoryId */}
-        <button 
+
+        <button
           onClick={goPrev}
           className={`product-swiper-prev-${categoryId} absolute left-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 lg:w-10 lg:h-10 flex items-center justify-center rounded-full bg-black text-white hover:bg-white hover:text-black transition-colors`}
         >
           <ChevronLeft size={isMobile ? 20 : 24} />
         </button>
-        <button 
+        <button
           onClick={goNext}
           className={`product-swiper-next-${categoryId} absolute right-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 lg:w-10 lg:h-10 flex items-center justify-center rounded-full bg-black text-white hover:bg-white hover:text-black transition-colors`}
         >
           <ChevronRight size={isMobile ? 20 : 24} />
         </button>
       </div>
-      
-      {/* Cart Drawer */}
-      <CartDrawer 
-        isOpen={isCartOpen} 
-        onClose={handleCartClose} 
-        // FIX: Removed productId prop as CartDrawer should rely on global cartItems context
+
+      <CartDrawer
+        isOpen={isCartOpen}
+        onClose={handleCartClose}
+      />
+
+      <VariantSelectionModal
+        isOpen={isVariantModalOpen}
+        onClose={() => setIsVariantModalOpen(false)}
+        product={productForVariantSelection}
+        onVariantSelected={handleAddProductToCart}
       />
     </div>
   );

@@ -2,9 +2,9 @@
 "use client";
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Package, ArrowLeft, Upload, X, Info, CheckCircle, XCircle } from 'lucide-react'; // Added Info, CheckCircle, XCircle
+import { Package, ArrowLeft, Upload, X, Info, CheckCircle, XCircle, Plus } from 'lucide-react'; // Added Plus for variants
 import Link from 'next/link';
-import { useState, useEffect, useRef, useCallback } from 'react'; // Added useCallback
+import { useState, useEffect, useRef, useCallback } from 'react';
 import apiService from '@/utils/api/apiService';
 import Image from 'next/image';
 
@@ -12,11 +12,10 @@ import Image from 'next/image';
 interface Category {
   id: string;
   category_name: string;
-  sub_categories?: SubCategory[]; 
-  category_image?: string | null; 
-  slug?: string; 
+  sub_categories?: SubCategory[];
+  category_image?: string | null;
+  slug?: string;
 }
-
 
 interface SubCategory {
   id: string;
@@ -28,18 +27,29 @@ interface ProductImage {
   product_image: string; // The URL path from the API
 }
 
+// New interface for product variants
+interface ProductVariant {
+  id?: string; // Optional for new variants, present for existing ones (THIS IS THE KEY)
+  variant_name: string;
+  quantity: number;
+  weight: number;
+}
+
 interface ProductData {
   product_name: string;
   product_price: number;
-  quantity: number;
-  product_weight: number;
+  quantity: number; // This will be the main quantity if no variants
+  product_weight: number; // This will be the main weight if no variants
   product_box_weight: number;
   product_description: string;
   product_status: boolean;
-  sub_category: string; // This will be the ID of the subcategory
+  sub_category: string;
   strike_price: number;
   product_code: string;
   images: ProductImage[];
+  have_variants: boolean; // New field
+  // Change this from 'variants' to 'product_variant' to match your API response
+  product_variant?: ProductVariant[];
 }
 
 export default function ProductFormPage() {
@@ -48,35 +58,38 @@ export default function ProductFormPage() {
   const productId = searchParams.get('id');
   const isEditMode = !!productId;
 
-  const [isLoading, setIsLoading] = useState(false); // For form submission state
-  const [isFetching, setIsFetching] = useState(isEditMode); // For initial data fetch state
-  const [formError, setFormError] = useState<string | null>(null); // General form error
+  const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(isEditMode);
+  const [formError, setFormError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form fields
   const [productName, setProductName] = useState('');
   const [productPrice, setProductPrice] = useState('');
-  const [quantity, setQuantity] = useState('');
-  const [productWeight, setProductWeight] = useState(''); // Renamed for consistency
-  const [productBoxWeight, setProductBoxWeight] = useState(''); // Renamed for consistency
+  const [quantity, setQuantity] = useState(''); // Main quantity, used if no variants
+  const [productWeight, setProductWeight] = useState(''); // Main weight, used if no variants
+  const [productBoxWeight, setProductBoxWeight] = useState('');
   const [productDescription, setProductDescription] = useState('');
-  const [productStatus, setProductStatus] = useState(true); // Default to active
+  const [productStatus, setProductStatus] = useState(true);
   const [strikePrice, setStrikePrice] = useState('');
   const [productCode, setProductCode] = useState('');
 
   // Category selection states
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
-  const [selectedSubCategoryId, setSelectedSubCategoryId] = useState(''); // New state for subcategory dropdown
+  const [selectedSubCategoryId, setSelectedSubCategoryId] = useState('');
 
   // Multiple images
-  const [newProductImages, setNewProductImages] = useState<File[]>([]); // Renamed for clarity
+  const [newProductImages, setNewProductImages] = useState<File[]>([]);
   const [imageErrors, setImageErrors] = useState<string | null>(null);
-  const [newImagePreviews, setNewImagePreviews] = useState<string[]>([]); // Renamed for clarity
-
-  // Existing images from the database (for edit mode)
+  const [newImagePreviews, setNewImagePreviews] = useState<string[]>([]);
   const [existingImages, setExistingImages] = useState<ProductImage[]>([]);
-  const [deletedImageIds, setDeletedImageIds] = useState<string[]>([]); // Store original IDs for deletion
+  const [deletedImageIds, setDeletedImageIds] = useState<string[]>([]);
+
+  // New states for variants
+  const [haveVariants, setHaveVariants] = useState(false);
+  const [variants, setVariants] = useState<ProductVariant[]>([]);
+  const [deletedVariantIds, setDeletedVariantIds] = useState<string[]>([]); // To track variants for deletion
 
   // Fetch data on component mount
   const fetchData = useCallback(async () => {
@@ -93,18 +106,33 @@ export default function ProductFormPage() {
         // Populate form fields
         setProductName(productData.product_name || '');
         setProductPrice(productData.product_price?.toString() || '');
-        setQuantity(productData.quantity?.toString() || '');
-        setProductWeight(productData.product_weight?.toString() || '');
         setProductBoxWeight(productData.product_box_weight?.toString() || '');
         setProductDescription(productData.product_description || '');
-        setProductStatus(productData.product_status ?? true); // Default to true if null/undefined
+        setProductStatus(productData.product_status ?? true);
         setStrikePrice(productData.strike_price?.toString() || '');
         setProductCode(productData.product_code || '');
+        setHaveVariants(productData.have_variants ?? false); // Set initial have_variants state
 
         // Handle existing images
         if (productData.images && productData.images.length > 0) {
           setExistingImages(productData.images);
         }
+        console.log('hello productData', productData)
+        // Handle variants data
+        // Use productData.product_variant instead of productData.variants
+        if (productData.have_variants && productData.product_variant && productData.product_variant.length > 0) {
+          setVariants(productData.product_variant);
+
+        } else {
+          setVariants([]); // Ensure no old variants are present if have_variants is false or no variants
+        }
+
+        // If no variants, populate main quantity and weight fields
+        if (!productData.have_variants) {
+          setQuantity(productData.quantity?.toString() || '');
+          setProductWeight(productData.product_weight?.toString() || '');
+        }
+
 
         // Find and set the selected category and subcategory based on productData.sub_category ID
         if (productData.sub_category) {
@@ -150,6 +178,7 @@ export default function ProductFormPage() {
     const categoryId = e.target.value;
     setSelectedCategoryId(categoryId);
     setSelectedSubCategoryId(''); // Reset subcategory when category changes
+    setFormError(null); // Clear form error on category change
   }, []);
 
   // Handle image upload
@@ -200,6 +229,81 @@ export default function ProductFormPage() {
     setImageErrors(null); // Clear image error if user removes problematic image
   }, []);
 
+  // Variant handling functions
+  const handleAddVariant = useCallback(() => {
+    // Add a new empty variant to the state
+    setVariants(prevVariants => [...prevVariants, { variant_name: '', quantity: 0, weight: 0 }]);
+    setFormError(null); // Clear form error when adding a variant
+  }, []);
+
+  const handleRemoveVariant = useCallback((indexToRemove: number) => {
+    const variantToRemove = variants[indexToRemove];
+    // Check if variantToRemove exists and if its 'id' property is a defined string
+    if (variantToRemove && typeof variantToRemove.id === 'string') {
+      // Now TypeScript knows variantToRemove.id is definitely a string
+      setDeletedVariantIds(prevIds => [...prevIds, variantToRemove.id as string]);
+    }
+    // Remove the variant from the local state
+    setVariants(prevVariants => prevVariants.filter((_, index) => index !== indexToRemove));
+    setFormError(null); // Clear form error when removing a variant
+  }, [variants]); // Dependency on `variants` is important here
+
+  const handleVariantChange = useCallback((index: number, field: keyof ProductVariant, value: string | number) => {
+    setVariants(prevVariants =>
+      prevVariants.map((variant, i) =>
+        i === index ? { ...variant, [field]: value } : variant
+      )
+    );
+    setFormError(null); // Clear form error on variant input change
+  }, []);
+
+  // Handlers for individual form field changes to clear errors
+  const handleProductNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setProductName(e.target.value);
+    setFormError(null);
+  };
+
+  const handleProductPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setProductPrice(e.target.value);
+    setFormError(null); // Clear error when product price changes
+  };
+
+  const handleStrikePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setStrikePrice(e.target.value);
+    setFormError(null); // Clear error when strike price changes
+  };
+
+  const handleProductCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setProductCode(e.target.value);
+    setFormError(null);
+  };
+
+  const handleProductBoxWeightChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setProductBoxWeight(e.target.value);
+    setFormError(null);
+  };
+
+  const handleProductDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setProductDescription(e.target.value);
+    setFormError(null);
+  };
+
+  const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setQuantity(e.target.value);
+    setFormError(null);
+  };
+
+  const handleProductWeightChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setProductWeight(e.target.value);
+    setFormError(null);
+  };
+
+  const handleHaveVariantsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setHaveVariants(e.target.checked);
+    setFormError(null); // Clear form error when changing variant setting
+  };
+
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -207,10 +311,55 @@ export default function ProductFormPage() {
     const totalImagesCount = existingImages.length + newProductImages.length;
 
     // Form validation
-    if (!productName.trim() || !productPrice.trim() || !quantity.trim() || !productDescription.trim() || !productCode.trim() || !productWeight.trim() || !productBoxWeight.trim()) {
+    if (!productName.trim() || !productDescription.trim() || !productCode.trim() || !productBoxWeight.trim()) {
       setFormError('All required fields must be filled.');
       return;
     }
+    // Price validation moved up to ensure it's checked before variant-specific price/quantity logic
+    if (parseFloat(productPrice) <= 0) {
+      setFormError('Price must be a positive number.');
+      return;
+    }
+    if (strikePrice && parseFloat(strikePrice) <= 0) {
+      setFormError('Strike Price must be a positive number if entered.');
+      return;
+    }
+    if (strikePrice && parseFloat(strikePrice) < parseFloat(productPrice)) {
+      setFormError('Strike Price cannot be less than Product Price.');
+      return;
+    }
+
+    let calculatedQuantity = 0;
+    let mainProductWeight = 0; // Default to 0 for variant products
+
+    if (!haveVariants) { // Validate main quantity and weight only if no variants
+      if (!quantity.trim() || !productWeight.trim()) {
+        setFormError('Quantity and Product Weight are required if "This product has variants" is not checked.');
+        return;
+      }
+      if (parseFloat(quantity) <= 0 || parseFloat(productWeight) <= 0) {
+        setFormError('Quantity and Product Weight must be positive numbers if no variants.');
+        return;
+      }
+      calculatedQuantity = parseFloat(quantity);
+      mainProductWeight = parseFloat(productWeight);
+    } else { // Validate variants if haveVariants is true
+      if (variants.length === 0) {
+        setFormError('Please add at least one variant if "This product has variants" is checked.');
+        return;
+      }
+      for (const variant of variants) {
+        if (!variant.variant_name.trim() || variant.quantity <= 0 || variant.weight <= 0) {
+          setFormError('All variant fields (name, quantity, weight) must be filled and positive numbers.');
+          return;
+        }
+        calculatedQuantity += variant.quantity; // Sum up variant quantities
+      }
+      // For variant products, main product_weight can be 0 or a nominal value, as specific weights are per variant.
+      // We'll set it to 0 as per your request.
+      mainProductWeight = 0;
+    }
+
     if (!selectedSubCategoryId) {
       setFormError('Please select a subcategory.');
       return;
@@ -219,46 +368,60 @@ export default function ProductFormPage() {
       setImageErrors('Please upload at least 2 product images.');
       return;
     }
-    if (parseFloat(productPrice) <= 0 || (strikePrice && parseFloat(strikePrice) <= 0)) {
-        setFormError('Price and Strike Price must be positive numbers.');
-        return;
-    }
-    if (strikePrice && parseFloat(strikePrice) < parseFloat(productPrice)) {
-        setFormError('Strike Price cannot be less than Product Price.');
-        return;
-    }
 
 
     setIsLoading(true); // For form submission
-    setFormError(null);
-    setImageErrors(null);
+    setFormError(null); // Clear any lingering form errors before submission attempt
+    setImageErrors(null); // Clear any lingering image errors before submission attempt
 
     try {
       const formData = new FormData();
       formData.append('product_name', productName);
       formData.append('product_price', productPrice);
-      formData.append('quantity', quantity);
       formData.append('product_description', productDescription);
       formData.append('sub_category', selectedSubCategoryId); // Use the selected subcategory ID
       formData.append('product_status', productStatus.toString());
       formData.append('strike_price', strikePrice);
       formData.append('product_code', productCode);
-      formData.append('product_weight', productWeight);
       formData.append('product_box_weight', productBoxWeight);
+      formData.append('have_variants', haveVariants.toString()); // Append the new field
+
+      // Always include quantity and product_weight based on variant status
+      formData.append('quantity', calculatedQuantity.toString());
+      formData.append('product_weight', mainProductWeight.toString());
+
+      // Always send 'variants' field as an array (empty if no variants or haveVariants is false)
+      if (haveVariants) {
+        formData.append('variants', JSON.stringify(variants.map(v => ({
+          id: v.id, // Include ID for existing variants
+          variant_name: v.variant_name,
+          quantity: Number(v.quantity),
+          weight: Number(v.weight),
+        }))));
+      } else {
+        // If haveVariants is false, send an empty array for variants
+        formData.append('variants', JSON.stringify([]));
+      }
+
+      // Always send 'for_delete_variants' and 'for_delete' as arrays (empty if nothing to delete)
+      formData.append('variant_delete_ids', JSON.stringify(deletedVariantIds));
+
 
       if (isEditMode && productId) {
         formData.append('id', productId); // Pass original ID without replacing hyphens
-        // Only include for_delete if there are images to delete
-        if (deletedImageIds.length > 0) {
-          formData.append('for_delete', JSON.stringify(deletedImageIds));
-        }
+        formData.append('for_delete', JSON.stringify(deletedImageIds)); // Always send for_delete, even if empty
+      } else {
+        // If it's a new product, no existing images to delete, so send empty array
+        formData.append('for_delete', JSON.stringify([]));
       }
+
 
       newProductImages.forEach(image => {
         formData.append('product_images', image); // Append new images
       });
 
-      await apiService.post('/products/add_product', formData, true); // Assuming this endpoint handles both add/edit
+      // Assuming apiService.post correctly handles FormData and the endpoint
+      await apiService.post('/products/add_product', formData, true);
 
       alert(`Product "${productName}" ${isEditMode ? 'updated' : 'created'} successfully!`);
       router.push('/admin/products/list');
@@ -269,6 +432,7 @@ export default function ProductFormPage() {
       setIsLoading(false);
     }
   };
+
 
   const triggerFileInput = useCallback(() => {
     if (fileInputRef.current) {
@@ -285,6 +449,9 @@ export default function ProductFormPage() {
       </div>
     );
   }
+
+  // Determine if the submit button should be disabled
+  const isSubmitDisabled = isLoading || !!formError || !!imageErrors || (existingImages.length + newProductImages.length < 2) || (haveVariants && variants.length === 0) || (haveVariants && variants.some(v => !v.variant_name.trim() || v.quantity <= 0 || v.weight <= 0)) || (!haveVariants && (!quantity.trim() || !productWeight.trim() || parseFloat(quantity) <= 0 || parseFloat(productWeight) <= 0)) || !productName.trim() || !productDescription.trim() || !productCode.trim() || !productBoxWeight.trim() || parseFloat(productPrice) <= 0 || (strikePrice && parseFloat(strikePrice) <= 0) || (strikePrice && parseFloat(strikePrice) < parseFloat(productPrice)) || !selectedSubCategoryId;
 
   return (
     <div className="space-y-8">
@@ -339,10 +506,10 @@ export default function ProductFormPage() {
                   type="text"
                   id="productCode"
                   className="w-full p-3 border border-gray-300 rounded-md text-gray-800
-                             focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent
-                             transition-all duration-200"
+                                  focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent
+                                  transition-all duration-200"
                   value={productCode}
-                  onChange={(e) => setProductCode(e.target.value)}
+                  onChange={handleProductCodeChange}
                   required
                   disabled={isLoading}
                   placeholder="e.g., SKU12345"
@@ -356,10 +523,10 @@ export default function ProductFormPage() {
                   type="text"
                   id="productName"
                   className="w-full p-3 border border-gray-300 rounded-md text-gray-800
-                             focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent
-                             transition-all duration-200"
+                                  focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent
+                                  transition-all duration-200"
                   value={productName}
-                  onChange={(e) => setProductName(e.target.value)}
+                  onChange={handleProductNameChange}
                   required
                   disabled={isLoading}
                   placeholder="e.g., Classic Leather Wallet"
@@ -372,8 +539,8 @@ export default function ProductFormPage() {
                 <select
                   id="category"
                   className="w-full p-3 border border-gray-300 rounded-md text-gray-800 appearance-none cursor-pointer
-                             focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent
-                             transition-all duration-200 bg-white"
+                                  focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent
+                                  transition-all duration-200 bg-white"
                   value={selectedCategoryId}
                   onChange={handleCategoryChange}
                   required
@@ -396,10 +563,10 @@ export default function ProductFormPage() {
                   <select
                     id="subCategory"
                     className="w-full p-3 border border-gray-300 rounded-md text-gray-800 appearance-none cursor-pointer
-                               focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent
-                               transition-all duration-200 bg-white"
+                                    focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent
+                                    transition-all duration-200 bg-white"
                     value={selectedSubCategoryId}
-                    onChange={(e) => setSelectedSubCategoryId(e.target.value)}
+                    onChange={(e) => { setSelectedSubCategoryId(e.target.value); setFormError(null); }} // Clear error on subcategory change
                     required
                     disabled={isLoading}
                   >
@@ -420,10 +587,10 @@ export default function ProductFormPage() {
                 <select
                   id="productStatus"
                   className="w-full p-3 border border-gray-300 rounded-md text-gray-800 appearance-none cursor-pointer
-                             focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent
-                             transition-all duration-200 bg-white"
+                                  focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent
+                                  transition-all duration-200 bg-white"
                   value={productStatus ? "active" : "inactive"}
-                  onChange={(e) => setProductStatus(e.target.value === "active")}
+                  onChange={(e) => { setProductStatus(e.target.value === "active"); setFormError(null); }} // Clear error on status change
                   disabled={isLoading}
                   required
                 >
@@ -450,10 +617,10 @@ export default function ProductFormPage() {
                   min="0"
                   step="0.01"
                   className="w-full p-3 border border-gray-300 rounded-md text-gray-800
-                             focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent
-                             transition-all duration-200"
+                                  focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent
+                                  transition-all duration-200"
                   value={productPrice}
-                  onChange={(e) => setProductPrice(e.target.value)}
+                  onChange={handleProductPriceChange}
                   required
                   disabled={isLoading}
                   placeholder="e.g., 99.99"
@@ -469,49 +636,12 @@ export default function ProductFormPage() {
                   min="0"
                   step="0.01"
                   className="w-full p-3 border border-gray-300 rounded-md text-gray-800
-                             focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent
-                             transition-all duration-200"
+                                  focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent
+                                  transition-all duration-200"
                   value={strikePrice}
-                  onChange={(e) => setStrikePrice(e.target.value)}
+                  onChange={handleStrikePriceChange}
                   disabled={isLoading}
                   placeholder="Optional, e.g., 129.99"
-                />
-              </div>
-              <div>
-                <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 mb-2">
-                  Quantity <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  id="quantity"
-                  min="0"
-                  className="w-full p-3 border border-gray-300 rounded-md text-gray-800
-                             focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent
-                             transition-all duration-200"
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
-                  required
-                  disabled={isLoading}
-                  placeholder="e.g., 100"
-                />
-              </div>
-              <div>
-                <label htmlFor="productWeight" className="block text-sm font-medium text-gray-700 mb-2">
-                  Product Weight (kg/g) <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  id="productWeight"
-                  min="0"
-                  step="0.01"
-                  className="w-full p-3 border border-gray-300 rounded-md text-gray-800
-                             focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent
-                             transition-all duration-200"
-                  value={productWeight}
-                  onChange={(e) => setProductWeight(e.target.value)}
-                  required
-                  disabled={isLoading}
-                  placeholder="e.g., 0.5 (for 500g)"
                 />
               </div>
               <div>
@@ -524,15 +654,152 @@ export default function ProductFormPage() {
                   min="0"
                   step="0.01"
                   className="w-full p-3 border border-gray-300 rounded-md text-gray-800
-                             focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent
-                             transition-all duration-200"
+                                  focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent
+                                  transition-all duration-200"
                   value={productBoxWeight}
-                  onChange={(e) => setProductBoxWeight(e.target.value)}
+                  onChange={handleProductBoxWeightChange}
                   required
                   disabled={isLoading}
                   placeholder="e.g., 0.1 (for 100g packaging)"
                 />
               </div>
+
+              {/* Have Variants Checkbox */}
+              <div className="md:col-span-2 flex items-center mt-4">
+                <input
+                  type="checkbox"
+                  id="haveVariants"
+                  checked={haveVariants}
+                  onChange={handleHaveVariantsChange}
+                  className="h-5 w-5 text-[var(--color-primary-950)] border-gray-300 rounded focus:ring-[var(--color-primary-950)]"
+                  disabled={isLoading}
+                />
+                <label htmlFor="haveVariants" className="ml-2 block text-base font-medium text-gray-700">
+                  This product has variants (e.g., different sizes, colors)
+                </label>
+              </div>
+
+              {/* Conditional rendering for quantity and weight based on haveVariants */}
+              {!haveVariants ? (
+                <>
+                  <div>
+                    <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 mb-2">
+                      Quantity <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      id="quantity"
+                      min="0"
+                      className="w-full p-3 border border-gray-300 rounded-md text-gray-800
+                                        focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent
+                                        transition-all duration-200"
+                      value={quantity}
+                      onChange={handleQuantityChange}
+                      required={!haveVariants} // Required only if no variants
+                      disabled={isLoading}
+                      placeholder="e.g., 100"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="productWeight" className="block text-sm font-medium text-gray-700 mb-2">
+                      Product Weight (kg/g) <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      id="productWeight"
+                      min="0"
+                      step="0.01"
+                      className="w-full p-3 border border-gray-300 rounded-md text-gray-800
+                                        focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent
+                                        transition-all duration-200"
+                      value={productWeight}
+                      onChange={handleProductWeightChange}
+                      required={!haveVariants} // Required only if no variants
+                      disabled={isLoading}
+                      placeholder="e.g., 0.5 (for 500g)"
+                    />
+                  </div>
+                </>
+              ) : (
+                /* Variants Form Array */
+                <div className="md:col-span-2">
+                  <h5 className="text-md font-semibold text-gray-700 mb-3 flex items-center">
+                    <CheckCircle className="w-4 h-4 mr-2 text-blue-500" /> Product Variants
+                  </h5>
+                  {variants.map((variant, index) => (
+                    <div key={variant.id || `new-${index}`} className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 p-4 border border-gray-200 rounded-md bg-gray-50 relative">
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveVariant(index)}
+                        className="absolute top-2 right-2 bg-red-100 p-1 rounded-full text-red-600 hover:bg-red-200 transition-colors"
+                        title="Remove variant"
+                        disabled={isLoading}
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                      <div>
+                        <label htmlFor={`variantName-${index}`} className="block text-sm font-medium text-gray-700 mb-2">
+                          Variant Name <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          id={`variantName-${index}`}
+                          className="w-full p-2 border border-gray-300 rounded-md text-gray-800
+                          focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent"
+                          value={variant.variant_name}
+                          onChange={(e) => handleVariantChange(index, 'variant_name', e.target.value)}
+                          required
+                          disabled={isLoading}
+                          placeholder="e.g., Small, Red"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor={`variantQuantity-${index}`} className="block text-sm font-medium text-gray-700 mb-2">
+                          Quantity <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          id={`variantQuantity-${index}`}
+                          min="0"
+                          className="w-full p-2 border border-gray-300 rounded-md text-gray-800
+                          focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent"
+                          value={variant.quantity}
+                          onChange={(e) => handleVariantChange(index, 'quantity', Number(e.target.value))}
+                          required
+                          disabled={isLoading}
+                          placeholder="e.g., 50"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor={`variantWeight-${index}`} className="block text-sm font-medium text-gray-700 mb-2">
+                          Weight (kg/g) <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          id={`variantWeight-${index}`}
+                          min="0"
+                          step="0.01"
+                          className="w-full p-2 border border-gray-300 rounded-md text-gray-800
+                          focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent"
+                          value={variant.weight}
+                          onChange={(e) => handleVariantChange(index, 'weight', Number(e.target.value))}
+                          required
+                          disabled={isLoading}
+                          placeholder="e.g., 0.1"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={handleAddVariant}
+                    className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200 flex items-center gap-2"
+                    disabled={isLoading}
+                  >
+                    <Plus className="w-5 h-5" /> Add Variant
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -546,10 +813,10 @@ export default function ProductFormPage() {
               id="productDescription"
               rows={8}
               className="w-full p-3 border border-gray-300 rounded-md text-gray-800
-                         focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent
-                         transition-all duration-200"
+                                    focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent
+                                    transition-all duration-200"
               value={productDescription}
-              onChange={(e) => setProductDescription(e.target.value)}
+              onChange={handleProductDescriptionChange}
               required
               disabled={isLoading}
               placeholder="Enter a detailed product description here, including features, benefits, and specifications."
@@ -588,7 +855,7 @@ export default function ProductFormPage() {
                         type="button"
                         onClick={() => removeExistingImage(image.id)}
                         className="absolute top-2 right-2 bg-white rounded-full p-1 shadow-md opacity-80 hover:opacity-100 transition-opacity duration-200
-                                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-400"
+                                        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-400"
                         title="Remove existing image"
                         disabled={isLoading}
                       >
@@ -620,7 +887,7 @@ export default function ProductFormPage() {
                         type="button"
                         onClick={() => removeNewImage(index)}
                         className="absolute top-2 right-2 bg-white rounded-full p-1 shadow-md opacity-80 hover:opacity-100 transition-opacity duration-200
-                                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-400"
+                                        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-400"
                         title="Remove new image"
                         disabled={isLoading}
                       >
@@ -636,7 +903,7 @@ export default function ProductFormPage() {
             <div
               onClick={triggerFileInput}
               className={`border-2 border-dashed ${imageErrors ? 'border-red-400' : 'border-gray-300'} rounded-xl p-8 text-center cursor-pointer transition-all duration-200
-                          hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-primary-950)]`}
+                                    hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-primary-950)]`}
               tabIndex={0}
               role="button"
             >
@@ -667,8 +934,8 @@ export default function ProductFormPage() {
               <button
                 type="button"
                 className="px-6 py-3 border border-gray-300 rounded-md text-gray-700
-                           hover:bg-gray-100 transition-colors duration-200
-                           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-400"
+                                hover:bg-gray-100 transition-colors duration-200
+                                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-400"
                 disabled={isLoading}
               >
                 Cancel
@@ -677,12 +944,12 @@ export default function ProductFormPage() {
             <button
               type="submit"
               className={`px-6 py-3 rounded-md text-white shadow-md transition-all duration-200
-                         flex items-center justify-center gap-2
-                         ${isLoading || formError || imageErrors || (existingImages.length + newProductImages.length < 2)
-                           ? 'bg-gray-400 cursor-not-allowed opacity-80'
-                           : 'bg-[var(--color-primary-950)] hover:bg-[color:var(--color-primary-950)]/90 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-primary-950)]'
-                         }`}
-              disabled={isLoading || !!formError || !!imageErrors || (existingImages.length + newProductImages.length < 2)}
+                                flex items-center justify-center gap-2
+                                ${isSubmitDisabled
+                  ? 'bg-gray-400 cursor-not-allowed opacity-80'
+                  : 'bg-[var(--color-primary-950)] hover:bg-[color:var(--color-primary-950)]/90 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-primary-950)]'
+                }`}
+              disabled={isSubmitDisabled}
             >
               {isLoading ? (
                 <>

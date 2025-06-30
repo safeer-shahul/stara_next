@@ -3,9 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { auth } from './firebase/config'; // Adjust this path to match your project structure
+import { auth } from './firebase/config';
 import apiService from '@/utils/api/apiService';
-import { useCart } from '@/context/cartContext';
 
 interface LoginProps {
   onClose: () => void;
@@ -16,10 +15,9 @@ interface LoginProps {
 
 const Login = ({ onClose, switchToRegister, onLoginSuccess, switchToForgotPassword }: LoginProps) => {
   const router = useRouter();
-  const { dispatchCart } = useCart();
 
   const [formData, setFormData] = useState({
-    username: '', // Or 'email' if your direct login uses email instead of username
+    username: '',
     password: '',
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -33,6 +31,16 @@ const Login = ({ onClose, switchToRegister, onLoginSuccess, switchToForgotPasswo
     }));
   };
 
+  const handleSuccessfulLogin = async () => {
+    try {
+      console.log('Login successful - cart will sync automatically');
+      onLoginSuccess();
+    } catch (error) {
+      console.error('Error after login:', error);
+      onLoginSuccess();
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -40,15 +48,16 @@ const Login = ({ onClose, switchToRegister, onLoginSuccess, switchToForgotPasswo
 
     try {
       const data = await apiService.login(formData.username, formData.password);
+      
+      // Store tokens
       localStorage.setItem('accessToken', data.access);
       if (data.refresh) {
         localStorage.setItem('refreshToken', data.refresh);
       }
 
-      // Trigger cart synchronization after successful login
-      dispatchCart({ type: 'TRIGGER_SYNC' });
+      // Handle successful login
+      await handleSuccessfulLogin();
 
-      onLoginSuccess();
     } catch (err: any) {
       console.error('Login failed:', err);
       setError(err.detail || err.message || 'Login failed. Please check your username and password.');
@@ -70,17 +79,22 @@ const Login = ({ onClose, switchToRegister, onLoginSuccess, switchToForgotPasswo
 
       const response = await apiService.googleKeyVerify({ idToken });
 
+      // Store tokens
       localStorage.setItem('accessToken', response.access_token);
       localStorage.setItem('refreshToken', response.refresh_token);
 
-      // Fetch user profile after storing tokens, as per original logic
-      const userProfile = await apiService.getUserProfile();
-      localStorage.setItem('me', JSON.stringify(userProfile));
+      // Fetch and store user profile
+      try {
+        const userProfile = await apiService.getUserProfile();
+        localStorage.setItem('me', JSON.stringify(userProfile));
+      } catch (profileError) {
+        console.warn('Failed to fetch user profile:', profileError);
+        // Continue with login even if profile fetch fails
+      }
 
-      // Trigger cart synchronization after successful Google login
-      dispatchCart({ type: 'TRIGGER_SYNC' });
+      // Handle successful login
+      await handleSuccessfulLogin();
 
-      onLoginSuccess();
     } catch (err) {
       console.error('Google login error:', err);
       let errorMessage = 'Failed to login with Google.';
@@ -108,7 +122,7 @@ const Login = ({ onClose, switchToRegister, onLoginSuccess, switchToForgotPasswo
       <button
         onClick={handleGoogleLogin}
         disabled={isLoading}
-        className="w-full flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-50 mb-4 transition duration-200"
+        className="w-full flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-50 mb-4 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
           <g transform="matrix(1, 0, 0, 1, 27.009001, -39.238998)">
@@ -118,7 +132,7 @@ const Login = ({ onClose, switchToRegister, onLoginSuccess, switchToForgotPasswo
             <path fill="#EA4335" d="M -14.754 43.989 C -12.984 43.989 -11.404 44.599 -10.154 45.789 L -6.734 42.369 C -8.804 40.429 -11.514 39.239 -14.754 39.239 C -19.444 39.239 -23.494 41.939 -25.464 45.859 L -21.484 48.949 C -20.534 46.099 -17.884 43.989 -14.754 43.989 Z" />
           </g>
         </svg>
-        Sign in with Google
+        {isLoading ? 'Signing In...' : 'Sign in with Google'}
       </button>
 
       <div className="relative my-4">
@@ -143,6 +157,7 @@ const Login = ({ onClose, switchToRegister, onLoginSuccess, switchToForgotPasswo
             onChange={handleChange}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200"
             required
+            disabled={isLoading}
           />
         </div>
 
@@ -158,11 +173,13 @@ const Login = ({ onClose, switchToRegister, onLoginSuccess, switchToForgotPasswo
             onChange={handleChange}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200"
             required
+            disabled={isLoading}
           />
           <button
             type="button"
             onClick={switchToForgotPassword}
             className="text-sm text-[var(--color-primary-950)] hover:underline mt-1 block text-right focus:outline-none"
+            disabled={isLoading}
           >
             Forgot Password?
           </button>
@@ -171,7 +188,7 @@ const Login = ({ onClose, switchToRegister, onLoginSuccess, switchToForgotPasswo
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full bg-[var(--color-primary-950)] text-white py-2 px-4 rounded-md hover:bg-[#124a62] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:ring-opacity-50 transition duration-200 flex items-center justify-center"
+          className="w-full bg-[var(--color-primary-950)] text-white py-2 px-4 rounded-md hover:bg-[#124a62] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:ring-opacity-50 transition duration-200 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isLoading ? (
             <>
@@ -192,6 +209,7 @@ const Login = ({ onClose, switchToRegister, onLoginSuccess, switchToForgotPasswo
         <button
           onClick={switchToRegister}
           className="text-[var(--color-primary-950)] hover:underline focus:outline-none font-medium"
+          disabled={isLoading}
         >
           Sign up
         </button>

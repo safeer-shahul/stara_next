@@ -10,7 +10,7 @@ import BillSummary from './BillSummary';
 import RazorpayPayment from './RazorpayPayment';
 import OrderConfirmation from './OrderConfirmation';
 
-import { CartOfferItem, CartNormalItem, CartItemType, ProductItemDetails } from '@/context/cartContext';
+import { CartOfferItem, CartNormalItem, ProductItemDetails } from '@/context/cartContext';
 import { useCart } from '@/context/cartContext';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -36,10 +36,10 @@ interface CheckoutModalProps {
   isOpen: boolean;
   onClose: () => void;
   onProceed: (addressId: string) => void;
-  checkoutMode: 'cart' | 'buy_now'; // Indicates source of checkout
-  buyNowProduct?: ProductItemDetails | null; // For direct buy-now scenarios (optional, can be null)
-  normalItemsForCheckout?: CartNormalItem[]; // For cart-based checkout (optional)
-  offerSetsForCheckout?: CartOfferItem[]; // For cart-based checkout (optional)
+  checkoutMode: 'cart' | 'buy_now';
+  buyNowProduct?: ProductItemDetails | null;
+  normalItemsForCheckout?: CartNormalItem[];
+  offerSetsForCheckout?: CartOfferItem[];
 }
 
 const INDIAN_STATES: { [key: string]: string } = {
@@ -82,61 +82,65 @@ const INDIAN_STATES: { [key: string]: string } = {
   "WB": "West Bengal"
 };
 
-
 const CheckoutModal: React.FC<CheckoutModalProps> = ({
   isOpen,
   onClose,
   onProceed,
   checkoutMode,
   buyNowProduct,
-  normalItemsForCheckout = [], // Default to empty array
-  offerSetsForCheckout = [], // Default to empty array
+  normalItemsForCheckout = [],
+  offerSetsForCheckout = [],
 }) => {
-  const { dispatchCart } = useCart();
+  const { clearCart } = useCart();
 
-  // Memoized items for ProductSummary and BillSummary based on checkoutMode
+  // Memoized normal items for checkout
   const memoizedNormalItems: CartNormalItem[] = useMemo(() => {
     if (checkoutMode === 'buy_now' && buyNowProduct) {
       return [{
-        id: uuidv4(), // Temporary ID for this single item in checkout flow
+        id: uuidv4(),
         product_id: buyNowProduct.id,
         quantity: 1,
-        type: 'normal', // Explicitly 'normal'
+        type: 'normal',
         isSynced: false,
         product_name: buyNowProduct.product_name,
         product_price: buyNowProduct.product_price,
         strike_price: buyNowProduct.strike_price,
         images: buyNowProduct.images,
         isInStock: buyNowProduct.isInStock,
-        stock_quantity: buyNowProduct.quantity,
+        stock_quantity: buyNowProduct.selectedVariant?.quantity ?? buyNowProduct.quantity,
+        ...(buyNowProduct.selectedVariant && { selectedVariant: buyNowProduct.selectedVariant }),
+        productDetails: buyNowProduct,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       }];
     }
-    return normalItemsForCheckout; // Use passed prop for cart mode
+    return normalItemsForCheckout;
   }, [normalItemsForCheckout, checkoutMode, buyNowProduct]);
 
   const memoizedOfferSets: CartOfferItem[] = useMemo(() => {
     if (checkoutMode === 'buy_now') return [];
-    return offerSetsForCheckout; // Use passed prop for cart mode
+    return offerSetsForCheckout;
   }, [offerSetsForCheckout, checkoutMode]);
 
+  // State management
   const [currentStep, setCurrentStep] = useState<CheckoutStep>(CheckoutStep.ADDRESS_SELECTION);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'Cod' | 'Razorpay'>('Razorpay');
   const [orderId, setOrderId] = useState<string | null>(null);
   const [staraOrderId, setStaraOrderId] = useState<string | null>(null);
-  const [staraShippingCharge, setStaraShippingCharge] = useState<string | null>(null);
   const [paymentId, setPaymentId] = useState<string | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<'success' | 'failed' | 'canceled'>('success');
+  const [paymentMethod, setPaymentMethod] = useState<'Cod' | 'Razorpay'>('Razorpay');
   const [cartCleared, setCartCleared] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authModalClosed, setAuthModalClosed] = useState(false);
   const [showAddressForm, setShowAddressForm] = useState(false);
 
+  // Reset state on modal open
   const resetCheckoutState = useCallback(() => {
     setCurrentStep(CheckoutStep.ADDRESS_SELECTION);
     setError(null);
@@ -149,8 +153,10 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     setSelectedAddressId(null);
     setSelectedAddress(null);
     setLoading(true);
+    setShowAddressForm(false);
   }, []);
 
+  // Check authentication
   const checkAuthentication = useCallback(() => {
     const token = localStorage.getItem('accessToken');
     if (token) {
@@ -162,11 +168,13 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     return false;
   }, []);
 
+  // Fetch addresses
   const fetchAddresses = useCallback(async () => {
     if (!isAuthenticated) {
       setLoading(false);
       return;
     }
+    
     setLoading(true);
     try {
       const response = await apiService.getAddresses();
@@ -191,23 +199,21 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
   }, [isAuthenticated]);
 
-  const clearCart = useCallback(async () => {
+  // Clear cart after successful order
+  const handleCartClear = useCallback(async () => {
     if (checkoutMode === 'cart') {
       try {
-        await apiService.addToCart({ mode: 'delete_cart' });
-        dispatchCart({ type: 'TRIGGER_SYNC' });
+        await clearCart();
         setCartCleared(true);
-        console.log('Cart cleared successfully via API and sync triggered.');
+        console.log('Cart cleared successfully');
       } catch (error) {
         console.error('Error clearing cart:', error);
-        localStorage.setItem('cartItems', JSON.stringify([]));
-        dispatchCart({ type: 'SET_CART_ITEMS', payload: [] });
+        setCartCleared(false);
       }
-    } else {
-      setCartCleared(false);
     }
-  }, [checkoutMode, dispatchCart]);
+  }, [checkoutMode, clearCart]);
 
+  // Initialize on modal open
   useEffect(() => {
     if (isOpen) {
       resetCheckoutState();
@@ -217,6 +223,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
   }, [isOpen, resetCheckoutState, checkAuthentication, fetchAddresses]);
 
+  // Handle body scroll lock
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -229,12 +236,14 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     };
   }, [isOpen]);
 
+  // Handle auth modal close
   useEffect(() => {
     if (authModalClosed && !isAuthenticated) {
       onClose();
     }
   }, [authModalClosed, isAuthenticated, onClose]);
 
+  // Event handlers
   const handleProceedToPayment = () => {
     if (selectedAddressId && selectedAddress) {
       setCurrentStep(CheckoutStep.BILL_SUMMARY);
@@ -254,7 +263,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     if (method === 'Razorpay') {
       setCurrentStep(CheckoutStep.PAYMENT_PROCESSING);
     } else {
-      await clearCart();
+      await handleCartClear();
       setPaymentStatus('success');
       setCurrentStep(CheckoutStep.ORDER_CONFIRMATION);
     }
@@ -265,9 +274,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       setPaymentId(paymentId);
     }
     setPaymentStatus('success');
-
-    await clearCart();
-
+    await handleCartClear();
     setCurrentStep(CheckoutStep.ORDER_CONFIRMATION);
     console.log('Payment success:', orderId, paymentId);
   };
@@ -352,6 +359,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       <div className="absolute inset-0 bg-black/80" onClick={handleClose}></div>
 
       <div className="relative w-full max-w-md bg-[#e1e1e1] rounded-lg shadow-xl flex flex-col max-h-[90vh]">
+        {/* Header */}
         <div className="flex justify-between items-center p-4 bg-white rounded-t-lg z-10">
           <div className="flex items-center">
             {currentStep !== CheckoutStep.ADDRESS_SELECTION && (
@@ -386,18 +394,21 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
           </button>
         </div>
 
+        {/* Content */}
         <div className="overflow-y-auto flex-1">
           {showAuthModal && !isAuthenticated ? (
             <AuthModal isOpen={true} onClose={handleAuthModalClose} />
           ) : (
             <div className="p-5">
 
+              {/* Address Selection Step */}
               {currentStep === CheckoutStep.ADDRESS_SELECTION && (
                 <>
                   <div className="mb-6">
                     <ProductSummary
                       normalItems={memoizedNormalItems}
                       offerSets={memoizedOfferSets}
+                      parentLoading={loading}
                     />
                   </div>
 
@@ -476,6 +487,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </>
               )}
 
+              {/* Bill Summary Step */}
               {currentStep === CheckoutStep.BILL_SUMMARY && selectedAddress && (
                 <BillSummary
                   normalItems={memoizedNormalItems}
@@ -488,6 +500,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 />
               )}
 
+              {/* Payment Processing Step */}
               {currentStep === CheckoutStep.PAYMENT_PROCESSING && orderId && selectedAddress && (
                 <RazorpayPayment
                   orderId={orderId}
@@ -498,6 +511,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 />
               )}
 
+              {/* Order Confirmation Step */}
               {currentStep === CheckoutStep.ORDER_CONFIRMATION && (
                 <OrderConfirmation
                   orderId={staraOrderId}
@@ -514,6 +528,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
           )}
         </div>
 
+        {/* Footer Button for Address Selection */}
         {currentStep === CheckoutStep.ADDRESS_SELECTION && addresses.length > 0 && !showAddressForm && (
           <div className="p-4 border-t border-gray-200 bg-gray-50 rounded-b-lg">
             <button

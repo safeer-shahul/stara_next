@@ -590,7 +590,7 @@ export default function OrderListPage() {
                                 <Copy className="w-4 h-4" />
                               </button>
                               {showCopyDropdown === order.order_id && (
-                                <div className="absolute z-10 bg-white shadow-lg rounded-md mt-2 w-32 left-0 -ml-16"> {/* Adjust positioning */}
+                                <div className="absolute z-60 bg-white shadow-md rounded-md mt-2 w-42 left-0 -ml-16"> {/* Adjust positioning */}
                                   <button
                                     onClick={() => copyToClipboard(order.order_id)}
                                     className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"

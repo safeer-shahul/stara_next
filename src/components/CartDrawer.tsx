@@ -1,4 +1,3 @@
-// components/CartDrawer.tsx
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { X, ShoppingCart } from 'lucide-react';
@@ -6,8 +5,6 @@ import CartItem from './CartItem';
 import OfferCartItem from './OfferCartItem';
 import CheckoutModal from './CheckoutModal';
 import { useCart, CartItemType, CartNormalItem, CartOfferItem } from '@/context/cartContext';
-import { cartService } from '@/utils/api/cartService'; // Keep this import
-import apiService from '@/utils/api/apiService'; // Keep this import
 import { cartUtils } from '@/utils/cartUtils';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -17,7 +14,13 @@ interface CartDrawerProps {
 }
 
 const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
-  const { cartItems, dispatchCart, loading: contextLoading, getTotalProductQuantitiesInCart } = useCart();
+  const { 
+    cartItems, 
+    dispatchCart, 
+    loading: contextLoading, 
+    getEffectiveProductStock,
+    clearCart
+  } = useCart();
   const [showCheckoutModal, setShowCheckoutModal] = useState<boolean>(false);
 
   useEffect(() => {
@@ -31,17 +34,23 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
     };
   }, [isOpen]);
 
-  const handleRemoveItem = async (id: string): Promise<void> => {
-    console.log(`CartDrawer: Dispatching REMOVE_ITEM for ID: ${id}`);
+  const handleRemoveItem = useCallback(async (id: string): Promise<void> => {
+    console.log(`CartDrawer: Removing item with ID: ${id}`);
     dispatchCart({ type: 'REMOVE_ITEM', payload: id });
-  };
+  }, [dispatchCart]);
 
-  const handleQuantityChange = async (id: string, change: number): Promise<void> => {
+  const handleQuantityChange = useCallback(async (id: string, change: number): Promise<void> => {
     console.log('CartDrawer: handleQuantityChange called for item ID:', id, 'change:', change);
     const itemToUpdate = cartItems.find(item => item.id === id);
 
     if (!itemToUpdate || itemToUpdate.type !== 'normal') {
-      console.warn(`CartDrawer: Attempted to change quantity of non-normal item or item not found with ID: ${id}. Only normal items can be adjusted here.`);
+      console.warn(`CartDrawer: Cannot update quantity - item not found or not normal type`);
+      return;
+    }
+
+    if (!itemToUpdate.productDetails) {
+      console.error(`CartDrawer: Cannot update quantity - missing productDetails`);
+      alert('Cannot update quantity: product data incomplete. Please refresh your cart.');
       return;
     }
 
@@ -52,109 +61,114 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
       return;
     }
 
-    const totalProductQuantitiesMap = getTotalProductQuantitiesInCart();
-    const productIdBeingUpdated = (itemToUpdate as CartNormalItem).product_id.replace(/-/g, '');
+    const currentEffectiveStock = getEffectiveProductStock(itemToUpdate.productDetails, itemToUpdate.selectedVariant?.id);
 
-    const currentTotalQuantityOfThisProductInCart = totalProductQuantitiesMap.get(productIdBeingUpdated) || 0;
-
-    const effectiveAvailableStockForThisNormalItem = itemToUpdate.stock_quantity - (currentTotalQuantityOfThisProductInCart - itemToUpdate.quantity);
-
-
-    if (newQuantity > effectiveAvailableStockForThisNormalItem) {
-      console.warn(`CartDrawer: Cannot increase quantity for item ${id} beyond effective available stock (${effectiveAvailableStockForThisNormalItem}).`);
+    if (newQuantity > currentEffectiveStock + itemToUpdate.quantity) {
+      const maxAllowed = currentEffectiveStock + itemToUpdate.quantity;
+      console.warn(`CartDrawer: Cannot increase quantity beyond stock limit`);
+      alert(`Cannot add more: Maximum available stock is ${maxAllowed} units.`);
       return;
     }
 
-    console.log(`CartDrawer: Dispatching UPDATE_ITEM_QUANTITY for item ${id} to new quantity: ${newQuantity}.`);
+    console.log(`CartDrawer: Updating quantity for item ${id} to ${newQuantity}`);
     dispatchCart({ type: 'UPDATE_ITEM_QUANTITY', payload: { id, quantity: newQuantity } });
-  };
+  }, [cartItems, dispatchCart, getEffectiveProductStock, handleRemoveItem]);
 
-  const handleProceedToCheckout = (): void => {
+  const handleProceedToCheckout = useCallback((): void => {
     setShowCheckoutModal(true);
-  };
+  }, []);
 
-  const handleCheckoutClose = (): void => {
+  const handleCheckoutClose = useCallback((): void => {
     setShowCheckoutModal(false);
-    dispatchCart({ type: 'TRIGGER_SYNC' });
-  };
+  }, []);
 
-  const handleAddressSelected = (addressId: string): void => {
+  const handleAddressSelected = useCallback((addressId: string): void => {
     console.log(`CartDrawer: Proceeding with address ID: ${addressId}`);
     setShowCheckoutModal(false);
-    dispatchCart({ type: 'TRIGGER_SYNC' });
-  };
+  }, []);
 
-  const clearCart = async (): Promise<void> => {
+  const handleClearCart = useCallback(async (): Promise<void> => {
     try {
-      dispatchCart({ type: 'SET_CART_ITEMS', payload: [] });
-      console.log('CartDrawer: Cart cleared locally.');
-
-      if (localStorage.getItem('accessToken')) {
-        console.log(`CartDrawer: Attempting to clear cart on backend for authenticated user.`);
-        await apiService.addToCart({ mode: 'delete_cart' });
-        dispatchCart({ type: 'TRIGGER_SYNC' });
-      } else {
-        console.log(`CartDrawer: Cart cleared locally for guest user (no backend interaction).`);
-      }
+      console.log('CartDrawer: Clearing cart');
+      await clearCart();
     } catch (error) {
       console.error('CartDrawer: Error clearing cart:', error);
-      // For network error in authenticated clear:
-      // The local cart is already cleared. A subsequent sync (triggered below or by refresh)
-      // will fetch the real backend state. If backend failed to clear, items might reappear.
-      // For guest, this catch is less relevant as no network call is made during local clear.
-      dispatchCart({ type: 'TRIGGER_SYNC' }); // Trigger a sync to reconcile if backend failed to clear
+      dispatchCart({ type: 'CLEAR_CART' });
     }
-  };
+  }, [clearCart, dispatchCart]);
 
-  const hasOutOfStockItems = (): boolean => {
+  // Calculate totals using cartUtils
+  const calculateTotals = useCallback(() => {
+    if (!cartItems || cartItems.length === 0) {
+      return {
+        normalSubtotal: 0,
+        offerSubtotal: 0,
+        offerSavings: 0,
+        totalItems: 0,
+        grandTotal: 0,
+      };
+    }
+
+    try {
+      return cartUtils.calculateDetailedTotals(cartItems);
+    } catch (error) {
+      console.error('Error calculating totals:', error);
+      return {
+        normalSubtotal: 0,
+        offerSubtotal: 0,
+        offerSavings: 0,
+        totalItems: 0,
+        grandTotal: 0,
+      };
+    }
+  }, [cartItems]);
+
+  const hasOutOfStockItems = useCallback((): boolean => {
     return cartUtils.hasOutOfStockItems(cartItems);
-  };
+  }, [cartItems]);
 
-  const getOutOfStockItems = (): string[] => {
+  const getOutOfStockItems = useCallback((): string[] => {
     return cartUtils.getOutOfStockItems(cartItems);
-  };
+  }, [cartItems]);
+
+  // Group normal items by product and variant for display
+  const groupedNormalItems = useCallback(() => {
+    const normalItems = cartItems.filter(item => item.type === 'normal') as CartNormalItem[];
+    return normalItems;
+  }, [cartItems]);
 
   if (!isOpen) return null;
 
-  const totalCartUnits = cartItems.reduce((total: number, item: CartItemType) => {
-    if (item.type === 'normal') {
-      return total + item.quantity;
-    } else {
-      return total + item.offer_items.reduce((offerTotal, p) => offerTotal + p.quantity, 0);
-    }
-  }, 0);
-
-  const subtotal = cartUtils.calculateSubtotal(cartItems);
-  const offerSavings = cartUtils.calculateTotalOfferSavings(cartItems);
-
-  const finalTotal = subtotal;
-
-  // Prepare items for CheckoutModal when opened from CartDrawer
-  const normalItemsForCheckout = cartItems.filter(item => item.type === 'normal') as CartNormalItem[];
-  const offerSetsForCheckout = cartItems.filter(item => item.type === 'offer') as CartOfferItem[];
-
+  const totals = calculateTotals();
+  const normalItems = groupedNormalItems();
+  const offerItems = cartItems.filter(item => item.type === 'offer') as CartOfferItem[];
 
   return (
     <>
-      <div className="fixed inset-0 z-51 overflow-hidden">
+      <div className="fixed inset-0 z-50 overflow-hidden">
         <div className="absolute inset-0 bg-black/80" onClick={onClose}></div>
 
         <div className="absolute right-0 top-0 h-full w-full max-w-sm bg-[#f2f4f7] shadow-xl transform transition-transform rounded-tl-[16px] rounded-bl-[16px]">
           <div className="flex flex-col h-full">
+            {/* Header */}
             <div className="flex items-center justify-between py-3 pl-6 pr-2 border-b">
               <div className="flex items-center">
                 <ShoppingCart className="mr-2 text-[#7F7F7F]" size={18} />
                 <h3 className="text-[16px] font-medium text-[#7F7F7F]">
-                  Your Cart ({totalCartUnits} items)
+                  Your Cart ({totals.totalItems} items)
                 </h3>
               </div>
               <button onClick={onClose} className="text-black hover:text-gray-700">
                 <X size={22} />
               </button>
             </div>
+
+            {/* Promo Banner */}
             <div className="bg-[var(--color-primary-950)] py-1 text-center">
               <p className="text-white text-[12px]">BUY 1 GET 1 FREE | USE CODE : B1G1</p>
             </div>
+
+            {/* Cart Items */}
             <div className="flex-1 overflow-y-auto">
               {contextLoading ? (
                 <div className="flex justify-center items-center h-40">
@@ -164,34 +178,39 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
               ) : (
                 <>
                   {cartItems.length > 0 ? (
-                    <>
-                      {cartItems.map((item) => {
-                        if (item.type === 'normal') {
-                          const totalProductQuantitiesMap = getTotalProductQuantitiesInCart();
-                          const productIdForThisItem = item.product_id.replace(/-/g, '');
-                          const currentTotalQuantityOfThisProductInCart = totalProductQuantitiesMap.get(productIdForThisItem) || 0;
-                          const effectiveMaxForThisNormalItem = item.stock_quantity - (currentTotalQuantityOfThisProductInCart - item.quantity);
+                    <div className="space-y-2">
+                      {/* Normal Items Section */}
+                      {normalItems.length > 0 && (
+                        <div>
+                          {normalItems.map((item) => {
+                            const effectiveMaxForThisItem = item.selectedVariant?.quantity ?? item.stock_quantity;
 
-                          return (
-                            <CartItem
-                              key={item.id ?? uuidv4()}
-                              product={item}
-                              onRemove={handleRemoveItem}
-                              onQuantityChange={handleQuantityChange}
-                              maxAllowedQuantity={effectiveMaxForThisNormalItem}
-                            />
-                          );
-                        } else {
-                          return (
+                            return (
+                              <CartItem
+                                key={`${item.id}-${item.selectedVariant?.id || 'no-variant'}`}
+                                product={item}
+                                onRemove={handleRemoveItem}
+                                onQuantityChange={handleQuantityChange}
+                                maxAllowedQuantity={effectiveMaxForThisItem}
+                              />
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Offer Items Section */}
+                      {offerItems.length > 0 && (
+                        <div>
+                          {offerItems.map((item) => (
                             <OfferCartItem
-                              key={item.id ?? uuidv4()}
+                              key={item.id}
                               offerSet={item}
                               onRemove={handleRemoveItem}
                             />
-                          );
-                        }
-                      })}
-                    </>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <div className="text-center py-8">
                       <ShoppingCart size={40} className="mx-auto text-gray-300 mb-3" />
@@ -201,20 +220,43 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                 </>
               )}
             </div>
+
+            {/* Cart Summary */}
             {cartItems.length > 0 && (
               <div className="px-4 pb-6">
-                <div className="mb-4">
-                  {offerSavings > 0 && (
-                    <div className="flex justify-between text-green-600 mb-1">
-                      <span className="text-sm">Offer Savings</span>
-                      <span className="text-base font-bold">₹{offerSavings.toFixed(2)}</span>
+                <div className="mb-4 space-y-1">
+                  {/* Normal Items Subtotal */}
+                  {totals.normalSubtotal > 0 && (
+                    <div className="flex justify-between text-gray-600 text-sm">
+                      <span>Regular Items</span>
+                      <span>₹{totals.normalSubtotal.toFixed(2)}</span>
                     </div>
                   )}
-                  <div className="flex items-center justify-between text-[#7F7F7F]">
-                    <span className="text-sm">Estimated Total</span>
-                    <span className="text-base font-bold">₹{finalTotal.toFixed(2)}</span>
+
+                  {/* Offer Items Subtotal */}
+                  {totals.offerSubtotal > 0 && (
+                    <div className="flex justify-between text-gray-600 text-sm">
+                      <span>Offer Items</span>
+                      <span>₹{totals.offerSubtotal.toFixed(2)}</span>
+                    </div>
+                  )}
+
+                  {/* Offer Savings */}
+                  {totals.offerSavings > 0 && (
+                    <div className="flex justify-between text-green-600 mb-1">
+                      <span className="text-sm">You Save (Free Items)</span>
+                      <span className="text-base font-bold">₹{totals.offerSavings.toFixed(2)}</span>
+                    </div>
+                  )}
+
+                  {/* Total */}
+                  <div className="flex items-center justify-between text-[#7F7F7F] pt-2 border-t">
+                    <span className="text-sm font-medium">Total</span>
+                    <span className="text-base font-bold">₹{totals.grandTotal.toFixed(2)}</span>
                   </div>
                 </div>
+
+                {/* Out of Stock Warning */}
                 {hasOutOfStockItems() && (
                   <div className="bg-red-50 border border-red-200 text-red-600 p-3 mb-4 rounded text-sm">
                     Please remove out of stock item(s) to continue:
@@ -225,11 +267,13 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                     </ul>
                   </div>
                 )}
+
+                {/* Action Buttons */}
                 <div className="flex gap-2">
                   {cartItems.length > 0 && (
                     <button
                       className="px-3 py-3 border border-[var(--color-primary-950)] text-[14px] text-[var(--color-primary-950)] font-medium hover:bg-gray-100 cursor-pointer transition-colors rounded"
-                      onClick={clearCart}
+                      onClick={handleClearCart}
                     >
                       Clear Cart
                     </button>
@@ -248,14 +292,15 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
             )}
           </div>
         </div>
+
+        {/* Checkout Modal */}
         {showCheckoutModal && (
           <CheckoutModal
             isOpen={showCheckoutModal}
             onClose={handleCheckoutClose}
             onProceed={handleAddressSelected}
-            // Pass the explicitly prepared items for cart checkout
-            normalItemsForCheckout={normalItemsForCheckout}
-            offerSetsForCheckout={offerSetsForCheckout}
+            normalItemsForCheckout={normalItems}
+            offerSetsForCheckout={offerItems}
             checkoutMode={'cart'}
           />
         )}

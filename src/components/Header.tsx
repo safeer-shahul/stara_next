@@ -1,12 +1,11 @@
-// src/components/Header.tsx
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Search, User, Heart, Menu, X, LogOut, ShoppingCart, LayoutDashboard } from 'lucide-react'; // Added LayoutDashboard icon
+import { Search, User, Heart, Menu, X, LogOut, ShoppingCart, LayoutDashboard } from 'lucide-react';
 import CartDrawer from './CartDrawer';
-import UserDropdown from './auth/UserDropdown'; // Assuming this component exists and handles regular user dropdown
+import UserDropdown from './auth/UserDropdown';
 import AuthModal from './auth/AuthModal';
 import apiService from '@/utils/api/apiService';
 import { useCart, CartItemType } from '@/context/cartContext';
@@ -15,7 +14,7 @@ export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
-  const [userProfile, setUserProfile] = useState<any>(null); // This will hold is_superuser, is_staff etc.
+  const [userProfile, setUserProfile] = useState<any>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
   const [categories, setCategories] = useState<any[]>([]);
@@ -23,20 +22,30 @@ export default function Header() {
   const [categoryError, setCategoryError] = useState<string | null>(null);
   const [wishlistCount, setWishlistCount] = useState<number>(0);
 
-  const { cartItems } = useCart(); // Access cartItems from global context
+  const { cartItems } = useCart();
 
-  // Derive cartCount directly from cartItems from context
   const totalCartUnits = cartItems.reduce((total: number, item: CartItemType) => {
   if (item.type === 'normal') {
     return total + item.quantity;
-  } else { // item.type === 'offer'
-    // Sum the quantities of all products within the offer_items array
-    // CORRECTED LINE: access p.quantity
-    return total + item.offer_items.reduce((offerTotal, p) => offerTotal + p.quantity, 0); 
+  } else {
+    return total + item.offer_items.reduce((offerTotal, p) => offerTotal + p.quantity, 0);
   }
 }, 0);
 
-  // Fetch categories for header menu
+  const getWishlistCountFromLocalStorage = () => {
+    try {
+      const wishList = localStorage.getItem('wishlist');
+      if (wishList) {
+        const parsedWishlist = JSON.parse(wishList);
+        return Array.isArray(parsedWishlist) ? parsedWishlist.length : 0;
+      }
+      return 0;
+    } catch (error) {
+      console.error('Error reading wishlist from localStorage:', error);
+      return 0;
+    }
+  };
+
   useEffect(() => {
     const fetchCategories = async () => {
       try {
@@ -63,29 +72,13 @@ export default function Header() {
     fetchCategories();
   }, []);
   
-  // Function to get wishlist count from localStorage (still used if no dedicated context)
-  const getWishlistCountFromLocalStorage = () => {
-    try {
-      const wishList = localStorage.getItem('wishlist');
-      if (wishList) {
-        const parsedWishlist = JSON.parse(wishList);
-        return Array.isArray(parsedWishlist) ? parsedWishlist.length : 0;
-      }
-      return 0;
-    } catch (error) {
-      console.error('Error reading wishlist from localStorage:', error);
-      return 0;
-    }
-  };
-
-  // Check authentication status and update counts
   useEffect(() => {
     const checkAuthStatus = () => {
       const token = localStorage.getItem('accessToken');
       
       if (token) {
         setIsLoggedIn(true);
-        fetchUserProfile(); // Fetch user profile including is_superuser/is_staff
+        fetchUserProfile();
       } else {
         setIsLoggedIn(false);
         setUserProfile(null);
@@ -93,38 +86,35 @@ export default function Header() {
       }
     };
 
-    // Initial check
     checkAuthStatus();
 
-    // Setup listener for storage events (for multi-tab support)
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'accessToken') {
         checkAuthStatus();
       } 
       else if (e.key === 'wishlist') {
-        if (!isLoggedIn) { // Only update from local storage if not logged in
+        if (!isLoggedIn) {
           setWishlistCount(getWishlistCountFromLocalStorage());
         }
       }
     };
 
-    // Add listener for user login event (dispatched from AuthModal)
     const handleUserLogin = () => {
       setIsLoggedIn(true);
       const token = localStorage.getItem('accessToken');
       if (token) {
-        fetchUserProfile(); // Re-fetch profile on login
+        fetchUserProfile();
       }
     };
     
     window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('userLoggedIn', handleUserLogin); // Custom event listener
+    window.addEventListener('userLoggedIn', handleUserLogin);
     
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('userLoggedIn', handleUserLogin);
     };
-  }, [isLoggedIn]); // isLoggedIn is a dependency to re-run effect when login status changes
+  }, [isLoggedIn]);
 
   const fetchUserProfile = async () => {
     try {
@@ -134,13 +124,13 @@ export default function Header() {
       if (response?.wishlist_item_count !== undefined) {
         setWishlistCount(response.wishlist_item_count);
       } else {
-        setWishlistCount(getWishlistCountFromLocalStorage()); // Fallback
+        setWishlistCount(getWishlistCountFromLocalStorage());
       }
     } catch (error) {
       console.error('Failed to fetch user profile:', error);
-      setUserProfile(null); // Clear profile if fetching fails
-      setIsLoggedIn(false); // Consider user logged out if profile fetch fails
-      setWishlistCount(getWishlistCountFromLocalStorage()); // Fallback for wishlist
+      setUserProfile(null);
+      setIsLoggedIn(false);
+      setWishlistCount(getWishlistCountFromLocalStorage());
     }
   };
 
@@ -160,16 +150,13 @@ export default function Header() {
     setIsLoggedIn(false);
     setUserProfile(null);
     setIsMenuOpen(false);
-    apiService.logout(); // Call your logout API service
-    // Dispatch a custom event for other components to react to logout
+    apiService.logout();
     window.dispatchEvent(new Event('userLoggedOut')); 
-    // Optionally redirect to home page or login page
-    // router.push('/'); 
   }, []);
 
   const isAdminOrStaff = userProfile?.is_superuser || userProfile?.is_staff;
   const accountLink = isAdminOrStaff ? '/admin' : '/account';
-  const AccountIcon = isAdminOrStaff ? LayoutDashboard : User; // Use dashboard icon for admin/staff
+  const AccountIcon = isAdminOrStaff ? LayoutDashboard : User;
 
   return (
     <>
@@ -206,10 +193,8 @@ export default function Header() {
               {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
             
-            {/* User account icon - conditionally render dropdown or open auth modal */}
             <div className="hidden md:block cursor-pointer">
               {isLoggedIn ? (
-                // If logged in, show admin/staff dashboard link or regular user dropdown
                 isAdminOrStaff ? (
                   <Link href={accountLink} className="flex items-center" title="Admin/Staff Dashboard">
                     <AccountIcon size={22} />
@@ -218,7 +203,6 @@ export default function Header() {
                   <UserDropdown userProfile={userProfile} />
                 )
               ) : (
-                // If not logged in, show login/register button
                 <a href="#" onClick={handleUserClick} title="Login / Register">
                   <User size={22} />
                 </a>
@@ -232,11 +216,10 @@ export default function Header() {
               </span>
             </Link>
 
-            {/* Shopping Cart Icon */}
             <a href="#" className="relative" onClick={handleCartClick} title="Shopping Cart">
               <ShoppingCart size={22} />
               <span className={`absolute ${isLoggedIn ? 'bottom-[-1px]' : 'bottom-[-11px]'} left-1/2 transform -translate-x-1/2 bg-[#F0FBFF] text-[var(--color-primary-950)] text-[11px] h-3 w-6 flex items-center justify-center rounded-full`}>
-                {totalCartUnits} {/* Use totalCartUnits from context */}
+                {totalCartUnits}
               </span>
             </a>
           </div>
@@ -253,7 +236,7 @@ export default function Header() {
                 categories.map((category, index) => (
                   <li 
                     key={index} 
-                    className="relative group" // Added group for potential hover effects
+                    className="relative group"
                   >
                     <Link href={category.link || '#'} className="hover:text-gray-600 flex items-center text-[14px]">
                       {category.title}
@@ -276,7 +259,6 @@ export default function Header() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
               
-              {/* Mobile user account link */}
               {isLoggedIn ? (
                 <div className="flex items-center py-2 border-b border-gray-100 mb-2">
                   <div className="w-8 h-8 rounded-full bg-[var(--color-primary-950)] text-white flex items-center justify-center mr-2">
@@ -313,7 +295,6 @@ export default function Header() {
               </Link>
               
               <ul className="space-y-2 mt-2">
-                {/* Display dynamically loaded categories for mobile */}
                 {loadingCategories ? (
                   <li className="text-gray-500 py-2">Loading categories...</li>
                 ) : categoryError ? (
@@ -329,7 +310,6 @@ export default function Header() {
                 )}
               </ul>
               
-              {/* Mobile logout button if logged in */}
               {isLoggedIn && (
                 <button 
                   className="w-full py-2 px-4 mt-4 rounded-md border border-red-500 text-red-500 flex items-center justify-center"
@@ -344,14 +324,11 @@ export default function Header() {
         )}
       </header>
       
-      {/* Cart Drawer */}
       <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
       
-      {/* Auth Modal */}
       <AuthModal 
         isOpen={isAuthModalOpen} 
         onClose={() => setIsAuthModalOpen(false)}
-        // Pass userProfile and isAdminOrStaff to AuthModal for redirection logic after login
         userProfile={userProfile}
         isAdminOrStaff={isAdminOrStaff}
       />

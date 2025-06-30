@@ -1,34 +1,11 @@
-// components/OfferMobileSlider.tsx
 'use client';
 import { useEffect, useState, useCallback, memo } from 'react';
 import Image from 'next/image';
 import { X, ShoppingBag } from 'lucide-react';
-// import apiService from '@/utils/api/apiService'; // Removed direct apiService import
 import { v4 as uuidv4 } from 'uuid';
-import { useCart, CartOfferItem, ProductItemDetails } from '@/context/cartContext'; // Ensure correct path
+import { useCart, CartOfferItem, ProductItemDetails, ProductVariant } from '@/context/cartContext';
 
-interface ProductItem {
-    id: string;
-    images: {
-        id: string;
-        product_image: string;
-        product: string;
-    }[];
-    product_name: string;
-    product_price: string;
-    strike_price: string;
-    product_status: boolean;
-    product_code?: string;
-    product_description?: string;
-    quantity?: number;
-    product_weight?: string;
-    product_box_weight?: string;
-    created_at?: string;
-    updated_at?: string;
-    sub_category?: string;
-    isInStock?: boolean;
-}
-
+interface ProductItem extends ProductItemDetails {}
 
 interface OfferData {
     id: string;
@@ -44,6 +21,7 @@ interface OfferData {
 interface OfferSlot {
     id: string;
     product: ProductItem | null;
+    selectedVariant?: ProductVariant | null;
     slotIndex: number;
 }
 
@@ -64,7 +42,7 @@ export default memo(function OfferMobileSlider({
     slots,
     onSlotClear,
     onOpenCartDrawer,
-    isAuthenticated = false // isAuthenticated is now largely for UI presentation/button enabling
+    isAuthenticated = false
 }: OfferMobileSliderProps) {
     useEffect(() => {
         if (isOpen) {
@@ -88,24 +66,12 @@ export default memo(function OfferMobileSlider({
             return { payableTotal: 0, savings: 0, freeItems: [] };
         }
 
-        const allIndividualProductsInSlots: (ProductItemDetails & { uniqueSlotId: string })[] = filledSlots.map(slot => {
+        const allIndividualProductsInSlots: (ProductItemDetails & { uniqueSlotId: string; selectedVariant?: ProductVariant })[] = filledSlots.map(slot => {
             const product = slot.product!;
             return {
-                id: product.id,
-                images: product.images || [],
-                product_name: product.product_name,
-                product_price: product.product_price,
-                strike_price: product.strike_price,
-                product_status: product.product_status,
-                product_code: product.product_code || '',
-                product_description: product.product_description || '',
+                ...product,
                 quantity: 1,
-                product_weight: product.product_weight || '',
-                product_box_weight: product.product_box_weight || '',
-                created_at: product.created_at || new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-                sub_category: product.sub_category || '',
-                isInStock: product.product_status && (product.quantity || 1) > 0,
+                ...(slot.selectedVariant && { selectedVariant: slot.selectedVariant }),
                 uniqueSlotId: slot.id,
             };
         });
@@ -143,38 +109,27 @@ export default memo(function OfferMobileSlider({
 
         filledSlots.forEach(slot => {
             if (slot.product) {
-                const product = slot.product;
-                const productDetails: ProductItemDetails = {
-                    id: product.id,
-                    images: product.images || [],
-                    product_name: product.product_name,
-                    product_price: product.product_price,
-                    strike_price: product.strike_price,
-                    product_status: product.product_status,
-                    product_code: product.product_code || '',
-                    product_description: product.product_description || '',
+                const productKey = `${slot.product.id}-${slot.selectedVariant?.id || ''}`;
+
+                const productDetailsForCartOfferItem: ProductItemDetails & { quantity: number; selectedVariant?: ProductVariant } = {
+                    ...slot.product,
                     quantity: 1,
-                    product_weight: product.product_weight || '',
-                    product_box_weight: product.product_box_weight || '',
-                    created_at: product.created_at || new Date().toISOString(),
-                    updated_at: new Date().toISOString(),
-                    sub_category: product.sub_category || '',
-                    isInStock: product.product_status && (product.quantity || 1) > 0,
+                    ...(slot.selectedVariant && { selectedVariant: slot.selectedVariant }),
                 };
 
-                if (aggregatedOfferItemsMap.has(productDetails.id)) {
-                    const existingProduct = aggregatedOfferItemsMap.get(productDetails.id)!;
-                    aggregatedOfferItemsMap.set(productDetails.id, {
+                if (aggregatedOfferItemsMap.has(productKey)) {
+                    const existingProduct = aggregatedOfferItemsMap.get(productKey)!;
+                    aggregatedOfferItemsMap.set(productKey, {
                         ...existingProduct,
                         quantity: existingProduct.quantity + 1,
                     });
                 } else {
-                    aggregatedOfferItemsMap.set(productDetails.id, productDetails);
+                    aggregatedOfferItemsMap.set(productKey, productDetailsForCartOfferItem);
                 }
             }
         });
 
-        const aggregatedOfferItems: ProductItemDetails[] = Array.from(aggregatedOfferItemsMap.values());
+        const aggregatedOfferItems: (ProductItemDetails & { quantity: number; selectedVariant?: ProductVariant })[] = Array.from(aggregatedOfferItemsMap.values());
         const temporaryId = uuidv4();
 
         const offerSetPayload: CartOfferItem = {
@@ -183,22 +138,20 @@ export default memo(function OfferMobileSlider({
             offer_name: { id: offerData.id, offer_name: offerData.offer_name },
             buy_count: offerData.buy_count,
             get_count: offerData.get_count,
-            isSynced: false, // Always initially false for optimistic update
+            isSynced: false,
             type: 'offer',
             offer_items: aggregatedOfferItems,
+            updated_at: '',
+            created_at: ''
         };
 
         try {
-            // Optimistic UI update: Add the offer set locally
-            // This will also trigger the CartProvider's customDispatch, which
-            // then sets `syncRequested` for an authenticated user.
             dispatchCart({ type: 'ADD_OFFER_SET', payload: offerSetPayload });
-            console.log("OfferMobileSlider: Dispatched ADD_OFFER_SET. CartProvider will handle backend sync.");
+            console.log("OfferMobileSlider: Dispatched ADD_OFFER_SET with aggregated items:", aggregatedOfferItems);
 
-            onOpenCartDrawer(); // Open cart drawer after processing
+            onOpenCartDrawer();
         } catch (error) {
             console.error('OfferMobileSlider: Failed to add to cart (local dispatch failed?):', error);
-            // If local dispatch somehow failed, show error.
             alert('Failed to add offer. Please try again.');
         } finally {
             setLoading(false);
@@ -252,7 +205,12 @@ export default memo(function OfferMobileSlider({
                                                 />
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <p className="text-xs font-medium line-clamp-2">{slot.product.product_name}</p>
+                                                <p className="text-xs font-medium line-clamp-2">
+                                                  {slot.product.product_name}
+                                                  {slot.selectedVariant && (
+                                                    <span className="text-gray-500 text-[10px] ml-1"> ({slot.selectedVariant.variant_name})</span>
+                                                  )}
+                                                </p>
                                                 {freeItems.some(freeItem => freeItem.uniqueSlotId === slot.id) ? (
                                                     <div className="flex items-center gap-2">
                                                         <span className="text-xs text-gray-500 line-through">₹{parseFloat(slot.product.product_price).toLocaleString()}</span>

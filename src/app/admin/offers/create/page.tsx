@@ -1,279 +1,279 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-// Importing additional icons for better UX and consistency
 import { Tag, ArrowLeft, Search, X, Upload, Image as ImageIcon, Calendar, Info, Loader2, DollarSign, Percent, CheckCircle, XCircle, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import apiService from '@/utils/api/apiService';
 
-// Define specific interfaces for better type safety
 interface Product {
   id: string;
   product_name: string;
   product_code: string;
-  product_price: string; // Keeping as string from original, convert to number if needed for math
+  product_price: string;
   images: {
-    id?: string;
+    id: string;
     product_image: string;
-    product?: string;
+    product: string;
   }[];
 }
 
 interface OfferData {
-  id: string; // Assuming ID can be string from API
+  id: string;
   offer_name: string;
   offer_image: string | null;
   buy_count: number;
   get_count: number;
-  start_date: string; // ISO string format
-  end_date: string;   // ISO string format
-  products: Product[]; // Associated products
+  start_date: string;
+  end_date: string;
+  products: Product[];
 }
 
 function AddOfferPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const offerId = searchParams.get('id');
-  const isEditMode = !!offerId; // Proper boolean check
+  const isEditMode = !!offerId;
 
-  // Form states
   const [offerName, setOfferName] = useState('');
-  const [offerImageFile, setOfferImageFile] = useState<File | null>(null);
-  const [offerImagePreview, setOfferImagePreview] = useState<string | null>(null); // Changed to null for no image state
+  const [offerImage, setOfferImage] = useState<File | null>(null);
+  const [offerImagePreview, setOfferImagePreview] = useState<string>('');
   const [buyCount, setBuyCount] = useState('');
   const [getCount, setGetCount] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false); // For form submission
-  const [formError, setFormError] = useState<string | null>(null); // General form errors
-  const [offerImageError, setOfferImageError] = useState<string | null>(null); // Specific image upload errors
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null); // Changed from 'error' to 'formError' for clarity in new design
+  const [offerImageError, setOfferImageError] = useState<string | null>(null); // New state for image specific errors
+  const [isLoading, setIsLoading] = useState(false); // Renamed from isFetchingInitialData to isLoading for consistency with old code
 
-  // Data fetching states
-  const [isFetchingInitialData, setIsFetchingInitialData] = useState(isEditMode); // For initial data fetch (edit mode)
-  const [isProductsLoading, setIsProductsLoading] = useState(false); // For infinite scroll loading
-
-  // Product selection states
-  const [availableProducts, setAvailableProducts] = useState<Product[]>([]); // Renamed from 'products' for clarity
+  const [products, setProducts] = useState<Product[]>([]); // These are the available products from API
   const [selectedProducts, setSelectedProducts] = useState<Product[]>([]);
-  const [originalSelectedProductIds, setOriginalSelectedProductIds] = useState<Set<string>>(new Set()); // Track original product IDs for deletion
-  const [removedProductIds, setRemovedProductIds] = useState<string[]>([]); // Track removed product IDs to send to API
-
+  const [originalSelectedProducts, setOriginalSelectedProducts] = useState<Product[]>([]); // Track original products for edit mode
+  const [removedProductIds, setRemovedProductIds] = useState<string[]>([]); // Track removed product IDs for edit mode
   const [searchTerm, setSearchTerm] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [hasMoreProducts, setHasMoreProducts] = useState(true); // Renamed from 'hasMore'
+  const [hasMore, setHasMore] = useState(true); // Renamed from hasMoreProducts to hasMore for consistency with old code
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const productListScrollRef = useRef<HTMLDivElement>(null); // Renamed from 'productListRef'
-  const fileInputRef = useRef<HTMLInputElement>(null); // For offer image
+  const productListRef = useRef<HTMLDivElement>(null); // Renamed from productListScrollRef for consistency
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Get today's date in YYYY-MM-DD format for date pickers
-  const getTodayDate = useCallback(() => {
+  // Get today's date in YYYY-MM-DD format
+  const getTodayDate = () => {
     const today = new Date();
     return today.toISOString().split('T')[0];
-  }, []);
+  };
 
-  // Check if start date input should be disabled (today or in the past for edit mode)
-  const isStartDateDisabled = useCallback(() => {
-    if (!isEditMode) return false; // Not disabled in create mode
-    if (!startDate) return false; // Not disabled if no start date set yet
+  // Check if start date should be disabled (today or in the past)
+  const isStartDateDisabled = () => {
+    if (!isEditMode) return false;
+    if (!startDate) return false;
 
     const today = new Date();
     const startDateObj = new Date(startDate);
-    today.setHours(0, 0, 0, 0); // Reset time to start of day
-    startDateObj.setHours(0, 0, 0, 0); // Reset time to start of day
 
-    return startDateObj <= today; // Disable if start date is today or in the past
-  }, [isEditMode, startDate]);
+    // Reset time to start of day for comparison
+    today.setHours(0, 0, 0, 0);
+    startDateObj.setHours(0, 0, 0, 0);
 
-  // Fetch offer data if in edit mode (memoized)
-  const fetchOfferData = useCallback(async () => {
+    return startDateObj <= today;
+  };
+
+  // Fetch offer data if in edit mode
+  useEffect(() => {
+    if (isEditMode) {
+      fetchOfferData();
+    } else {
+      // Load initial products only for new offers
+      loadProducts(1);
+    }
+  }, [offerId]); // Depend only on offerId, as per old code's logic
+
+  // Fetch offer data for editing
+  const fetchOfferData = async () => {
     if (!offerId) return;
 
-    setIsFetchingInitialData(true);
-    setFormError(null);
+    setIsLoading(true);
+    setFormError(null); // Clear previous errors
     try {
-      const offerData: OfferData = await apiService.offerByID(offerId); // Assuming API handles ID directly
+      const offerData: OfferData = await apiService.offerByID(offerId);
+      setOfferName(offerData.offer_name);
+      setBuyCount(offerData.buy_count.toString());
+      setGetCount(offerData.get_count.toString());
 
-      setOfferName(offerData.offer_name || '');
-      setBuyCount(offerData.buy_count?.toString() || '');
-      setGetCount(offerData.get_count?.toString() || '');
-      setStartDate(offerData.start_date ? new Date(offerData.start_date).toISOString().split('T')[0] : '');
-      setEndDate(offerData.end_date ? new Date(offerData.end_date).toISOString().split('T')[0] : '');
+      // Set dates if they exist
+      if (offerData.start_date) {
+        const startDateFormatted = new Date(offerData.start_date).toISOString().split('T')[0];
+        setStartDate(startDateFormatted);
+      }
+      if (offerData.end_date) {
+        const endDateFormatted = new Date(offerData.end_date).toISOString().split('T')[0];
+        setEndDate(endDateFormatted);
+      }
 
+      // Set offer image preview if exists
       if (offerData.offer_image) {
         setOfferImagePreview(`${process.env.NEXT_PUBLIC_API_BASE_URL}${offerData.offer_image}`);
       } else {
-        setOfferImagePreview(null);
+        setOfferImagePreview(''); // Ensure it's empty if no image
       }
 
       // Set selected products from the fetched offer
+      let selectedProductsFromOffer: React.SetStateAction<Product[]> | undefined = [];
       if (offerData.products && Array.isArray(offerData.products)) {
-        const productsFromOffer = offerData.products.map(p => ({
-            id: p.id, product_name: p.product_name, product_code: p.product_code, product_price: p.product_price, images: p.images || []
-        }));
-        setSelectedProducts(productsFromOffer);
-        setOriginalSelectedProductIds(new Set(productsFromOffer.map(p => p.id))); // Store original IDs
-      } else {
-          setSelectedProducts([]);
-          setOriginalSelectedProductIds(new Set());
+        selectedProductsFromOffer = offerData.products;
+        setSelectedProducts(selectedProductsFromOffer);
+        setOriginalSelectedProducts([...selectedProductsFromOffer]); // Store original products
       }
+
+      // Load products after setting selected products (old logic calls this without waiting for new render)
+      await loadProducts(1, selectedProductsFromOffer);
 
     } catch (err) {
       console.error('Error fetching offer data:', err);
       setFormError('Failed to load offer data. Please try again.');
     } finally {
-      setIsFetchingInitialData(false);
+      setIsLoading(false);
     }
-  }, [offerId]); // Depend on offerId
+  };
 
-  // Load initial available products or more products for infinite scroll (memoized)
-  const loadProducts = useCallback(async (pageToLoad: number, term: string = '') => {
-    if (isProductsLoading) return; // Prevent multiple simultaneous fetches
-
-    setIsProductsLoading(true);
-    try {
-      // Assuming getPaginatedProducts can take a search query and returns Product[] and count
-      const response = await apiService.getPaginatedProducts(
-        pageToLoad,
-        10, // Page size
-        term || undefined // Pass search term if not empty
-      );
-
-      const newFetchedProducts: Product[] = response.products || []; // Adjust based on your API response
-
-      // Filter out products that are already in selectedProducts list
-      const filteredNewProducts = newFetchedProducts.filter(
-        (newProduct) => !selectedProducts.some((selectedProduct) => selectedProduct.id === newProduct.id)
-      );
-
-      // Also filter out products already loaded in availableProducts list (if not first page)
-      const uniqueFilteredProducts = pageToLoad === 1
-        ? filteredNewProducts
-        : filteredNewProducts.filter(
-            (np) => !availableProducts.some((ap) => ap.id === np.id)
-          );
-
-      setAvailableProducts(prev =>
-        pageToLoad === 1 ? uniqueFilteredProducts : [...prev, ...uniqueFilteredProducts]
-      );
-      setCurrentPage(pageToLoad);
-      setHasMoreProducts(newFetchedProducts.length > 0); // Check if there's more to load
-
-    } catch (err) {
-      console.error('Error loading products:', err);
-      setFormError('Failed to load products for selection. Please try again.');
-    } finally {
-      setIsProductsLoading(false);
-    }
-  }, [selectedProducts, availableProducts, isProductsLoading]); // Dependencies for useCallback
-
-  // Effect to fetch initial offer data (edit mode) AND then initial products
-  useEffect(() => {
-    if (isEditMode) {
-      fetchOfferData();
-    }
-    // Load initial products (first page) when component mounts or search term changes
-    // This will be called after fetchOfferData potentially completes in edit mode,
-    // ensuring `selectedProducts` is up-to-date before `loadProducts` filters.
-    // The `isFetchingInitialData` check in the `loadProducts` dependency array will also help.
-    if (!isFetchingInitialData) {
-        loadProducts(1, searchTerm); // Re-load products if search term changes or initial fetch finishes
-    }
-  }, [isEditMode, fetchOfferData, isFetchingInitialData, searchTerm]);
-
-
-  // Handle clicks outside the dropdown to close it
+  // Handle clicks outside the dropdown
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsDropdownOpen(false);
       }
     };
+
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
 
+  // Load products from API
+  // This function is the *old logic* for loading products
+  const loadProducts = async (page: number, excludeProducts: Product[] = []) => {
+    if (isLoading) return; // Prevent multiple loads if already loading
+
+    setIsLoading(true); // Set loading state
+    try {
+      const response = await apiService.getPaginatedProducts(page, 10);
+
+      // Check if API returns data in expected format (response.products or direct array)
+      const newProducts = response.products || response;
+
+      if (newProducts.length === 0) {
+        setHasMore(false);
+      } else {
+        setProducts(prev => {
+          // Use excludeProducts parameter if provided (from initial edit load), otherwise use current selectedProducts
+          const productsToExclude = excludeProducts.length > 0 ? excludeProducts : selectedProducts;
+
+          // Filter out products that are already selected
+          const filteredNewProducts = newProducts.filter(
+            (newProduct: any) => !productsToExclude.some(selectedProduct => selectedProduct.id === newProduct.id)
+          );
+
+          return page === 1
+            ? filteredNewProducts
+            : [...prev, ...filteredNewProducts];
+        });
+        setCurrentPage(page);
+      }
+    } catch (err) {
+      console.error('Error loading products:', err);
+      setFormError('Failed to load products. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+
   // Handle infinite scroll in dropdown
-  const handleScroll = useCallback(() => {
-    if (productListScrollRef.current) {
-      const { scrollTop, scrollHeight, clientHeight } = productListScrollRef.current;
+  const handleScroll = () => {
+    if (productListRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = productListRef.current;
+
       // Load more data when scrolled to bottom (with a small buffer)
-      if (scrollTop + clientHeight >= scrollHeight - 50 && hasMoreProducts && !isProductsLoading) {
-        loadProducts(currentPage + 1, searchTerm);
+      if (scrollTop + clientHeight >= scrollHeight - 20 && hasMore && !isLoading) {
+        loadProducts(currentPage + 1);
       }
     }
-  }, [currentPage, hasMoreProducts, isProductsLoading, loadProducts, searchTerm]);
+  };
 
   // Add product to selected list
-  const handleSelectProduct = useCallback((product: Product) => {
-    setSelectedProducts(prev => {
-      if (!prev.some(p => p.id === product.id)) { // Prevent adding duplicates
-        return [...prev, product];
-      }
-      return prev;
-    });
-    setAvailableProducts(prev => prev.filter(p => p.id !== product.id)); // Remove from available
-    // If this product was previously marked for removal, unmark it
-    setRemovedProductIds(prev => prev.filter(id => id !== product.id));
-    setIsDropdownOpen(false); // Close dropdown after selection
+  const handleSelectProduct = (product: Product) => {
+    setSelectedProducts(prev => [...prev, product]);
+    setProducts(prev => prev.filter(p => p.id !== product.id));
+
+    // If this product was previously removed, remove it from the removedProductIds list
+    if (isEditMode && removedProductIds.includes(product.id)) {
+      setRemovedProductIds(prev => prev.filter(id => id !== product.id));
+    }
+
+    setIsDropdownOpen(false);
     setSearchTerm(''); // Clear search term after selection
-    setFormError(null); // Clear error if products now selected
-  }, []);
+    setFormError(null); // Clear any general form errors if product is added
+  };
 
   // Remove product from selected list
-  const handleRemoveProduct = useCallback((product: Product) => {
+  const handleRemoveProduct = (product: Product) => {
     setSelectedProducts(prev => prev.filter(p => p.id !== product.id));
-    // Add back to available products, maintaining sorted order
-    setAvailableProducts(prev => [...prev, product].sort((a, b) =>
+    // When removing, add it back to available and sort (old logic)
+    setProducts(prev => [...prev, product].sort((a, b) =>
       a.product_name.localeCompare(b.product_name)
     ));
-    // If in edit mode and this product was originally selected, add its ID to removedProductIds
-    if (isEditMode && originalSelectedProductIds.has(product.id)) {
+
+    // If in edit mode and this product was originally selected, add it to removedProductIds
+    if (isEditMode && originalSelectedProducts.some(originalProduct => originalProduct.id === product.id)) {
       setRemovedProductIds(prev => [...prev, product.id]);
     }
-  }, [isEditMode, originalSelectedProductIds]);
+  };
 
-  // Filter products based on search term
-  const filteredAvailableProducts = searchTerm
-    ? availableProducts.filter(product =>
-        product.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.product_code.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    : availableProducts;
+  // Filter products based on search term - ensure selected products are not shown
+  // This uses the 'products' state (available products from API)
+  const filteredProducts = searchTerm
+    ? products.filter(product =>
+      (product.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+       product.product_code.toLowerCase().includes(searchTerm.toLowerCase())) && // Include product code in search
+      !selectedProducts.some(selectedProduct => selectedProduct.id === product.id)
+    )
+    : products.filter(product =>
+      !selectedProducts.some(selectedProduct => selectedProduct.id === product.id)
+    );
 
-  // Handle offer image file upload
-  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle file upload
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) {
-      setOfferImageFile(null);
-      setOfferImagePreview(null);
+      setOfferImage(null);
+      setOfferImagePreview('');
       setOfferImageError(null);
       return;
     }
 
-    setOfferImageError(null); // Clear previous error
+    setOfferImageError(null); // Clear previous image errors
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
       setOfferImageError('Please select a valid image file (JPG, PNG, WebP).');
-      setOfferImageFile(null);
+      setOfferImage(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
-    // Validate file size (e.g., 5MB limit)
+    // Validate file size (5MB limit)
     if (file.size > 5 * 1024 * 1024) {
       setOfferImageError('Image size should be less than 5MB.');
-      setOfferImageFile(null);
+      setOfferImage(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
-    // Validate aspect ratio (1:1)
+    // Read file for preview and validate aspect ratio
     const reader = new FileReader();
     reader.onload = (e) => {
       const img = new window.Image();
@@ -282,38 +282,37 @@ function AddOfferPage() {
         const height = img.height;
         const ratio = width / height;
 
-        // Allow a small tolerance, e.g., 5% deviation from 1:1
-        if (ratio < 0.95 || ratio > 1.05) {
+        if (ratio < 0.95 || ratio > 1.05) { // Allowing a small tolerance
           setOfferImageError("Image should have a 1:1 aspect ratio (square image).");
-          setOfferImageFile(null); // Invalidate file
+          setOfferImage(null);
         } else {
-          setOfferImageError(null);
-          setOfferImageFile(file); // Set file if valid
+          setOfferImageError(null); // Clear error if ratio is good
+          setOfferImage(file); // Set file only if valid
         }
       };
       img.onerror = () => {
         setOfferImageError("Failed to load image for preview.");
-        setOfferImageFile(null);
-        setOfferImagePreview(null);
+        setOfferImage(null);
+        setOfferImagePreview('');
       };
       setOfferImagePreview(e.target?.result as string);
       img.src = e.target?.result as string;
     };
     reader.readAsDataURL(file);
-  }, []);
+  };
 
   // Remove uploaded image
-  const handleRemoveImage = useCallback(() => {
-    setOfferImageFile(null);
-    setOfferImagePreview(null);
-    setOfferImageError(null);
+  const handleRemoveImage = () => {
+    setOfferImage(null);
+    setOfferImagePreview('');
+    setOfferImageError(null); // Clear image error on removal
     if (fileInputRef.current) {
-      fileInputRef.current.value = ''; // Clear file input
+      fileInputRef.current.value = '';
     }
-  }, []);
+  };
 
-  // Validate all form dates before submission
-  const validateDates = useCallback(() => {
+  // Validate dates
+  const validateDates = () => {
     if (!startDate || !endDate) {
       setFormError("Please select both start and end dates.");
       return false;
@@ -322,7 +321,7 @@ function AddOfferPage() {
     const start = new Date(startDate);
     const end = new Date(endDate);
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Reset time to start of day
+    today.setHours(0, 0, 0, 0); // Reset time to start of day for comparison
 
     // For new offers, start date should be today or in the future
     if (!isEditMode && start < today) {
@@ -330,51 +329,52 @@ function AddOfferPage() {
       return false;
     }
 
-    // End date must be after start date
+    // End date should be after start date
     if (end <= start) {
       setFormError("End date must be after start date.");
       return false;
     }
+
     return true;
-  }, [startDate, endDate, isEditMode]);
+  };
 
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Perform all validations upfront
+    // Re-validate all required fields before submission (old logic was less comprehensive here)
     if (!offerName.trim()) {
       setFormError("Offer Name is required.");
       return;
     }
     if (!buyCount || parseInt(buyCount) <= 0) {
-        setFormError("Buy Count must be a positive number.");
-        return;
+      setFormError("Buy Count must be a positive number.");
+      return;
     }
     if (!getCount || parseInt(getCount) <= 0) {
-        setFormError("Get Count must be a positive number.");
-        return;
-    }
-    if (!validateDates()) { // validateDates will set formError if needed
+      setFormError("Get Count must be a positive number.");
       return;
+    }
+    if (!validateDates()) {
+      return; // Error message set by validateDates
     }
     if (selectedProducts.length === 0) {
       setFormError("Please select at least one product for the offer.");
       return;
     }
-    if (!offerImageFile && !offerImagePreview && !isEditMode) { // Offer image is required for new offers
-        setFormError("Please upload an offer image.");
-        return;
+    // Only require image for new offer OR if there's no existing preview in edit mode AND no new file is selected
+    if (!offerImage && !offerImagePreview && !isEditMode) {
+      setFormError("Please upload an offer image.");
+      return;
     }
-    if (offerImageError) { // Don't submit if image has errors
-        setFormError("Please correct the offer image issues before submitting.");
-        return;
+    if (offerImageError) { // Check for existing image errors
+      setFormError("Please correct the offer image issues before submitting.");
+      return;
     }
-
 
     setIsSubmitting(true);
-    setFormError(null); // Clear form errors before submission
-    setOfferImageError(null); // Clear image-specific errors
+    setFormError(null); // Clear form error before submission attempt
+    setOfferImageError(null); // Clear image error before submission attempt
 
     try {
       const formData = new FormData();
@@ -384,36 +384,35 @@ function AddOfferPage() {
       formData.append('start_date', startDate);
       formData.append('end_date', endDate);
 
-      // Append all product IDs for products to be *associated* with the offer.
-      // API should handle difference between 'add' and 'delete' based on this complete list.
-      // Or, if API expects separate 'add_product_ids' and 'delete_product_ids',
-      // we need to construct those arrays based on 'originalSelectedProductIds' and 'selectedProducts'.
-      // Based on original code's formData.append('add_product_ids', ...) and formData.append('delete_product_ids', ...),
-      // we need to differentiate.
-      
-      const productsToAdd = selectedProducts.filter(p => !originalSelectedProductIds.has(p.id));
-      productsToAdd.forEach(product => {
-        formData.append('add_product_ids', product.id);
+      // Add product IDs for products to be added (those newly selected)
+      selectedProducts.forEach(product => {
+        // Only add if not originally selected in edit mode, or if it's a new offer
+        if (!isEditMode || !originalSelectedProducts.some(orig => orig.id === product.id)) {
+          formData.append('add_product_ids', product.id);
+        }
       });
 
-      // Pass removed product IDs if in edit mode
+      // Add product IDs for products to be removed (only in edit mode)
       if (isEditMode && removedProductIds.length > 0) {
         removedProductIds.forEach(productId => {
           formData.append('delete_product_ids', productId);
         });
       }
 
-      // Only append new offer image file if selected
-      if (offerImageFile) {
-        formData.append('offer_image', offerImageFile);
+      // Add new image file if selected
+      if (offerImage) {
+        formData.append('offer_image', offerImage);
       }
+      // If in edit mode and no new image is selected, but there was an old image, no 'offer_image' field is needed.
+      // If in edit mode and image was removed (offerImage is null, offerImagePreview is empty), backend should handle it as deletion.
+      // (Assuming apiService.createOffer handles this nuance)
 
       // Add ID for edit mode
       if (isEditMode && offerId) {
-        formData.append('id', offerId); // Assuming API accepts ID in formData for update
+        formData.append('id', offerId); // Use direct offerId, replace(/-/g, '') not needed unless API truly requires it
       }
 
-      await apiService.createOffer(formData); // Assuming this API function handles both create and update
+      await apiService.createOffer(formData); // This API call is used for both create and update
 
       alert(`Offer "${offerName}" ${isEditMode ? 'updated' : 'created'} successfully!`);
       router.push('/admin/offers/list');
@@ -423,7 +422,7 @@ function AddOfferPage() {
       if (err.response?.data?.detail) {
         errorMessage = `Error: ${err.response.data.detail}`;
       } else if (err.message) {
-          errorMessage = `Error: ${err.message}`;
+        errorMessage = `Error: ${err.message}`;
       }
       setFormError(errorMessage);
     } finally {
@@ -431,11 +430,11 @@ function AddOfferPage() {
     }
   };
 
+
   const pageTitle = isEditMode ? 'Edit Offer' : 'Add New Offer';
   const submitButtonText = isSubmitting ? (isEditMode ? 'Updating...' : 'Creating...') : (isEditMode ? 'Update Offer' : 'Create Offer');
 
-  // Show loading state while fetching initial data
-  if (isFetchingInitialData) {
+  if (isLoading && isEditMode) {
     return (
       <div className="flex flex-col items-center justify-center py-20 bg-gray-50 rounded-xl shadow-lg">
         <Loader2 className="animate-spin h-12 w-12 text-[var(--color-primary-950)]" />
@@ -498,8 +497,8 @@ function AddOfferPage() {
                   type="text"
                   id="offerName"
                   className="w-full p-3 border border-gray-300 rounded-md text-gray-800
-                             focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent
-                             transition-all duration-200"
+                                  focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent
+                                  transition-all duration-200"
                   value={offerName}
                   onChange={(e) => setOfferName(e.target.value)}
                   placeholder="e.g., Summer Sale, Diwali Special"
@@ -509,13 +508,13 @@ function AddOfferPage() {
               </div>
 
               {/* Offer Image Upload */}
-              <div className="md:col-span-2"> {/* Span across two columns */}
+              <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Offer Image <span className="text-red-500">*</span> (1:1 Aspect Ratio)
                 </label>
                 <div
                   className={`border-2 border-dashed ${offerImageError ? 'border-red-400' : 'border-gray-300'} rounded-xl p-6 text-center cursor-pointer transition-all duration-200
-                              hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-primary-950)]`}
+                                  hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-primary-950)]`}
                   onClick={() => fileInputRef.current?.click()}
                   tabIndex={0}
                   role="button"
@@ -544,7 +543,7 @@ function AddOfferPage() {
                         type="button"
                         className="text-red-600 hover:text-red-800 font-medium transition-colors duration-200 flex items-center gap-2"
                         onClick={(e) => {
-                          e.stopPropagation(); // Prevent triggering file input again
+                          e.stopPropagation();
                           handleRemoveImage();
                         }}
                         disabled={isSubmitting}
@@ -584,8 +583,8 @@ function AddOfferPage() {
                   type="number"
                   id="buyCount"
                   className="w-full p-3 border border-gray-300 rounded-md text-gray-800
-                             focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent
-                             transition-all duration-200"
+                                  focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent
+                                  transition-all duration-200"
                   value={buyCount}
                   onChange={(e) => setBuyCount(e.target.value)}
                   placeholder="e.g., 2"
@@ -604,8 +603,8 @@ function AddOfferPage() {
                   type="number"
                   id="getCount"
                   className="w-full p-3 border border-gray-300 rounded-md text-gray-800
-                             focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent
-                             transition-all duration-200"
+                                  focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent
+                                  transition-all duration-200"
                   value={getCount}
                   onChange={(e) => setGetCount(e.target.value)}
                   placeholder="e.g., 1"
@@ -625,12 +624,12 @@ function AddOfferPage() {
                     type="date"
                     id="startDate"
                     className={`w-full p-3 border border-gray-300 rounded-md pr-10 text-gray-800
-                               ${isStartDateDisabled() ? 'bg-gray-100 cursor-not-allowed' : ''}
-                               focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent
-                               transition-all duration-200`}
+                                  ${isStartDateDisabled() ? 'bg-gray-100 cursor-not-allowed' : ''}
+                                  focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent
+                                  transition-all duration-200`}
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    min={!isEditMode ? getTodayDate() : undefined} // For new offers, cannot be in past
+                    min={!isEditMode ? getTodayDate() : undefined}
                     required
                     disabled={isSubmitting || isStartDateDisabled()}
                   />
@@ -638,7 +637,7 @@ function AddOfferPage() {
                 </div>
                 {isStartDateDisabled() && (
                   <p className="text-xs text-gray-500 mt-1">
-                    Start date cannot be changed as it's today or in the past.
+                    Start date cannot be changed as it&apos;s today or in the past.
                   </p>
                 )}
               </div>
@@ -653,11 +652,11 @@ function AddOfferPage() {
                     type="date"
                     id="endDate"
                     className="w-full p-3 border border-gray-300 rounded-md pr-10 text-gray-800
-                               focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent
-                               transition-all duration-200"
+                                  focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent
+                                  transition-all duration-200"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    min={startDate || getTodayDate()} // End date cannot be before start date or today
+                    min={startDate || getTodayDate()}
                     required
                     disabled={isSubmitting}
                   />
@@ -682,8 +681,10 @@ function AddOfferPage() {
                 <div className="relative" ref={dropdownRef}>
                   <div
                     className="p-3 border border-gray-300 rounded-md flex items-center cursor-pointer
-                               focus-within:ring-2 focus-within:ring-[var(--color-primary-950)] focus-within:border-transparent
-                               transition-all duration-200"
+                                  focus-within:ring-2 focus-within:ring-[var(--color-primary-950)] focus-within:border-transparent
+                                  transition-all duration-200"
+                    // Modified to specifically open dropdown but let input handle search state
+                    onClick={() => setIsDropdownOpen(true)}
                   >
                     <Search className="w-5 h-5 text-gray-400 mr-3" />
                     <input
@@ -694,16 +695,10 @@ function AddOfferPage() {
                       value={searchTerm}
                       onChange={(e) => {
                         setSearchTerm(e.target.value);
-                        setCurrentPage(1); // Reset page on new search
-                        setAvailableProducts([]); // Clear existing products to fetch new ones
-                        setHasMoreProducts(true);
-                        setIsDropdownOpen(true);
+                        setIsDropdownOpen(true); // Open dropdown on change
                       }}
                       onFocus={() => {
                         setIsDropdownOpen(true);
-                        if (availableProducts.length === 0 && !isProductsLoading && hasMoreProducts) {
-                          loadProducts(1, searchTerm);
-                        }
                       }}
                       disabled={isSubmitting}
                     />
@@ -712,15 +707,15 @@ function AddOfferPage() {
                   {isDropdownOpen && (
                     <div
                       className="absolute z-20 mt-2 w-full bg-white border border-gray-300 rounded-lg shadow-xl max-h-80 overflow-y-auto"
-                      ref={productListScrollRef}
+                      ref={productListRef} // Use productListRef for consistency with old code
                       onScroll={handleScroll}
                     >
-                      {isProductsLoading && currentPage === 1 ? (
+                      {isLoading && currentPage === 1 ? ( // Use isLoading
                         <div className="p-4 text-center text-gray-600 flex items-center justify-center gap-2">
                           <Loader2 className="animate-spin w-5 h-5" /> Loading products...
                         </div>
-                      ) : filteredAvailableProducts.length > 0 ? (
-                        filteredAvailableProducts.map(product => (
+                      ) : filteredProducts.length > 0 ? (
+                        filteredProducts.map(product => (
                           <div
                             key={product.id}
                             className="p-3 hover:bg-gray-100 cursor-pointer flex items-center border-b border-gray-100 last:border-b-0"
@@ -739,24 +734,26 @@ function AddOfferPage() {
                             )}
                             <div className="flex-grow truncate">
                               <div className="font-medium text-base text-gray-800 truncate">{product.product_name}</div>
-                              <div className="text-sm text-gray-500">{product.product_code} - ₹{parseFloat(product.product_price).toFixed(2)}</div>
+                              <div className="text-sm text-gray-500">
+                                {product.product_code} - ₹{parseFloat(product.product_price).toFixed(2)}
+                              </div>
                             </div>
                           </div>
                         ))
                       ) : (
                         <div className="p-4 text-center text-gray-500">
-                          {isProductsLoading ? 'Loading...' : 'No products found matching your search.'}
+                          {isLoading ? 'Loading...' : 'No products found matching your search.'}
                         </div>
                       )}
 
                       {/* Infinite scroll loading indicator */}
-                      {isProductsLoading && currentPage > 1 && (
+                      {isLoading && currentPage > 0 && ( // Use isLoading and currentPage > 0
                         <div className="p-2 text-center text-gray-600 flex items-center justify-center gap-2">
                           <Loader2 className="animate-spin w-4 h-4" /> Loading more...
                         </div>
                       )}
-                      {!hasMoreProducts && currentPage > 1 && !isProductsLoading && (
-                          <div className="p-2 text-center text-gray-400 text-sm">No more products to load.</div>
+                      {!hasMore && currentPage > 0 && !isLoading && ( // Use hasMore
+                        <div className="p-2 text-center text-gray-400 text-sm">No more products to load.</div>
                       )}
                     </div>
                   )}
@@ -789,7 +786,9 @@ function AddOfferPage() {
                           )}
                           <div className="flex-grow pr-2 truncate">
                             <div className="font-medium text-base text-gray-800 truncate">{product.product_name}</div>
-                            <div className="text-sm text-gray-500">{product.product_code} - ₹{parseFloat(product.product_price).toFixed(2)}</div>
+                            <div className="text-sm text-gray-500">
+                              {product.product_code} - ₹{parseFloat(product.product_price).toFixed(2)}
+                            </div>
                           </div>
                           <button
                             type="button"
@@ -821,8 +820,8 @@ function AddOfferPage() {
               <button
                 type="button"
                 className="px-6 py-3 border border-gray-300 rounded-md text-gray-700
-                           hover:bg-gray-100 transition-colors duration-200
-                           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-400"
+                                hover:bg-gray-100 transition-colors duration-200
+                                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-400"
                 disabled={isSubmitting}
               >
                 Cancel
@@ -831,12 +830,12 @@ function AddOfferPage() {
             <button
               type="submit"
               className={`px-6 py-3 rounded-md text-white font-semibold shadow-md transition-all duration-200
-                         flex items-center justify-center gap-2
-                         ${isSubmitting || !!formError || !!offerImageError || (selectedProducts.length === 0) || (!isEditMode && !offerImageFile)
-                           ? 'bg-gray-400 cursor-not-allowed opacity-80'
-                           : 'bg-[var(--color-primary-950)] hover:bg-[color:var(--color-primary-950)]/90 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-primary-950)]'
-                         }`}
-              disabled={isSubmitting || !!formError || !!offerImageError || (selectedProducts.length === 0) || (!isEditMode && !offerImageFile)}
+                                flex items-center justify-center gap-2
+                                ${isSubmitting || !!formError || !!offerImageError || (selectedProducts.length === 0) || (!isEditMode && !offerImage)
+                                  ? 'bg-gray-400 cursor-not-allowed opacity-80'
+                                  : 'bg-[var(--color-primary-950)] hover:bg-[color:var(--color-primary-950)]/90 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-primary-950)]'
+                                }`}
+              disabled={isSubmitting || !!formError || !!offerImageError || (selectedProducts.length === 0) || (!isEditMode && !offerImage)} // Disable if no image in add mode
             >
               {isSubmitting ? (
                 <>

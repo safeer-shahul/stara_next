@@ -1,4 +1,3 @@
-// src/app/shop/offers/[id]/page.tsx
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
@@ -10,31 +9,11 @@ import Link from 'next/link';
 import OfferMobileSlider from '@/components/OfferMobileSlider';
 import OfferCartSidebar from '@/components/OfferCartSidebar';
 import CartDrawer from '@/components/CartDrawer';
-// Import useCart to get access to cart items and getTotalProductQuantitiesInCart
-import { useCart, ProductItemDetails } from '@/context/cartContext'; 
+import { useCart, ProductItemDetails, ProductVariant } from '@/context/cartContext';
+import VariantSelectionModal from '@/components/VariantSelectionModal';
+import { v4 as uuidv4 } from 'uuid';
 
-// Re-define ProductItem here to be consistent with ProductItemDetails
-// This ensures that when a ProductItem is selected for a slot, it has all necessary fields
-interface ProductItem {
-  id: string;
-  images: {
-    id: string;
-    product_image: string;
-    product: string;
-  }[];
-  product_code: string;
-  product_name: string;
-  product_description: string;
-  product_price: string;
-  strike_price: string;
-  quantity: number; // This is stock quantity from the API for this product
-  product_weight: string;
-  product_box_weight: string;
-  product_status: boolean;
-  created_at: string;
-  updated_at: string;
-  sub_category: string;
-}
+interface ProductItem extends ProductItemDetails {}
 
 interface OfferData {
   id: string;
@@ -44,12 +23,13 @@ interface OfferData {
   start_date: string;
   end_date: string;
   offer_image: string;
-  products: ProductItem[]; // These are the available products for the offer
+  products: ProductItem[];
 }
 
 interface OfferSlot {
   id: string;
-  product: ProductItem | null; // Slot can hold a ProductItem
+  product: ProductItem | null;
+  selectedVariant?: ProductVariant | null;
   slotIndex: number;
 }
 
@@ -58,8 +38,7 @@ export default function OfferProductsPage() {
   const router = useRouter();
   const offerId = params?.id as string;
 
-  // Use the useCart hook to access cart data and getter for product quantities
-  const { cartItems, getTotalProductQuantitiesInCart } = useCart(); 
+  const { cartItems, getTotalProductQuantitiesInCart, getEffectiveProductStock } = useCart();
 
   const [loading, setLoading] = useState(true);
   const [offerData, setOfferData] = useState<OfferData | null>(null);
@@ -71,6 +50,10 @@ export default function OfferProductsPage() {
   const [hoveredProduct, setHoveredProduct] = useState<string | null>(null);
   const [isNavigating, setIsNavigating] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  const [isVariantModalOpen, setIsVariantModalOpen] = useState(false);
+  const [productForVariantSelection, setProductForVariantSelection] = useState<ProductItemDetails | null>(null);
+
 
   const checkAuthentication = useCallback(() => {
     const accessToken = localStorage.getItem('accessToken');
@@ -99,8 +82,9 @@ export default function OfferProductsPage() {
       const slots: OfferSlot[] = [];
       for (let i = 0; i < totalSlots; i++) {
         slots.push({
-          id: `slot-${i}`,
+          id: `slot-${uuidv4()}`,
           product: null,
+          selectedVariant: null,
           slotIndex: i
         });
       }
@@ -113,8 +97,15 @@ export default function OfferProductsPage() {
       if (!offerId) return;
       try {
         setLoading(true);
-        const response = await apiService.offerByID(offerId);
-        setOfferData(response);
+        const response: OfferData = await apiService.offerByID(offerId);
+        const productsWithStockStatus: ProductItem[] = response.products.map(p => {
+            const hasInStockVariant = p.have_variants && p.product_variant?.some(v => v.quantity > 0);
+            return {
+                ...p,
+                isInStock: p.product_status && (p.have_variants ? hasInStockVariant : p.quantity > 0),
+            };
+        });
+        setOfferData({ ...response, products: productsWithStockStatus });
         setError(null);
       } catch (err) {
         console.error('Failed to fetch offer data:', err);
@@ -124,64 +115,71 @@ export default function OfferProductsPage() {
       }
     };
     fetchOfferData();
-    checkAuthentication(); // Check authentication on mount
+    checkAuthentication();
   }, [offerId, checkAuthentication]);
 
-  const getTotalProductCount = useCallback((productId: string) => {
-    // This counts how many times a product is selected IN THE CURRENT OFFER SLOTS
-    return offerSlots.filter(slot => slot.product?.id === productId).length;
+  const getTotalProductCount = useCallback((productId: string, variantId?: string) => {
+    return offerSlots.filter(slot =>
+      slot.product?.id === productId &&
+      (variantId ? slot.selectedVariant?.id === variantId : !slot.selectedVariant)
+    ).length;
   }, [offerSlots]);
 
-  const canAddProductToOfferSlot = useCallback((product: ProductItem) => {
+  const canAddProductToOfferSlot = useCallback((product: ProductItem, variant: ProductVariant | null) => {
     const emptySlots = offerSlots.filter(slot => !slot.product);
     if (emptySlots.length === 0) {
-        return false; // No more empty slots in the offer
+        return false;
     }
 
-    // --- NEW LOGIC: Check effective available stock ---
-    const totalProductQuantitiesMap = getTotalProductQuantitiesInCart();
-    const productIdClean = product.id.replace(/-/g, '');
-    
-    // Total quantity of this product already in the user's entire cart (normal + offer items)
-    const currentTotalQuantityInCart = totalProductQuantitiesMap.get(productIdClean) || 0;
+    const currentEffectiveStock = getEffectiveProductStock(product, variant?.id);
 
-    // Total stock from the API for this product
-    const productAPIStock = product.quantity; 
+    return (variant ? variant.quantity > 0 : (product.product_status && product.quantity > 0)) && currentEffectiveStock > 0;
+  }, [offerSlots, getEffectiveProductStock]);
 
-    // The actual available stock for adding *new* instances of this product
-    // is the total API stock minus what's *already* in the cart.
-    const effectiveAvailableStock = productAPIStock - currentTotalQuantityInCart;
-
-    // We can only add if the product is in stock (API status) AND
-    // if there's at least one unit of effective available stock
-    // AND if there's an empty slot in the offer.
-    return product.product_status && effectiveAvailableStock > 0;
-  }, [offerSlots, getTotalProductQuantitiesInCart, cartItems]); // cartItems as dependency for getTotalProductQuantitiesInCart
-
-  const handleProductAdd = useCallback((product: ProductItem) => {
+  const handleAddProductToSlot = useCallback((productToAdd: ProductItem, selectedVariantToAdd: ProductVariant | null = null) => {
     const emptySlot = offerSlots.find(slot => !slot.product);
-    if (!emptySlot || !canAddProductToOfferSlot(product)) { // Re-check canAddProduct here for safety
-        console.warn(`OfferProductsPage: Cannot add product ${product.product_name}. No empty slots or out of stock.`);
+
+    if (!emptySlot || !canAddProductToOfferSlot(productToAdd, selectedVariantToAdd)) {
+        console.warn(`OfferProductsPage: Cannot add product ${productToAdd.product_name} (variant: ${selectedVariantToAdd?.variant_name || 'N/A'}). No empty slots or out of stock.`);
         return;
     }
-    setOfferSlots(prev => 
-      prev.map(slot => 
-        slot.id === emptySlot.id 
-          ? { ...slot, product }
+
+    setOfferSlots(prev =>
+      prev.map(slot =>
+        slot.id === emptySlot.id
+          ? {
+              ...slot,
+              product: productToAdd,
+              selectedVariant: selectedVariantToAdd,
+            }
           : slot
       )
     );
-  }, [offerSlots, canAddProductToOfferSlot]); // Added canAddProductToOfferSlot as dependency
+    setIsVariantModalOpen(false);
+    setProductForVariantSelection(null);
+
+  }, [offerSlots, canAddProductToOfferSlot]);
+
+
+  const handleProductAdd = useCallback((product: ProductItem) => {
+    if (product.have_variants && product.product_variant && product.product_variant.length > 0) {
+      setProductForVariantSelection(product);
+      setIsVariantModalOpen(true);
+    } else {
+      handleAddProductToSlot(product);
+    }
+  }, [handleAddProductToSlot]);
+
 
   const handleOpenCartDrawer = useCallback(() => {
-    setShowMobileSlider(false); // Close slider if open when opening cart drawer
+    setShowMobileSlider(false);
     setIsCartDrawerOpen(true); 
   }, []);
 
   const handleSlotClear = useCallback((slotId: string) => {
     setOfferSlots((prev) =>
       prev.map((slot) =>
-        slot.id === slotId ? { ...slot, product: null } : slot
+        slot.id === slotId ? { ...slot, product: null, selectedVariant: null } : slot
       )
     );
   }, []);
@@ -217,11 +215,9 @@ export default function OfferProductsPage() {
 
   const ProductSelectionButton = ({ product }: { product: ProductItem }) => {
     const selectedCount = getTotalProductCount(product.id);
-    // Use the new canAddProductToOfferSlot for disabling the button
-    const canAdd = canAddProductToOfferSlot(product); 
+    const isProductAvailableForOffer = product.isInStock;
 
-    // Determine disabled status more comprehensively
-    const isDisabled = !canAdd || !product.product_status || product.quantity <= 0;
+    const isDisabled = !isProductAvailableForOffer || getFilledSlots().length >= (offerData?.buy_count || 0) + (offerData?.get_count || 0);
 
     return (
       <button
@@ -229,7 +225,7 @@ export default function OfferProductsPage() {
           e.stopPropagation();
           handleProductAdd(product);
         }}
-        disabled={isDisabled} // Use the new isDisabled
+        disabled={isDisabled}
         className="w-full flex items-center cursor-pointer justify-center gap-2 py-2 px-3 bg-[var(--color-primary-950)] text-white rounded-md hover:bg-[#0f4c67] disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
       >
         <ShoppingBag size={14} />
@@ -295,36 +291,27 @@ export default function OfferProductsPage() {
           </div>
 
           <h2 className="text-xl font-semibold mb-4">Select {totalRequiredItems} Products for Your Offer</h2>
-          
+
           <div className={`grid ${isMobile ? 'grid-cols-2' : 'grid-cols-3'} gap-2`}>
             {offerData.products.map((product) => {
               const discount = calculateDiscount(product.product_price, product.strike_price);
               const mainImage = product.images?.[0]?.product_image || '';
               const hoverImage = product.images?.[1]?.product_image || product.images?.[0]?.product_image || '';
               const isCurrentlyNavigating = isNavigating === product.id;
-              
-              const totalSelected = getTotalProductCount(product.id); 
 
-              // Get the total quantity of this product already in the user's entire cart
-              const totalProductQuantitiesMap = getTotalProductQuantitiesInCart();
-              const productIdClean = product.id.replace(/-/g, '');
-              const currentTotalQuantityInCart = totalProductQuantitiesMap.get(productIdClean) || 0;
+              const totalSelected = getTotalProductCount(product.id);
 
-              // Calculate how many more of this product can be added to the offer slots
-              // It's the product's total stock MINUS all instances of it currently in the cart.
-              const effectiveAvailableStockForOffer = product.quantity - currentTotalQuantityInCart;
-
-              const isProductEffectivelyOutOfStockForOffer = effectiveAvailableStockForOffer <= 0;
+              const isProductEffectivelyOutOfStockForOffer = !product.isInStock;
 
 
               return (
-                <div 
-                  key={product.id} 
+                <div
+                  key={product.id}
                   className="border border-gray-200 rounded-lg p-2 bg-white shadow-sm group"
                   onMouseEnter={() => handleProductHover(product.id)}
                   onMouseLeave={() => setHoveredProduct(null)}
                 >
-                  <div 
+                  <div
                     className={`relative w-full aspect-square cursor-pointer overflow-hidden rounded-lg mb-2 transition-opacity duration-200 ${
                       isCurrentlyNavigating ? 'opacity-75' : 'opacity-100'
                     }`}
@@ -335,7 +322,7 @@ export default function OfferProductsPage() {
                         <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-800 rounded-full animate-spin"></div>
                       </div>
                     )}
-                    
+
                     <Image
                       src={mainImage ? `${process.env.NEXT_PUBLIC_API_BASE_URL}${mainImage}` : '/images/placeholder.png'}
                       alt={product.product_name}
@@ -347,7 +334,7 @@ export default function OfferProductsPage() {
                       priority={false}
                       loading="lazy"
                     />
-                    
+
                     <Image
                       src={hoverImage ? `${process.env.NEXT_PUBLIC_API_BASE_URL}${hoverImage}` : '/images/placeholder.png'}
                       alt={`${product.product_name} - alternate view`}
@@ -358,13 +345,13 @@ export default function OfferProductsPage() {
                       }`}
                       loading="lazy"
                     />
-                    
-                    {!product.product_status || isProductEffectivelyOutOfStockForOffer ? ( // Use the new effective stock check for "Out of Stock" overlay
+
+                    {isProductEffectivelyOutOfStockForOffer ? (
                       <div className="absolute inset-0 bg-red-500/20 flex items-center justify-center">
                         <span className="bg-red-500 text-white text-xs px-2 py-1 rounded">Out of Stock</span>
                       </div>
                     ) : null}
-                    
+
                     {discount && (
                       <div className="absolute top-2 left-2 bg-green-500 text-white text-xs px-2 py-1 rounded z-10">
                         {discount}
@@ -377,9 +364,9 @@ export default function OfferProductsPage() {
                       </div>
                     )}
                   </div>
-                  
+
                   <div>
-                    <h3 
+                    <h3
                       className={`font-medium line-clamp-2 mb-1 cursor-pointer hover:text-blue-500 transition-colors ${
                         isCurrentlyNavigating ? 'text-gray-500' : ''
                       }`}
@@ -398,8 +385,7 @@ export default function OfferProductsPage() {
                         </>
                       )}
                     </div>
-                    {/* Pass the product to the button component for its internal logic */}
-                    <ProductSelectionButton product={product} /> 
+                    <ProductSelectionButton product={product} />
                   </div>
                 </div>
               );
@@ -407,9 +393,8 @@ export default function OfferProductsPage() {
           </div>
         </div>
 
-        {/* This is the desktop sidebar, which should always be present on desktop */}
         {!isMobile && (
-          <OfferCartSidebar 
+          <OfferCartSidebar
             offerData={offerData}
             slots={offerSlots}
             onSlotClear={handleSlotClear}
@@ -420,9 +405,9 @@ export default function OfferProductsPage() {
       </div>
 
       {isMobile && filledSlots.length > 0 && (
-        <div 
+        <div
           className="fixed bottom-0 left-0 right-0 bg-[var(--color-primary-950)] rounded-tr-2xl rounded-tl-2xl shadow-lg px-4 pt-4 pb-14 z-50"
-          onClick={() => setShowMobileSlider(true)} /* Clicking this bar opens the mobile slider */
+          onClick={() => setShowMobileSlider(true)}
         >
           <div
             className="flex items-center justify-between cursor-pointer"
@@ -463,6 +448,13 @@ export default function OfferProductsPage() {
       <CartDrawer
         isOpen={isCartDrawerOpen}
         onClose={() => setIsCartDrawerOpen(false)}
+      />
+
+      <VariantSelectionModal
+        isOpen={isVariantModalOpen}
+        onClose={() => setIsVariantModalOpen(false)}
+        product={productForVariantSelection}
+        onVariantSelected={handleAddProductToSlot}
       />
     </div>
   );

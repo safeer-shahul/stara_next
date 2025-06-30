@@ -1,3 +1,4 @@
+// AccountPage.tsx
 'use client';
 
 import { useState } from 'react';
@@ -7,8 +8,10 @@ import OrdersList from './components/OrdersList';
 import ChangePassword from './components/ChangePassword';
 import Support from './components/Support';
 import Wishlist from './components/Wishlist';
+import Complaints from './components/Complaints';
 
-type ActiveComponentType = 'orders' | 'change-password' | 'support' | 'wishlist' |  null;
+// Define ActiveComponentType once, here, to resolve the TypeScript error
+export type ActiveComponentType = 'orders' | 'change-password' | 'support' | 'wishlist' | 'complaints' | null;
 
 export default function AccountPage() {
   const [activeComponent, setActiveComponent] = useState<ActiveComponentType>(null);
@@ -24,6 +27,8 @@ export default function AccountPage() {
         return <Support />;
       case 'wishlist':
         return <Wishlist />;
+      case 'complaints':
+        return <Complaints />;
       default:
         return null;
     }

@@ -1,4 +1,3 @@
-// components/CartItem.tsx
 'use client';
 
 import { Plus, Minus, X, AlertCircle } from 'lucide-react';
@@ -9,33 +8,24 @@ type CartItemProps = {
   product: CartNormalItem;
   onRemove: (id: string) => void;
   onQuantityChange: (id: string, change: number) => void;
-  fromProductSummary?: boolean; // New prop
-  // NEW PROP: The calculated effective maximum quantity for this specific item in the cart
+  fromProductSummary?: boolean;
   maxAllowedQuantity?: number;
 };
 
 const CartItem = ({ product, onRemove, onQuantityChange, fromProductSummary = false, maxAllowedQuantity }: CartItemProps) => {
-  // `product.stock_quantity` is the total stock from the API.
-  // `maxAllowedQuantity` is the refined limit considering other items in the cart.
   const currentMaxLimit = typeof maxAllowedQuantity === 'number' ? maxAllowedQuantity : product.stock_quantity;
 
-  // `isOutOfStockOverall` checks if the product is fundamentally unavailable (e.g., API says 0 stock).
-  // This is separate from whether *this specific cart item* can be incremented further.
   const isOutOfStockOverall = product.stock_quantity <= 0 || !product.isInStock;
 
   const handleIncrement = () => {
-    // Only allow increment if the current quantity is less than the calculated effective limit
-    // AND the product is not completely out of stock overall.
     if (product.quantity < currentMaxLimit && !isOutOfStockOverall) {
       onQuantityChange(product.id, 1);
     } else if (product.quantity >= currentMaxLimit) {
-      // Optional: Add a toast/notification here if you want to explicitly tell the user why it's blocked.
       console.log(`Cannot add more of ${product.product_name}. Max available for your cart: ${currentMaxLimit}`);
     }
   };
 
   const handleDecrement = () => {
-    // Always allow decrement if quantity is greater than 1, regardless of stock
     if (product.quantity > 1) {
       onQuantityChange(product.id, -1);
     }
@@ -66,8 +56,13 @@ const CartItem = ({ product, onRemove, onQuantityChange, fromProductSummary = fa
 
       <div className="flex-1">
         <div className="flex justify-between items-start">
-          <h3 className="text-sm font-medium pr-2">{product.product_name}</h3>
-          {!fromProductSummary && ( // Conditionally render remove button
+          <h3 className="text-sm font-medium pr-2">
+            {product.product_name}
+            {product.selectedVariant && (
+              <span className="text-gray-500 text-xs ml-1"> (Size: {product.selectedVariant.variant_name})</span>
+            )}
+          </h3>
+          {!fromProductSummary && (
             <button
               onClick={() => onRemove(product.id)}
               className="bg-red-500 text-white cursor-pointer rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
@@ -100,20 +95,17 @@ const CartItem = ({ product, onRemove, onQuantityChange, fromProductSummary = fa
         </div>
       ) : (
         <div className="flex items-center mt-2 text-xs text-gray-600">
-          {/* Display the actual available quantity of the product */}
           Available Stock: {currentMaxLimit}
         </div>
       )
     ) : (
       <div className="flex items-center mt-2 text-xs text-gray-600">
-        {/* Display the actual quantity of the product */}
         Quantity: {product.quantity}
       </div>
     )}
 
 
-
-        {!fromProductSummary && ( // Conditionally render quantity controls
+        {!fromProductSummary && (
           <div className="flex items-center mt-2">
             <button
               className={`w-6 h-6 rounded-full border flex items-center justify-center ${
@@ -128,8 +120,6 @@ const CartItem = ({ product, onRemove, onQuantityChange, fromProductSummary = fa
             <span className="mx-2 text-sm font-medium">{product.quantity}</span>
 
             <button
-              // Disable if current quantity is at or above the calculated effective limit (currentMaxLimit)
-              // or if the product is fundamentally out of stock.
               className={`w-6 h-6 rounded-full border flex items-center justify-center ${
                 product.quantity >= currentMaxLimit || isOutOfStockOverall ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
               }`}

@@ -10,7 +10,7 @@ import CheckoutModal from '@/components/CheckoutModal';
 import apiService from '@/utils/api/apiService';
 import { useCart } from '@/context/cartContext';
 import { v4 as uuidv4 } from 'uuid';
-import { ProductItemDetails, CartNormalItem } from '@/context/cartContext';
+import { ProductItemDetails, CartNormalItem, ProductVariant } from '@/context/cartContext';
 
 // Import missing Lucide React icons
 import { AlertCircle, CheckCircle2, Star } from 'lucide-react';
@@ -41,18 +41,23 @@ export default function ProductDetailPage() {
   const productId = params.id as string;
   const fromOffer = searchParams.get('from') === 'offer';
 
-  const { dispatchCart } = useCart();
+  const { dispatchCart, getEffectiveProductStock } = useCart();
 
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
   const [isCheckoutOpen, setIsCheckoutToOpen] = useState<boolean>(false);
   const [product, setProduct] = useState<ProductItemDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedProductId, setSelectedProductId] = useState<string | null>(null); // For potential highlighting in CartDrawer
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
 
   // NEW STATES FOR DIRECT BUY NOW
   const [isDirectBuyCheckoutMode, setIsDirectBuyCheckoutMode] = useState<boolean>(false);
   const [directBuyProductData, setDirectBuyProductData] = useState<ProductItemDetails | null>(null);
+
+  // NEW STATES FOR VARIANTS
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
+  const [isProductAvailable, setIsProductAvailable] = useState<boolean>(false);
+
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -62,8 +67,22 @@ export default function ProductDetailPage() {
           const fetchedProduct: ProductItemDetails = await apiService.getProductByID(productId.replace(/-/g, ''));
           if (fetchedProduct) {
             fetchedProduct.isInStock = fetchedProduct.product_status && fetchedProduct.quantity > 0;
+            setProduct(fetchedProduct);
+
+            if (fetchedProduct.have_variants && fetchedProduct.product_variant && fetchedProduct.product_variant.length > 0) {
+              const firstAvailableVariant = fetchedProduct.product_variant.find(variant => variant.quantity > 0);
+              if (firstAvailableVariant) {
+                setSelectedVariant(firstAvailableVariant);
+                setIsProductAvailable(firstAvailableVariant.quantity > 0);
+              } else {
+                setSelectedVariant(null);
+                setIsProductAvailable(false);
+              }
+            } else {
+              setSelectedVariant(null);
+              setIsProductAvailable(fetchedProduct.quantity > 0 && fetchedProduct.product_status);
+            }
           }
-          setProduct(fetchedProduct);
         }
       } catch (err) {
         console.error('Error fetching product:', err);
@@ -79,43 +98,76 @@ export default function ProductDetailPage() {
   }, [productId]);
 
 
+  useEffect(() => {
+    if (product?.have_variants) {
+        setIsProductAvailable(selectedVariant ? selectedVariant.quantity > 0 : false);
+    } else if (product) {
+        setIsProductAvailable(product.quantity > 0 && product.product_status);
+    }
+  }, [selectedVariant, product]);
+
+
   const handleAddToBag = async () => {
-    if (product) {
-      setSelectedProductId(product.id); // For potential highlighting in cart drawer
+    if (product && isProductAvailable) {
+      const currentEffectiveStock = getEffectiveProductStock(product, selectedVariant?.id);
+      if (currentEffectiveStock <= 0) {
+          alert('This item is currently out of stock or you have reached the maximum quantity allowed in your cart.');
+          return;
+      }
+
+      setSelectedProductId(product.id);
       const tempCartItemId = uuidv4();
       dispatchCart({
         type: 'ADD_NORMAL_ITEM',
         payload: {
           id: tempCartItemId,
           product_id: product.id,
-          quantity: 1, // Always add 1 at a time from this button
+          quantity: 1,
           type: 'normal',
           isSynced: false,
           product_name: product.product_name,
           product_price: product.product_price,
           strike_price: product.strike_price,
           images: product.images,
-          isInStock: product.isInStock,
-          stock_quantity: product.quantity,
+          isInStock: selectedVariant ? selectedVariant.quantity > 0 : product.isInStock,
+          stock_quantity: selectedVariant?.quantity ?? product.quantity,
+          ...(selectedVariant && { selectedVariant: selectedVariant }),
+          productDetails: product, // Store full product details
+          created_at: new Date().toISOString(), // Add timestamps
+          updated_at: new Date().toISOString(),
         } as CartNormalItem,
       });
       setIsCartOpen(true);
-      setIsDirectBuyCheckoutMode(false); // Ensure this is false for cart-based checkout
+      setIsDirectBuyCheckoutMode(false);
     }
   };
 
   const handleBuyNow = async () => {
-    if (product) {
-      setDirectBuyProductData(product); // Store the product for direct buy
-      setIsDirectBuyCheckoutMode(true); // Indicate direct buy mode
-      setIsCheckoutToOpen(true); // Open the checkout modal
+    if (product && isProductAvailable) {
+        const currentEffectiveStock = getEffectiveProductStock(product, selectedVariant?.id);
+        if (currentEffectiveStock <= 0) {
+            alert('This item is currently out of stock or you have reached the maximum quantity allowed in your cart.');
+            return;
+        }
+
+      const productForDirectBuy = {
+        ...product,
+        ...(selectedVariant && {
+          quantity: selectedVariant.quantity,
+          selectedVariant: selectedVariant,
+        }),
+      } as ProductItemDetails;
+
+      setDirectBuyProductData(productForDirectBuy);
+      setIsDirectBuyCheckoutMode(true);
+      setIsCheckoutToOpen(true);
     }
   };
 
   const handleCheckoutClose = () => {
     setIsCheckoutToOpen(false);
-    setIsDirectBuyCheckoutMode(false); // Reset mode when modal closes
-    setDirectBuyProductData(null); // Clear direct buy product
+    setIsDirectBuyCheckoutMode(false);
+    setDirectBuyProductData(null);
   };
 
   const handleAddressSelected = (addressId: string): void => {
@@ -139,7 +191,7 @@ export default function ProductDetailPage() {
 
   const handleCartClose = () => {
     setIsCartOpen(false);
-    setSelectedProductId(null); // Reset selectedProductId after cart closes
+    setSelectedProductId(null);
   };
 
   if (isLoading) {
@@ -168,6 +220,11 @@ export default function ProductDetailPage() {
     const discount = ((originalPrice - currentPrice) / originalPrice) * 100;
     return `${Math.round(discount)}%`;
   };
+
+  const isActionButtonDisabled = !isProductAvailable || fromOffer ||
+                                 (product.have_variants && !selectedVariant) ||
+                                 (selectedVariant && selectedVariant.quantity <= 0);
+
 
   return (
     <div className="min-h-screen bg-white">
@@ -215,37 +272,57 @@ export default function ProductDetailPage() {
               <span className="font-medium">Product Code:</span> {product.product_code}
             </div>
 
-            {product.product_status && product.quantity > 0 ? (
+            {/* Variant Selection Section */}
+            {product.have_variants && product.product_variant && product.product_variant.length > 0 && (
+              <div className="pt-4">
+                <h3 className="text-base font-medium mb-2">Select Size:</h3>
+                <div className="flex flex-wrap gap-2">
+                  {product.product_variant.map((variant) => (
+                    <button
+                      key={variant.id}
+                      className={`px-4 py-2 text-sm rounded-md border ${
+                        selectedVariant?.id === variant.id
+                          ? 'border-black bg-black text-white'
+                          : 'border-gray-300 text-gray-700'
+                      } ${variant.quantity === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      onClick={() => setSelectedVariant(variant)}
+                      disabled={variant.quantity === 0}
+                    >
+                      {variant.variant_name} {variant.quantity === 0 && '(Out of Stock)'}
+                    </button>
+                  ))}
+                </div>
+                {!selectedVariant && product.product_variant.length > 0 && (
+                  <p className="text-sm text-red-500 mt-2">Please select a size.</p>
+                )}
+                {selectedVariant && selectedVariant.quantity === 0 && (
+                    <p className="text-sm text-red-500 mt-2">Selected size is out of stock.</p>
+                )}
+              </div>
+            )}
+
+
+            {isProductAvailable ? (
               <div className="flex items-center text-sm space-x-2">
                 <CheckCircle2 className="text-[#2e7e52] flex-shrink-0" />
                 <span className="text-[14px]">In stock - ready to ship</span>
               </div>
             ) : (
-                <div className="flex items-center text-sm space-x-2 text-red-500">
-                    <AlertCircle className="flex-shrink-0" size={16} />
-                    <span className="text-[14px]">Out of Stock</span>
-                </div>
+              <div className="flex items-center text-sm space-x-2 text-red-500">
+                <AlertCircle className="flex-shrink-0" size={16} />
+                <span className="text-[14px]">Out of Stock</span>
+              </div>
             )}
 
-            {product.product_status && product.quantity > 0 && !fromOffer ? (
-              <div className="py-2">
+            <div className="py-2">
                 <AddToCartButton
                   productId={product.id}
                   onAddToBag={handleAddToBag}
                   onBuyNow={handleBuyNow}
+                  disabled={isActionButtonDisabled}
                 />
-              </div>
-            ) : product.product_status && product.quantity > 0 && fromOffer ? (
-              <div className="py-4 text-center bg-gray-100 rounded-md text-gray-500 font-medium">
-                Select this product from the offer page
-              </div>
-            ) : (
-              <div className="py-4 text-center bg-gray-100 rounded-md text-red-500 font-medium">
-                Out of Stock
-              </div>
-            )}
+            </div>
 
-            {/* Replaced `onClick={openModal}` with `onClick={() => null}` as openModal is not defined */}
             <div className="flex items-center justify-between pt-2 cursor-pointer" onClick={() => null}>
               <p className="text-sm flex-1 truncate pr-4">Details: {product.product_description}</p>
               <span className="text-[#C69A7F] text-sm underline flex-shrink-0">View More</span>
@@ -290,19 +367,13 @@ export default function ProductDetailPage() {
       <CartDrawer
         isOpen={isCartOpen}
         onClose={handleCartClose}
-        // productId={selectedProductId} // Keep this if CartDrawer needs to highlight a product
       />
 
       <CheckoutModal
         isOpen={isCheckoutOpen}
         onClose={handleCheckoutClose}
         onProceed={handleAddressSelected}
-        // Only pass buyNowProduct if it's a direct buy.
         buyNowProduct={isDirectBuyCheckoutMode ? directBuyProductData : undefined}
-        // IMPORTANT: For 'buy_now' mode, do NOT pass `normalItemsForCheckout` or `offerSetsForCheckout`.
-        // For 'cart' mode, these props ARE expected by CheckoutModal from CartDrawer.
-        // We handle this by making them optional in CheckoutModalProps.
-        // ProductDetailPage only concerns itself with `buyNowProduct`.
         checkoutMode={isDirectBuyCheckoutMode ? 'buy_now' : 'cart'}
       />
     </div>

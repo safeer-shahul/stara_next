@@ -2,10 +2,9 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth'; // NEW: Import for Firebase Google Auth
-import { auth } from './firebase/config'; // NEW: Import Firebase auth instance
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { auth } from './firebase/config';
 import apiService from '@/utils/api/apiService';
-import { useCart } from '@/context/cartContext';
 
 interface RegisterProps {
   onClose: () => void;
@@ -15,7 +14,6 @@ interface RegisterProps {
 
 const Register = ({ onClose, switchToLogin, onRegisterSuccess }: RegisterProps) => {
   const router = useRouter();
-  const { dispatchCart } = useCart();
 
   const [formData, setFormData] = useState({
     username: '',
@@ -26,7 +24,7 @@ const Register = ({ onClose, switchToLogin, onRegisterSuccess }: RegisterProps) 
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [passwordsMatchError, setPasswordsMatchError] = useState(''); // NEW: State for real-time password match error
+  const [passwordsMatchError, setPasswordsMatchError] = useState('');
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -36,16 +34,26 @@ const Register = ({ onClose, switchToLogin, onRegisterSuccess }: RegisterProps) 
         [name]: value,
       };
 
-      // NEW: Real-time password matching check
+      // Real-time password matching check
       if (name === 'password' || name === 'confirmPassword') {
         if (newFormData.password && newFormData.confirmPassword && newFormData.password !== newFormData.confirmPassword) {
           setPasswordsMatchError('Passwords do not match.');
         } else {
-          setPasswordsMatchError(''); // Clear error if they match or one is empty
+          setPasswordsMatchError('');
         }
       }
       return newFormData;
     });
+  };
+
+  const handleSuccessfulRegistration = async () => {
+    try {
+      console.log('Registration successful - cart will sync automatically');
+      onRegisterSuccess();
+    } catch (error) {
+      console.error('Error after registration:', error);
+      onRegisterSuccess();
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -61,7 +69,7 @@ const Register = ({ onClose, switchToLogin, onRegisterSuccess }: RegisterProps) 
     setIsLoading(true);
 
     try {
-      // Direct fetch call for user registration
+      // Use apiService for registration instead of direct fetch
       const response = await fetch('/api/auth/register', { // Assuming this is your API route or proxy
         method: 'POST',
         headers: {
@@ -77,10 +85,7 @@ const Register = ({ onClose, switchToLogin, onRegisterSuccess }: RegisterProps) 
 
       const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.message || data.detail || 'Registration failed.');
-      }
-
+      // Store tokens if provided
       if (data.access) {
         localStorage.setItem('accessToken', data.access);
       }
@@ -88,25 +93,24 @@ const Register = ({ onClose, switchToLogin, onRegisterSuccess }: RegisterProps) 
         localStorage.setItem('refreshToken', data.refresh);
       }
 
-      dispatchCart({ type: 'TRIGGER_SYNC' });
-      onRegisterSuccess();
+      // Handle successful registration
+      await handleSuccessfulRegistration();
 
     } catch (err: any) {
       console.error('Registration failed:', err);
-      setError(err.message || 'An unexpected error occurred during registration.');
+      setError(err.detail || err.message || 'An unexpected error occurred during registration.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // NEW: handleGoogleSignup now mirrors Login's handleGoogleLogin
   const handleGoogleSignup = async () => {
     setIsLoading(true);
     setError('');
 
     try {
       const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: 'select_account' }); // Always prompt account selection
+      provider.setCustomParameters({ prompt: 'select_account' });
 
       const result = await signInWithPopup(auth, provider);
       const idToken = await result.user.getIdToken();
@@ -114,18 +118,22 @@ const Register = ({ onClose, switchToLogin, onRegisterSuccess }: RegisterProps) 
       // Verify Firebase ID token with your Django backend
       const response = await apiService.googleKeyVerify({ idToken });
 
-      // Save tokens from Django API response
+      // Store tokens from Django API response
       localStorage.setItem('accessToken', response.access_token);
       localStorage.setItem('refreshToken', response.refresh_token);
 
-      // Fetch user profile if needed (though onLoginSuccess might handle this globally)
-      const userProfile = await apiService.getUserProfile();
-      localStorage.setItem('me', JSON.stringify(userProfile));
+      // Fetch and store user profile
+      try {
+        const userProfile = await apiService.getUserProfile();
+        localStorage.setItem('me', JSON.stringify(userProfile));
+      } catch (profileError) {
+        console.warn('Failed to fetch user profile:', profileError);
+        // Continue with registration even if profile fetch fails
+      }
 
-      // Trigger cart synchronization after successful Google signup
-      dispatchCart({ type: 'TRIGGER_SYNC' });
+      // Handle successful registration
+      await handleSuccessfulRegistration();
 
-      onRegisterSuccess();
     } catch (err) {
       console.error('Google signup error:', err);
       let errorMessage = 'Failed to sign up with Google.';
@@ -156,7 +164,7 @@ const Register = ({ onClose, switchToLogin, onRegisterSuccess }: RegisterProps) 
       <button
         onClick={handleGoogleSignup}
         disabled={isLoading}
-        className="w-full flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-50 mb-4 transition duration-200"
+        className="w-full flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-50 mb-4 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
           <g transform="matrix(1, 0, 0, 1, 27.009001, -39.238998)">
@@ -166,7 +174,7 @@ const Register = ({ onClose, switchToLogin, onRegisterSuccess }: RegisterProps) 
             <path fill="#EA4335" d="M -14.754 43.989 C -12.984 43.989 -11.404 44.599 -10.154 45.789 L -6.734 42.369 C -8.804 40.429 -11.514 39.239 -14.754 39.239 C -19.444 39.239 -23.494 41.939 -25.464 45.859 L -21.484 48.949 C -20.534 46.099 -17.884 43.989 -14.754 43.989 Z" />
           </g>
         </svg>
-        Sign up with Google
+        {isLoading ? 'Creating Account...' : 'Sign up with Google'}
       </button>
 
       <div className="relative my-4">
@@ -191,6 +199,7 @@ const Register = ({ onClose, switchToLogin, onRegisterSuccess }: RegisterProps) 
             onChange={handleChange}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200"
             required
+            disabled={isLoading}
           />
         </div>
 
@@ -206,6 +215,7 @@ const Register = ({ onClose, switchToLogin, onRegisterSuccess }: RegisterProps) 
             onChange={handleChange}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200"
             required
+            disabled={isLoading}
           />
         </div>
 
@@ -221,6 +231,7 @@ const Register = ({ onClose, switchToLogin, onRegisterSuccess }: RegisterProps) 
             onChange={handleChange}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200"
             required
+            disabled={isLoading}
           />
         </div>
 
@@ -236,6 +247,7 @@ const Register = ({ onClose, switchToLogin, onRegisterSuccess }: RegisterProps) 
             onChange={handleChange}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200"
             required
+            disabled={isLoading}
           />
         </div>
 
@@ -249,10 +261,10 @@ const Register = ({ onClose, switchToLogin, onRegisterSuccess }: RegisterProps) 
             type="password"
             value={formData.confirmPassword}
             onChange={handleChange}
-            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200 ${passwordsMatchError ? 'border-red-500' : 'border-gray-300'}`} // NEW: Apply red border on error
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200 ${passwordsMatchError ? 'border-red-500' : 'border-gray-300'}`}
             required
+            disabled={isLoading}
           />
-          {/* NEW: Display real-time password match error */}
           {passwordsMatchError && (
             <p className="text-red-500 text-xs mt-1">{passwordsMatchError}</p>
           )}
@@ -282,6 +294,7 @@ const Register = ({ onClose, switchToLogin, onRegisterSuccess }: RegisterProps) 
         <button
           onClick={switchToLogin}
           className="text-[var(--color-primary-950)] hover:underline focus:outline-none font-medium"
+          disabled={isLoading}
         >
           Sign in
         </button>
