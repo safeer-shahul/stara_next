@@ -23,10 +23,12 @@ export default function OfferCartItem({ offerSet, onRemove, fromProductSummary =
     offerSet.offer_items.forEach(item => {
       const itemTotal = parseFloat(item.product_price || '0') * item.quantity;
       
-      if (item.isPaid) {
+      // Fix: Check isPaid correctly - it should be explicitly true for paid items
+      if (item.isPaid === true) {
         payableTotal += itemTotal;
         totalPaidItems += item.quantity;
       } else {
+        // isPaid is false or undefined - these are free items
         savings += itemTotal;
         totalFreeItems += item.quantity;
       }
@@ -44,6 +46,12 @@ export default function OfferCartItem({ offerSet, onRemove, fromProductSummary =
 
   const handleRemove = async () => {
     if (onRemove) {
+      console.log('OfferCartItem: Removing offer item with ID:', offerSet.id);
+      console.log('OfferCartItem: Offer details:', {
+        offerId: offerSet.offer,
+        offerName: offerSet.offer_name.offer_name,
+        itemId: offerSet.id
+      });
       await onRemove(offerSet.id);
     }
   };
@@ -69,12 +77,19 @@ export default function OfferCartItem({ offerSet, onRemove, fromProductSummary =
     selectedVariant?: ProductVariant;
     isPaid?: boolean;
   }) => {
-    // The isPaid flag comes directly from backend processing of buy_products vs get_products
+    // Fix: Check isPaid flag correctly
+    console.log('OfferCartItem: Product isPaid status:', product.product_name, 'isPaid:', product.isPaid);
     return {
-      isPaid: product.isPaid || false,
+      isPaid: product.isPaid === true, // Explicitly check for true
       quantity: product.quantity
     };
   };
+
+  console.log('OfferCartItem: Rendering offer with items:', offerSet.offer_items.map(item => ({
+    name: item.product_name,
+    isPaid: item.isPaid,
+    quantity: item.quantity
+  })));
 
   return (
     <div className="bg-white rounded-lg py-2 px-4 mb-4 border border-gray-200">
@@ -114,10 +129,16 @@ export default function OfferCartItem({ offerSet, onRemove, fromProductSummary =
                   className="object-cover"
                   sizes="48px"
                 />
-                {/* Free badge for free items */}
+                {/* Free badge for free items - Fix: Check isPaid correctly */}
                 {!isPaid && (
                   <div className="absolute top-0 right-0 bg-green-500 text-white text-[8px] px-1 py-0.5 rounded-bl">
                     FREE
+                  </div>
+                )}
+                {/* Paid badge for paid items */}
+                {isPaid && (
+                  <div className="absolute top-0 right-0 bg-blue-500 text-white text-[8px] px-1 py-0.5 rounded-bl">
+                    PAID
                   </div>
                 )}
               </div>
@@ -129,7 +150,7 @@ export default function OfferCartItem({ offerSet, onRemove, fromProductSummary =
                   )}
                 </p>
                 
-                {/* Show status and quantity */}
+                {/* Show status and quantity - Fix: Use correct isPaid logic */}
                 <div className="text-[10px] mt-1">
                   {isPaid ? (
                     <span className="text-blue-600 font-medium">Paid: {quantity}</span>
@@ -139,6 +160,7 @@ export default function OfferCartItem({ offerSet, onRemove, fromProductSummary =
                 </div>
 
                 <div className="flex items-center mt-1">
+                  {/* Fix: Show pricing based on isPaid status */}
                   {!isPaid ? (
                     <p className="text-xs font-bold text-green-600 mr-1">FREE</p>
                   ) : (
@@ -173,10 +195,26 @@ export default function OfferCartItem({ offerSet, onRemove, fromProductSummary =
           </div>
         )}
         <div className="flex justify-between font-semibold text-sm">
-          <span>Offer Total:</span>
+          <span>You Pay:</span>
           <span>₹{payableTotal.toLocaleString('en-IN')}</span>
         </div>
+        {totalPaidItems > 0 && (
+          <div className="text-[10px] text-gray-500 mt-1">
+            ({totalPaidItems} paid item{totalPaidItems !== 1 ? 's' : ''}{totalFreeItems > 0 ? ` + ${totalFreeItems} free` : ''})
+          </div>
+        )}
       </div>
+
+      {/* Debug Info (remove in production) */}
+      {/* {process.env.NODE_ENV === 'development' && (
+        <div className="mt-2 p-2 bg-yellow-50 rounded text-[10px]">
+          <div>Debug Info:</div>
+          <div>Paid Total: ₹{payableTotal}, Free Total: ₹{savings}</div>
+          <div>Items: {offerSet.offer_items.map((item, i) => 
+            `${i + 1}. ${item.product_name}: isPaid=${item.isPaid}`
+          ).join(', ')}</div>
+        </div>
+      )} */}
     </div>
   );
 }

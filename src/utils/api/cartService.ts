@@ -50,9 +50,9 @@ interface OfferDetailsFromBackend {
   offer_image: string;
 }
 
-// Helper to aggregate products in an offer for display
+// Helper to aggregate products WITHIN a single offer item (not across offer items)
 // IMPORTANT: Do NOT aggregate products with different isPaid status
-const _aggregateOfferProducts = (productsToAggregate: (ProductItemDetails & { 
+const _aggregateProductsWithinOffer = (productsToAggregate: (ProductItemDetails & { 
   quantity: number; 
   selectedVariant?: ProductVariant;
   isPaid?: boolean;
@@ -109,6 +109,7 @@ export const cartService = {
 
         rawCartDataFromSource = [...normalItems, ...offerItems];
         console.log("cartService: Raw cart data combined:", rawCartDataFromSource.length, "items");
+        console.log("cartService: Normal items:", normalItems.length, "Offer items:", offerItems.length);
       } else {
         console.log("cartService: Loading cart from localStorage for guest user");
         const storedItems = localStorage.getItem('cartItems');
@@ -221,9 +222,9 @@ export const cartService = {
         })
         .map((item: BackendCombinedRawItem) => {
           if ('buy_products' in item && item.buy_products !== undefined) {
-            // Process offer item
+            // Process offer item - EACH OFFER ITEM IS SEPARATE
             const offerItem = item as BackendRawOfferCartItem;
-            console.log("cartService: Processing offer item:", offerItem.id);
+            console.log("cartService: Processing offer item:", offerItem.id, "with offer:", offerItem.offer);
             
             const offerDetails = validOffersMap.get(offerItem.offer.replace(/-/g, ''));
             if (!offerDetails) {
@@ -279,12 +280,15 @@ export const cartService = {
               }
             });
 
-            const aggregatedOfferItems = _aggregateOfferProducts(productsInOfferBundle);
+            // Aggregate products ONLY within this single offer item
+            const aggregatedOfferItems = _aggregateProductsWithinOffer(productsInOfferBundle);
             
             if (aggregatedOfferItems.length === 0) {
               console.warn(`cartService: No valid products found for offer item after aggregation`);
               return null;
             }
+
+            console.log(`cartService: Created offer item with ${aggregatedOfferItems.length} aggregated products`);
 
             return {
               id: offerItem.id,
@@ -347,7 +351,10 @@ export const cartService = {
         })
         .filter((item): item is CartItemType => item !== null) as CartItemType[];
 
-      console.log("cartService: Enriched cart items:", enrichedCartItems.length);
+      console.log("cartService: Final enriched cart items:", enrichedCartItems.length);
+      console.log("cartService: Normal items:", enrichedCartItems.filter(i => i.type === 'normal').length);
+      console.log("cartService: Offer items:", enrichedCartItems.filter(i => i.type === 'offer').length);
+      
       return enrichedCartItems;
 
     } catch (error) {
@@ -375,18 +382,14 @@ export const cartService = {
     }
   },
 
+  // Force refresh cart from backend (call this after add/remove operations)
+  refreshCartFromBackend: async (): Promise<CartItemType[]> => {
+    console.log("cartService: Force refreshing cart from backend");
+    return await cartService.fetchCartFromBackend();
+  },
+
   pushLocalCartToBackend: async (localUnsyncedItems: CartItemType[]): Promise<void> => {
     console.log("cartService: Pushing", localUnsyncedItems.length, "unsynced items to backend");
-    
-    // Get current backend cart to compare
-    let backendCart: CartItemType[] = [];
-    try {
-      const backendCartResponse = await apiService.getUserCart();
-      // We need to process backend response to compare properly
-      // For now, we'll proceed with pushing local items
-    } catch (error) {
-      console.warn("cartService: Could not fetch backend cart for comparison:", error);
-    }
     
     for (const item of localUnsyncedItems) {
       try {
@@ -437,10 +440,37 @@ export const cartService = {
     console.log("cartService: Finished pushing local items to backend");
   },
 
-  addToCart: async (payload: { product_id?: string; mode: string; item_id?: string; variant_id?: string }) => {
+  addToCart: async (payload: { product_id?: string; mode: string; item_id?: string; variant_id?: string; is_cart?: string }) => {
     console.log("cartService: Calling apiService.addToCart with payload:", payload);
     const response = await apiService.addToCart(payload);
     console.log("cartService: apiService.addToCart response:", response);
+    return response;
+  },
+
+  // New method specifically for removing offer items
+  removeOfferItem: async (offerItemId: string): Promise<any> => {
+    console.log("cartService: Removing offer item with ID:", offerItemId);
+    const payload = {
+      mode: 'delete',
+      item_id: offerItemId.replace(/-/g, ''),
+      is_offer: 'yes'
+    };
+    console.log("cartService: Remove offer payload:", payload);
+    const response = await apiService.addToCart(payload);
+    console.log("cartService: Remove offer response:", response);
+    return response;
+  },
+
+  // Method for removing normal items (existing logic)
+  removeNormalItem: async (normalItemId: string): Promise<any> => {
+    console.log("cartService: Removing normal item with ID:", normalItemId);
+    const payload = {
+      mode: 'delete',
+      item_id: normalItemId.replace(/-/g, '')
+    };
+    console.log("cartService: Remove normal payload:", payload);
+    const response = await apiService.addToCart(payload);
+    console.log("cartService: Remove normal response:", response);
     return response;
   },
 };

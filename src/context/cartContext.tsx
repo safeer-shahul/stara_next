@@ -4,7 +4,7 @@ import apiService from '@/utils/api/apiService';
 import { cartService } from '@/utils/api/cartService';
 import { v4 as uuidv4 } from 'uuid';
 
-// --- Type Definitions ---
+// ... [Keep all existing type definitions from original cartContext.tsx] ...
 export interface ProductImage {
   id: string;
   product_image: string;
@@ -86,7 +86,8 @@ export type CartAction =
   | { type: 'UPDATE_ITEM_QUANTITY'; payload: { id: string; quantity: number } }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'CLEAR_CART' }
-  | { type: 'TRIGGER_SYNC' };
+  | { type: 'TRIGGER_SYNC' }
+  | { type: 'FORCE_REFRESH' }; // New action for forced refresh
 
 // --- Cart State and Context ---
 interface CartState {
@@ -99,6 +100,7 @@ interface CartContextType extends CartState {
   getTotalProductQuantitiesInCart: () => Map<string, number>;
   getEffectiveProductStock: (productDetails: ProductItemDetails, variantId?: string) => number;
   syncCart: () => Promise<void>;
+  forceRefreshCart: () => Promise<void>; // New method for forced refresh
   clearCart: () => Promise<void>;
   calculateTotals: () => {
     normalSubtotal: number;
@@ -254,6 +256,10 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
       console.log('Reducer: TRIGGER_SYNC - will trigger sync in useEffect');
       return state;
 
+    case 'FORCE_REFRESH':
+      console.log('Reducer: FORCE_REFRESH - will trigger force refresh in useEffect');
+      return state;
+
     default:
       console.warn(`Unhandled action type: ${(action as { type: string }).type}`);
       return state;
@@ -282,6 +288,7 @@ const useDebounce = (callback: Function, delay: number) => {
 export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   const [state, dispatch] = useReducer(cartReducer, initialState);
   const [syncRequested, setSyncRequested] = useState(false);
+  const [forceRefreshRequested, setForceRefreshRequested] = useState(false);
   const isInitialized = useRef(false);
   const isSyncing = useRef(false);
   const prevAccessTokenRef = useRef<string | null>(null);
@@ -342,6 +349,30 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, []);
 
+  // Force refresh cart from backend
+  const forceRefreshCart = useCallback(async () => {
+    if (isSyncing.current) {
+      console.log('Sync already in progress, skipping force refresh');
+      return;
+    }
+
+    isSyncing.current = true;
+    dispatch({ type: 'SET_LOADING', payload: true });
+
+    try {
+      console.log('Force refreshing cart from backend...');
+      const freshCartItems = await cartService.refreshCartFromBackend();
+      console.log('Force refresh completed. Items:', freshCartItems.length);
+      dispatch({ type: 'SET_CART_ITEMS', payload: freshCartItems });
+    } catch (error) {
+      console.error('Force refresh failed:', error);
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
+      isSyncing.current = false;
+      setForceRefreshRequested(false);
+    }
+  }, []);
+
   // Sync with backend - INTELLIGENT SYNC WITH STOCK VALIDATION
   const syncCart = useCallback(async () => {
     if (isSyncing.current) {
@@ -368,16 +399,22 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       console.log('Local cart items:', localCart.length);
       console.log('Backend cart items:', backendCart.length);
 
+      // For offers, always trust backend data since it's more complex
+      // For normal items, use intelligent merge
+      const finalCart: CartItemType[] = [];
+
+      // Get all offer items from backend (always trust backend for offers)
+      const backendOfferItems = backendCart.filter(item => item.type === 'offer') as CartOfferItem[];
+      finalCart.push(...backendOfferItems);
+
+      // For normal items, do intelligent merge
+      const localNormalItems = localCart.filter(item => item.type === 'normal') as CartNormalItem[];
+      const backendNormalItems = backendCart.filter(item => item.type === 'normal') as CartNormalItem[];
+
       // Collect all unique product IDs to fetch fresh stock data
       const allProductIds = new Set<string>();
-      [...localCart, ...backendCart].forEach(item => {
-        if (item.type === 'normal') {
-          allProductIds.add(item.product_id.replace(/-/g, ''));
-        } else if (item.type === 'offer') {
-          item.offer_items.forEach(offerProduct => {
-            allProductIds.add(offerProduct.id.replace(/-/g, ''));
-          });
-        }
+      [...localNormalItems, ...backendNormalItems].forEach(item => {
+        allProductIds.add(item.product_id.replace(/-/g, ''));
       });
 
       // Fetch fresh product data with current stock
@@ -426,36 +463,26 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
         return productData.quantity || 0;
       };
 
-      // Helper function to get total quantity from offer items
-      const getOfferTotalQuantity = (offerItem: CartOfferItem): number => {
-        return offerItem.offer_items.reduce((total, product) => total + product.quantity, 0);
-      };
-
       // Create maps for easier comparison (product_id + variant_id as key)
-      const createItemKey = (item: CartItemType) => {
-        if (item.type === 'normal') {
-          const variantId = item.selectedVariant?.id || 'no-variant';
-          return `${item.product_id}-${variantId}`;
-        } else {
-          return `offer-${item.offer}`;
-        }
+      const createItemKey = (item: CartNormalItem) => {
+        const variantId = item.selectedVariant?.id || 'no-variant';
+        return `${item.product_id}-${variantId}`;
       };
 
-      const localMap = new Map<string, CartItemType>();
-      const backendMap = new Map<string, CartItemType>();
+      const localMap = new Map<string, CartNormalItem>();
+      const backendMap = new Map<string, CartNormalItem>();
 
-      localCart.forEach(item => {
+      localNormalItems.forEach(item => {
         const key = createItemKey(item);
         localMap.set(key, item);
       });
 
-      backendCart.forEach(item => {
+      backendNormalItems.forEach(item => {
         const key = createItemKey(item);
         backendMap.set(key, item);
       });
 
-      const finalCart: CartItemType[] = [];
-      const itemsToAddToBackend: CartItemType[] = [];
+      const itemsToAddToBackend: CartNormalItem[] = [];
       const itemsToUpdateInBackend: { item: CartNormalItem; newQuantity: number }[] = [];
       const stockWarnings: string[] = [];
 
@@ -468,102 +495,82 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
 
         if (localItem && backendItem) {
           // Item exists in both - compare quantities with stock validation
-          if (localItem.type === 'normal' && backendItem.type === 'normal') {
-            const localQty = localItem.quantity;
-            const backendQty = backendItem.quantity;
-            const availableStock = getAvailableStock(localItem);
+          const localQty = localItem.quantity;
+          const backendQty = backendItem.quantity;
+          const availableStock = getAvailableStock(localItem);
 
-            // Determine the desired quantity (higher of the two)
-            const desiredQty = Math.max(localQty, backendQty);
-            
-            // Apply stock limit
-            const finalQty = Math.min(desiredQty, availableStock);
+          // Determine the desired quantity (higher of the two)
+          const desiredQty = Math.max(localQty, backendQty);
+          
+          // Apply stock limit
+          const finalQty = Math.min(desiredQty, availableStock);
 
-            if (finalQty < desiredQty) {
-              const productName = localItem.product_name;
-              const variantInfo = localItem.selectedVariant ? ` (${localItem.selectedVariant.variant_name})` : '';
-              stockWarnings.push(`${productName}${variantInfo}: Reduced quantity from ${desiredQty} to ${finalQty} due to stock limit`);
-              console.log(`Stock limit applied for ${key}: desired ${desiredQty}, available ${availableStock}, final ${finalQty}`);
-            }
-
-            if (finalQty === 0) {
-              // Remove item completely if no stock
-              const productName = localItem.product_name;
-              const variantInfo = localItem.selectedVariant ? ` (${localItem.selectedVariant.variant_name})` : '';
-              stockWarnings.push(`${productName}${variantInfo}: Removed from cart - out of stock`);
-              console.log(`Removing item ${key} - no stock available`);
-              continue; // Skip adding to final cart
-            }
-
-            // Create the final item with validated quantity
-            const finalItem = { ...localItem, quantity: finalQty };
-
-            if (localQty > backendQty && finalQty !== backendQty) {
-              // Need to update backend
-              console.log(`Updating backend quantity for ${key}: ${backendQty} -> ${finalQty}`);
-              itemsToUpdateInBackend.push({ item: finalItem, newQuantity: finalQty });
-            }
-
-            finalCart.push(finalItem);
-          } else {
-            // For offers, use backend version (assuming it's authoritative)
-            finalCart.push(backendItem);
+          if (finalQty < desiredQty) {
+            const productName = localItem.product_name;
+            const variantInfo = localItem.selectedVariant ? ` (${localItem.selectedVariant.variant_name})` : '';
+            stockWarnings.push(`${productName}${variantInfo}: Reduced quantity from ${desiredQty} to ${finalQty} due to stock limit`);
+            console.log(`Stock limit applied for ${key}: desired ${desiredQty}, available ${availableStock}, final ${finalQty}`);
           }
+
+          if (finalQty === 0) {
+            // Remove item completely if no stock
+            const productName = localItem.product_name;
+            const variantInfo = localItem.selectedVariant ? ` (${localItem.selectedVariant.variant_name})` : '';
+            stockWarnings.push(`${productName}${variantInfo}: Removed from cart - out of stock`);
+            console.log(`Removing item ${key} - no stock available`);
+            continue; // Skip adding to final cart
+          }
+
+          // Create the final item with validated quantity
+          const finalItem = { ...localItem, quantity: finalQty };
+
+          if (localQty > backendQty && finalQty !== backendQty) {
+            // Need to update backend
+            console.log(`Updating backend quantity for ${key}: ${backendQty} -> ${finalQty}`);
+            itemsToUpdateInBackend.push({ item: finalItem, newQuantity: finalQty });
+          }
+
+          finalCart.push(finalItem);
         } else if (localItem && !backendItem) {
           // Item exists only in local - validate stock before adding to backend
-          if (localItem.type === 'normal') {
-            const normalLocalItem = localItem as CartNormalItem;
-            const availableStock = getAvailableStock(normalLocalItem);
-            const finalQty = Math.min(normalLocalItem.quantity, availableStock);
+          const availableStock = getAvailableStock(localItem);
+          const finalQty = Math.min(localItem.quantity, availableStock);
 
-            if (finalQty < normalLocalItem.quantity) {
-              const productName = normalLocalItem.product_name;
-              const variantInfo = normalLocalItem.selectedVariant ? ` (${normalLocalItem.selectedVariant.variant_name})` : '';
-              stockWarnings.push(`${productName}${variantInfo}: Reduced quantity from ${normalLocalItem.quantity} to ${finalQty} due to stock limit`);
-            }
+          if (finalQty < localItem.quantity) {
+            const productName = localItem.product_name;
+            const variantInfo = localItem.selectedVariant ? ` (${localItem.selectedVariant.variant_name})` : '';
+            stockWarnings.push(`${productName}${variantInfo}: Reduced quantity from ${localItem.quantity} to ${finalQty} due to stock limit`);
+          }
 
-            if (finalQty > 0) {
-              const finalItem = { ...normalLocalItem, quantity: finalQty };
-              console.log(`Adding local item to backend with stock validation: ${key} (qty: ${finalQty})`);
-              itemsToAddToBackend.push(finalItem);
-              finalCart.push(finalItem);
-            } else {
-              const productName = normalLocalItem.product_name;
-              const variantInfo = normalLocalItem.selectedVariant ? ` (${normalLocalItem.selectedVariant.variant_name})` : '';
-              stockWarnings.push(`${productName}${variantInfo}: Removed from cart - out of stock`);
-            }
+          if (finalQty > 0) {
+            const finalItem = { ...localItem, quantity: finalQty };
+            console.log(`Adding local item to backend with stock validation: ${key} (qty: ${finalQty})`);
+            itemsToAddToBackend.push(finalItem);
+            finalCart.push(finalItem);
           } else {
-            // For offers, add as-is (offer stock validation is more complex)
-            const offerLocalItem = localItem as CartOfferItem;
-            itemsToAddToBackend.push(offerLocalItem);
-            finalCart.push(offerLocalItem);
+            const productName = localItem.product_name;
+            const variantInfo = localItem.selectedVariant ? ` (${localItem.selectedVariant.variant_name})` : '';
+            stockWarnings.push(`${productName}${variantInfo}: Removed from cart - out of stock`);
           }
         } else if (!localItem && backendItem) {
           // Item exists only in backend - validate stock before adding to local
-          if (backendItem.type === 'normal') {
-            const normalBackendItem = backendItem as CartNormalItem;
-            const availableStock = getAvailableStock(normalBackendItem);
-            const finalQty = Math.min(normalBackendItem.quantity, availableStock);
+          const availableStock = getAvailableStock(backendItem);
+          const finalQty = Math.min(backendItem.quantity, availableStock);
 
-            if (finalQty < normalBackendItem.quantity) {
-              const productName = normalBackendItem.product_name;
-              const variantInfo = normalBackendItem.selectedVariant ? ` (${normalBackendItem.selectedVariant.variant_name})` : '';
-              stockWarnings.push(`${productName}${variantInfo}: Reduced quantity from ${normalBackendItem.quantity} to ${finalQty} due to stock limit`);
-            }
+          if (finalQty < backendItem.quantity) {
+            const productName = backendItem.product_name;
+            const variantInfo = backendItem.selectedVariant ? ` (${backendItem.selectedVariant.variant_name})` : '';
+            stockWarnings.push(`${productName}${variantInfo}: Reduced quantity from ${backendItem.quantity} to ${finalQty} due to stock limit`);
+          }
 
-            if (finalQty > 0) {
-              const finalItem = { ...normalBackendItem, quantity: finalQty };
-              console.log(`Adding backend item to local with stock validation: ${key} (qty: ${finalQty})`);
-              finalCart.push(finalItem);
-            } else {
-              const productName = normalBackendItem.product_name;
-              const variantInfo = normalBackendItem.selectedVariant ? ` (${normalBackendItem.selectedVariant.variant_name})` : '';
-              stockWarnings.push(`${productName}${variantInfo}: Removed from cart - out of stock`);
-            }
+          if (finalQty > 0) {
+            const finalItem = { ...backendItem, quantity: finalQty };
+            console.log(`Adding backend item to local with stock validation: ${key} (qty: ${finalQty})`);
+            finalCart.push(finalItem);
           } else {
-            // For offers, add as-is (offer stock validation is more complex)
-            const offerBackendItem = backendItem as CartOfferItem;
-            finalCart.push(offerBackendItem);
+            const productName = backendItem.product_name;
+            const variantInfo = backendItem.selectedVariant ? ` (${backendItem.selectedVariant.variant_name})` : '';
+            stockWarnings.push(`${productName}${variantInfo}: Removed from cart - out of stock`);
           }
         }
       }
@@ -572,7 +579,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       for (const { item, newQuantity } of itemsToUpdateInBackend) {
         try {
           const backendItem = backendMap.get(createItemKey(item));
-          const currentQty = (backendItem && backendItem.type === 'normal') ? backendItem.quantity : 0;
+          const currentQty = backendItem ? backendItem.quantity : 0;
           const difference = newQuantity - currentQty;
           
           if (difference > 0) {
@@ -596,31 +603,13 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       // Execute backend additions
       for (const item of itemsToAddToBackend) {
         try {
-          if (item.type === 'normal') {
-            for (let i = 0; i < item.quantity; i++) {
-              await cartService.addToCart({
-                product_id: item.product_id.replace(/-/g, ''),
-                mode: '+',
-                ...(item.selectedVariant && {
-                  variant_id: item.selectedVariant.id.replace(/-/g, ''),
-                }),
-              });
-            }
-          } else if (item.type === 'offer') {
-            const productsPayload: { product_id: string; variant_id?: string }[] = [];
-            item.offer_items.forEach(p => {
-              const productIdClean = p.id.replace(/-/g, '');
-              const variantIdClean = p.selectedVariant?.id?.replace(/-/g, '');
-              for (let q = 0; q < p.quantity; q++) {
-                productsPayload.push({
-                  product_id: productIdClean,
-                  ...(variantIdClean && { variant_id: variantIdClean }),
-                });
-              }
-            });
-            await apiService.addToCartOffer({
-              offer_id: item.offer.replace(/-/g, ''),
-              products: productsPayload,
+          for (let i = 0; i < item.quantity; i++) {
+            await cartService.addToCart({
+              product_id: item.product_id.replace(/-/g, ''),
+              mode: '+',
+              ...(item.selectedVariant && {
+                variant_id: item.selectedVariant.id.replace(/-/g, ''),
+              }),
             });
           }
         } catch (error) {
@@ -636,9 +625,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       // Show stock warnings to user if any
       if (stockWarnings.length > 0) {
         console.warn('Stock validation warnings:', stockWarnings);
-        // You can dispatch a notification action here or show an alert
         const warningMessage = `Cart updated due to stock limitations:\n${stockWarnings.join('\n')}`;
-        // For now, using alert - you can replace with your notification system
         if (typeof window !== 'undefined') {
           setTimeout(() => alert(warningMessage), 100);
         }
@@ -653,7 +640,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [state.cartItems]);
 
-  // Debounced sync function - SINGLE DECLARATION
+  // Debounced sync function
   const debouncedSync = useDebounce(() => {
     setSyncRequested(true);
   }, 1000);
@@ -671,6 +658,14 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       console.log('Sync requested but no access token - skipping');
     }
   }, [syncRequested, syncCart]);
+
+  // Auto force refresh when requested
+  useEffect(() => {
+    if (forceRefreshRequested && isInitialized.current) {
+      console.log('Force refresh requested');
+      forceRefreshCart();
+    }
+  }, [forceRefreshRequested, forceRefreshCart]);
 
   // Clear cart function
   const clearCart = useCallback(async () => {
@@ -698,8 +693,14 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
+      if (action.type === 'FORCE_REFRESH') {
+        setForceRefreshRequested(true);
+        return;
+      }
+
       // Handle backend operations for authenticated users
       if (accessToken && isInitialized.current) {
+        console.log('Processing backend operation for:', action.type, 'accessToken:', !!accessToken, 'initialized:', isInitialized.current);
         try {
           if (action.type === 'REMOVE_ITEM') {
             const operationKey = `remove-${action.payload}`;
@@ -712,11 +713,32 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
 
             try {
               console.log('Removing item from backend:', action.payload);
-              await cartService.addToCart({
-                item_id: action.payload.replace(/-/g, ''),
-                mode: 'delete',
-              });
+              
+              // Find the item to determine if it's an offer or normal item
+              const itemToRemove = state.cartItems.find(item => item.id === action.payload);
+              
+              if (itemToRemove) {
+                if (itemToRemove.type === 'offer') {
+                  console.log('Removing offer item using removeOfferItem method');
+                  await cartService.removeOfferItem(action.payload);
+                } else {
+                  console.log('Removing normal item using removeNormalItem method');
+                  await cartService.removeNormalItem(action.payload);
+                }
+              } else {
+                console.warn('Item not found in cart, using fallback removal method');
+                await cartService.addToCart({
+                  item_id: action.payload.replace(/-/g, ''),
+                  mode: 'delete',
+                });
+              }
+              
               console.log('Item removed from backend successfully');
+              
+              // Force refresh to get updated cart state
+              setTimeout(() => {
+                setForceRefreshRequested(true);
+              }, 500);
             } finally {
               pendingOperations.current.delete(operationKey);
             }
@@ -756,6 +778,11 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
                   }),
                 });
                 console.log('Quantity updated on backend successfully with variant matching');
+                
+                // Force refresh to get updated cart state
+                setTimeout(() => {
+                  setForceRefreshRequested(true);
+                }, 500);
               }
             } finally {
               pendingOperations.current.delete(operationKey);
@@ -783,6 +810,11 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
                 });
               }
               console.log('Item added to backend successfully');
+              
+              // Force refresh to get updated cart state
+              setTimeout(() => {
+                setForceRefreshRequested(true);
+              }, 500);
             } finally {
               pendingOperations.current.delete(operationKey);
             }
@@ -817,6 +849,11 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
                 products: productsPayloadForBackend,
               });
               console.log('Offer added to backend successfully');
+              
+              // Force refresh to get updated cart state
+              setTimeout(() => {
+                setForceRefreshRequested(true);
+              }, 1000);
             } finally {
               pendingOperations.current.delete(operationKey);
             }
@@ -824,12 +861,12 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
         } catch (error) {
           console.error(`Error in backend operation for ${action.type}:`, error);
         }
+      } else {
+        console.log('Skipping backend operation for:', action.type, 'accessToken:', !!accessToken, 'initialized:', isInitialized.current);
       }
 
       // Always dispatch to local state first
       dispatch(action);
-
-      // Manual sync trigger is handled above, no additional logic needed here
     },
     [state.cartItems, debouncedSync]
   );
@@ -968,10 +1005,11 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       getTotalProductQuantitiesInCart,
       getEffectiveProductStock,
       syncCart,
+      forceRefreshCart,
       clearCart,
       calculateTotals,
     }),
-    [state.cartItems, state.loading, customDispatch, getTotalProductQuantitiesInCart, getEffectiveProductStock, syncCart, clearCart, calculateTotals]
+    [state.cartItems, state.loading, customDispatch, getTotalProductQuantitiesInCart, getEffectiveProductStock, syncCart, forceRefreshCart, clearCart, calculateTotals]
   );
 
   return <CartContext.Provider value={contextValue}>{children}</CartContext.Provider>;

@@ -19,25 +19,47 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
     dispatchCart, 
     loading: contextLoading, 
     getEffectiveProductStock,
-    clearCart
+    clearCart,
+    forceRefreshCart // New method for forcing refresh
   } = useCart();
   const [showCheckoutModal, setShowCheckoutModal] = useState<boolean>(false);
 
+  // Force refresh cart when drawer opens for authenticated users
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
+      
+      // Force refresh cart data when drawer opens (for authenticated users)
+      const accessToken = localStorage.getItem('accessToken');
+      if (accessToken) {
+        console.log('CartDrawer: Forcing cart refresh on open');
+        forceRefreshCart();
+      }
     } else {
       document.body.style.overflow = 'auto';
     }
     return () => {
       document.body.style.overflow = 'auto';
     };
-  }, [isOpen]);
+  }, [isOpen, forceRefreshCart]);
 
   const handleRemoveItem = useCallback(async (id: string): Promise<void> => {
     console.log(`CartDrawer: Removing item with ID: ${id}`);
+    
+    // Find the item to log details for debugging
+    const itemToRemove = cartItems.find(item => item.id === id);
+    if (itemToRemove) {
+      // console.log(`CartDrawer: Removing ${itemToRemove.type} item:`, {
+      //   id: itemToRemove.id,
+      //   type: itemToRemove.type,
+      //   name: itemToRemove.type === 'normal' 
+      //     ? (itemToRemove as CartNormalItem).product_name 
+      //     : (itemToRemove as CartOfferItem).offer_name.offer_name
+      // });
+    }
+    
     dispatchCart({ type: 'REMOVE_ITEM', payload: id });
-  }, [dispatchCart]);
+  }, [dispatchCart, cartItems]);
 
   const handleQuantityChange = useCallback(async (id: string, change: number): Promise<void> => {
     console.log('CartDrawer: handleQuantityChange called for item ID:', id, 'change:', change);
@@ -91,11 +113,19 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
     try {
       console.log('CartDrawer: Clearing cart');
       await clearCart();
+      
+      // Force refresh after clearing cart to ensure sync
+      const accessToken = localStorage.getItem('accessToken');
+      if (accessToken) {
+        setTimeout(() => {
+          forceRefreshCart();
+        }, 500);
+      }
     } catch (error) {
       console.error('CartDrawer: Error clearing cart:', error);
       dispatchCart({ type: 'CLEAR_CART' });
     }
-  }, [clearCart, dispatchCart]);
+  }, [clearCart, dispatchCart, forceRefreshCart]);
 
   // Calculate totals using cartUtils
   const calculateTotals = useCallback(() => {
@@ -143,6 +173,13 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
   const normalItems = groupedNormalItems();
   const offerItems = cartItems.filter(item => item.type === 'offer') as CartOfferItem[];
 
+  console.log('CartDrawer: Rendering with items:', {
+    total: cartItems.length,
+    normal: normalItems.length,
+    offers: offerItems.length,
+    totals
+  });
+
   return (
     <>
       <div className="fixed inset-0 z-50 overflow-hidden">
@@ -182,6 +219,9 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                       {/* Normal Items Section */}
                       {normalItems.length > 0 && (
                         <div>
+                          <div className="px-4 py-2 bg-gray-100">
+                            <h4 className="text-sm font-medium text-gray-700">Regular Items ({normalItems.length})</h4>
+                          </div>
                           {normalItems.map((item) => {
                             const effectiveMaxForThisItem = item.selectedVariant?.quantity ?? item.stock_quantity;
 
@@ -201,6 +241,9 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                       {/* Offer Items Section */}
                       {offerItems.length > 0 && (
                         <div>
+                          <div className="px-4 py-2 bg-green-50">
+                            <h4 className="text-sm font-medium text-green-700">Special Offers ({offerItems.length})</h4>
+                          </div>
                           {offerItems.map((item) => (
                             <OfferCartItem
                               key={item.id}
@@ -215,6 +258,12 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                     <div className="text-center py-8">
                       <ShoppingCart size={40} className="mx-auto text-gray-300 mb-3" />
                       <p className="text-gray-500">Your cart is empty</p>
+                      <button
+                        onClick={() => forceRefreshCart()}
+                        className="mt-2 text-sm text-blue-600 hover:text-blue-800"
+                      >
+                        Refresh Cart
+                      </button>
                     </div>
                   )}
                 </>
@@ -236,7 +285,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                   {/* Offer Items Subtotal */}
                   {totals.offerSubtotal > 0 && (
                     <div className="flex justify-between text-gray-600 text-sm">
-                      <span>Offer Items</span>
+                      <span>Offer Items (Paid)</span>
                       <span>₹{totals.offerSubtotal.toFixed(2)}</span>
                     </div>
                   )}
@@ -255,6 +304,16 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                     <span className="text-base font-bold">₹{totals.grandTotal.toFixed(2)}</span>
                   </div>
                 </div>
+
+                {/* Debug Info (remove in production) */}
+                {/* {process.env.NODE_ENV === 'development' && (
+                  <div className="mb-2 p-2 bg-yellow-50 rounded text-xs">
+                    <div>Debug: Total Items: {cartItems.length}</div>
+                    <div>Normal: {normalItems.length}, Offers: {offerItems.length}</div>
+                    <div>Subtotal: ₹{totals.normalSubtotal + totals.offerSubtotal}</div>
+                    <div>Savings: ₹{totals.offerSavings}</div>
+                  </div>
+                )} */}
 
                 {/* Out of Stock Warning */}
                 {hasOutOfStockItems() && (
@@ -288,6 +347,16 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                     Proceed To Checkout
                   </button>
                 </div>
+
+                {/* Refresh Button for Development */}
+                {/* {process.env.NODE_ENV === 'development' && (
+                  <button
+                    onClick={() => forceRefreshCart()}
+                    className="w-full mt-2 text-xs text-gray-500 hover:text-gray-700 py-1 border border-gray-300 rounded"
+                  >
+                    Force Refresh Cart (Dev)
+                  </button>
+                )} */}
               </div>
             )}
           </div>
