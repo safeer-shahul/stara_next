@@ -668,7 +668,7 @@ export const cartService = {
     const payload = {
       mode: 'delete',
       item_id: offerItemId.replace(/-/g, ''),
-      is_cart: 'yes'
+      is_offer: 'yes'
     };
     console.log("cartService: Remove offer payload:", payload);
     const response = await apiService.addToCart(payload);

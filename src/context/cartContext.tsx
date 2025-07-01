@@ -291,10 +291,20 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   const [forceRefreshRequested, setForceRefreshRequested] = useState(false);
   const isInitialized = useRef(false);
   const isSyncing = useRef(false);
+  const isMounted = useRef(true);
   const prevAccessTokenRef = useRef<string | null>(null);
 
   // Track pending operations to prevent duplicates
   const pendingOperations = useRef(new Set<string>());
+  const lastRemovalTime = useRef<number>(0);
+
+  // Track component mount status
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   // Track authentication state changes
   useEffect(() => {
@@ -375,6 +385,13 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       return;
     }
 
+    // Prevent rapid successive refreshes after removal operations
+    const now = Date.now();
+    if (now - lastRemovalTime.current < 2000) {
+      console.log('Recent removal operation, skipping rapid refresh');
+      return;
+    }
+
     isSyncing.current = true;
     dispatch({ type: 'SET_LOADING', payload: true });
 
@@ -430,7 +447,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
 
       // For offers, we need a different strategy since they're complex
       // 1. Always trust backend for synced offers
-      // 2. Push local unsynced offers to backend
+      // 2. Only push local offers that don't exist on backend
       // 3. Don't do intelligent merge for offers - too complex
 
       const finalCart: CartItemType[] = [];
@@ -439,17 +456,52 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       const backendOfferItems = backendCart.filter(item => item.type === 'offer') as CartOfferItem[];
       console.log('Backend offer items:', backendOfferItems.length);
       
-      // Get local offer items that need to be pushed to backend
+      // Get local offer items that might need to be pushed to backend
       const localOfferItems = localCart.filter(item => item.type === 'offer' && !item.isSynced) as CartOfferItem[];
       console.log('Local unsynced offer items:', localOfferItems.length);
       
-      // Add all backend offers to final cart
+      // Add all backend offers to final cart first
       finalCart.push(...backendOfferItems);
       
-      // Push local unsynced offers to backend
+      // Check which local offers actually need to be pushed (don't exist on backend)
+      const offersToActuallyPush: CartOfferItem[] = [];
+      
       for (const localOffer of localOfferItems) {
+        // Check if this offer already exists on backend by comparing offer ID and products
+        const existsOnBackend = backendOfferItems.some(backendOffer => {
+          // Same offer ID
+          if (backendOffer.offer.replace(/-/g, '') !== localOffer.offer.replace(/-/g, '')) {
+            return false;
+          }
+          
+          // Check if products match (simple comparison by product IDs and quantities)
+          const backendProductSignature = backendOffer.offer_items
+            .map(item => `${item.id.replace(/-/g, '')}-${item.selectedVariant?.id?.replace(/-/g, '') || 'novariant'}-${item.quantity}`)
+            .sort()
+            .join('|');
+            
+          const localProductSignature = localOffer.offer_items
+            .map(item => `${item.id.replace(/-/g, '')}-${item.selectedVariant?.id?.replace(/-/g, '') || 'novariant'}-${item.quantity}`)
+            .sort()
+            .join('|');
+            
+          return backendProductSignature === localProductSignature;
+        });
+        
+        if (!existsOnBackend) {
+          console.log('Local offer not found on backend, will push:', localOffer.offer_name.offer_name);
+          offersToActuallyPush.push(localOffer);
+        } else {
+          console.log('Local offer already exists on backend, skipping push:', localOffer.offer_name.offer_name);
+        }
+      }
+      
+      console.log('Offers that actually need to be pushed:', offersToActuallyPush.length);
+      
+      // Push only the offers that don't exist on backend
+      for (const localOffer of offersToActuallyPush) {
         try {
-          console.log('Pushing local offer to backend:', localOffer.offer_name.offer_name);
+          console.log('Pushing unique local offer to backend:', localOffer.offer_name.offer_name);
           
           const productsPayloadForBackend: { product_id: string; variant_id?: string }[] = [];
           localOffer.offer_items.forEach((p) => {
@@ -469,28 +521,30 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
             products: productsPayloadForBackend,
           });
           
-          console.log('Successfully pushed local offer to backend');
+          console.log('Successfully pushed unique local offer to backend');
         } catch (error) {
-          console.error('Error pushing local offer to backend:', error);
+          console.error('Error pushing unique local offer to backend:', error);
           // If push fails, keep the local offer in cart
           finalCart.push(localOffer);
         }
       }
       
-      // After pushing offers, fetch fresh backend data to get the complete state
-      try {
-        console.log('Fetching fresh cart after pushing local offers...');
-        const freshBackendCart = await cartService.fetchCartFromBackend();
-        const freshBackendOffers = freshBackendCart.filter(item => item.type === 'offer') as CartOfferItem[];
-        
-        // Replace backend offers with fresh data
-        const cartWithoutOffers = finalCart.filter(item => item.type !== 'offer');
-        finalCart.length = 0; // Clear array
-        finalCart.push(...cartWithoutOffers, ...freshBackendOffers);
-        
-        console.log('Updated cart with fresh backend offers:', freshBackendOffers.length);
-      } catch (error) {
-        console.error('Error fetching fresh backend data:', error);
+      // After pushing unique offers, fetch fresh backend data to get the complete state
+      if (offersToActuallyPush.length > 0) {
+        try {
+          console.log('Fetching fresh cart after pushing unique local offers...');
+          const freshBackendCart = await cartService.fetchCartFromBackend();
+          const freshBackendOffers = freshBackendCart.filter(item => item.type === 'offer') as CartOfferItem[];
+          
+          // Replace backend offers with fresh data
+          const cartWithoutOffers = finalCart.filter(item => item.type !== 'offer');
+          finalCart.length = 0; // Clear array
+          finalCart.push(...cartWithoutOffers, ...freshBackendOffers);
+          
+          console.log('Updated cart with fresh backend offers after unique push:', freshBackendOffers.length);
+        } catch (error) {
+          console.error('Error fetching fresh backend data after unique push:', error);
+        }
       }
 
       // For normal items, do intelligent merge
@@ -806,10 +860,29 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
               if (itemToRemove) {
                 if (itemToRemove.type === 'offer') {
                   console.log('Removing offer item using removeOfferItem method');
+                  
+                  // Track removal time to prevent rapid refreshes
+                  lastRemovalTime.current = Date.now();
+                  
                   await cartService.removeOfferItem(action.payload);
+                  
+                  // For offer removal, wait a bit longer before refresh to ensure backend processing
+                  console.log('Offer removed, waiting before refresh to ensure backend sync...');
+                  setTimeout(() => {
+                    if (isMounted.current && !pendingOperations.current.has(operationKey)) {
+                      setForceRefreshRequested(true);
+                    }
+                  }, 1500); // Longer delay for offers
                 } else {
                   console.log('Removing normal item using removeNormalItem method');
                   await cartService.removeNormalItem(action.payload);
+                  
+                  // Normal refresh timing for normal items
+                  setTimeout(() => {
+                    if (isMounted.current && !pendingOperations.current.has(operationKey)) {
+                      setForceRefreshRequested(true);
+                    }
+                  }, 500);
                 }
               } else {
                 console.warn('Item not found in cart, using fallback removal method');
@@ -817,14 +890,15 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
                   item_id: action.payload.replace(/-/g, ''),
                   mode: 'delete',
                 });
+                
+                setTimeout(() => {
+                  if (isMounted.current) {
+                    setForceRefreshRequested(true);
+                  }
+                }, 500);
               }
               
               console.log('Item removed from backend successfully');
-              
-              // Force refresh to get updated cart state
-              setTimeout(() => {
-                setForceRefreshRequested(true);
-              }, 500);
             } finally {
               pendingOperations.current.delete(operationKey);
             }
