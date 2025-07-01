@@ -313,11 +313,6 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     return () => clearInterval(interval);
   }, []);
 
-  // Debounced sync function
-  const debouncedSync = useDebounce(() => {
-    setSyncRequested(true);
-  }, 1000); // Consolidated to a single declaration with 1000ms delay
-
   // Initialize cart from localStorage on mount
   useEffect(() => {
     if (typeof window !== 'undefined' && !isInitialized.current) {
@@ -347,7 +342,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, []);
 
-  // Sync with backend
+  // Sync with backend - INTELLIGENT SYNC WITH STOCK VALIDATION
   const syncCart = useCallback(async () => {
     if (isSyncing.current) {
       console.log('Sync already in progress, skipping');
@@ -364,36 +359,304 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     dispatch({ type: 'SET_LOADING', payload: true });
 
     try {
-      console.log('Starting cart sync...');
+      console.log('Starting intelligent cart sync with stock validation...');
 
-      // For authenticated gebruikers, fetch backend cart first
+      // Get both local and backend carts
+      const localCart = state.cartItems;
       const backendCart = await cartService.fetchCartFromBackend();
-      console.log('Fetched cart from backend:', backendCart.length, 'items');
+      
+      console.log('Local cart items:', localCart.length);
+      console.log('Backend cart items:', backendCart.length);
 
-      // Check if we have unsynced local items to merge
-      const unsyncedItems = state.cartItems.filter((item) => !item.isSynced);
+      // Collect all unique product IDs to fetch fresh stock data
+      const allProductIds = new Set<string>();
+      [...localCart, ...backendCart].forEach(item => {
+        if (item.type === 'normal') {
+          allProductIds.add(item.product_id.replace(/-/g, ''));
+        } else if (item.type === 'offer') {
+          item.offer_items.forEach(offerProduct => {
+            allProductIds.add(offerProduct.id.replace(/-/g, ''));
+          });
+        }
+      });
 
-      if (unsyncedItems.length > 0) {
-        console.log('Found unsynced local items, pushing to backend:', unsyncedItems.length);
-        await cartService.pushLocalCartToBackend(unsyncedItems);
-
-        // Fetch updated cart after pushing local items
-        const updatedBackendCart = await cartService.fetchCartFromBackend();
-        console.log('Fetched updated cart after merge:', updatedBackendCart.length, 'items');
-        dispatch({ type: 'SET_CART_ITEMS', payload: updatedBackendCart });
-      } else {
-        // No local items to merge, use backend cart as-is
-        dispatch({ type: 'SET_CART_ITEMS', payload: backendCart });
+      // Fetch fresh product data with current stock
+      let stockMap = new Map<string, ProductItemDetails>();
+      if (allProductIds.size > 0) {
+        try {
+          const productsResponse = await apiService.getPaginatedProducts(1, 100, undefined, Array.from(allProductIds));
+          productsResponse.products.forEach((p: any) => {
+            stockMap.set(p.id.replace(/-/g, ''), {
+              id: p.id,
+              images: p.images || [],
+              product_code: p.product_code,
+              product_name: p.product_name,
+              product_description: p.product_description,
+              product_price: p.product_price,
+              strike_price: p.strike_price,
+              quantity: p.quantity,
+              product_weight: p.product_weight,
+              product_box_weight: p.product_box_weight,
+              product_status: p.product_status,
+              created_at: p.created_at,
+              updated_at: p.updated_at,
+              sub_category: p.sub_category,
+              isInStock: p.product_status && p.quantity > 0,
+              have_variants: p.have_variants || false,
+              product_variant: p.product_variant || [],
+            });
+          });
+          console.log('Fresh stock data fetched for', stockMap.size, 'products');
+        } catch (error) {
+          console.error('Failed to fetch fresh stock data:', error);
+        }
       }
+
+      // Helper function to get available stock for an item
+      const getAvailableStock = (item: CartNormalItem): number => {
+        const productData = stockMap.get(item.product_id.replace(/-/g, ''));
+        if (!productData) return 0;
+
+        if (item.selectedVariant && productData.have_variants) {
+          const variant = productData.product_variant.find(v => 
+            v.id.replace(/-/g, '') === item.selectedVariant!.id.replace(/-/g, '')
+          );
+          return variant?.quantity || 0;
+        }
+        return productData.quantity || 0;
+      };
+
+      // Helper function to get total quantity from offer items
+      const getOfferTotalQuantity = (offerItem: CartOfferItem): number => {
+        return offerItem.offer_items.reduce((total, product) => total + product.quantity, 0);
+      };
+
+      // Create maps for easier comparison (product_id + variant_id as key)
+      const createItemKey = (item: CartItemType) => {
+        if (item.type === 'normal') {
+          const variantId = item.selectedVariant?.id || 'no-variant';
+          return `${item.product_id}-${variantId}`;
+        } else {
+          return `offer-${item.offer}`;
+        }
+      };
+
+      const localMap = new Map<string, CartItemType>();
+      const backendMap = new Map<string, CartItemType>();
+
+      localCart.forEach(item => {
+        const key = createItemKey(item);
+        localMap.set(key, item);
+      });
+
+      backendCart.forEach(item => {
+        const key = createItemKey(item);
+        backendMap.set(key, item);
+      });
+
+      const finalCart: CartItemType[] = [];
+      const itemsToAddToBackend: CartItemType[] = [];
+      const itemsToUpdateInBackend: { item: CartNormalItem; newQuantity: number }[] = [];
+      const stockWarnings: string[] = [];
+
+      // Process all unique keys (from both local and backend)
+      const allKeys = new Set([...localMap.keys(), ...backendMap.keys()]);
+
+      for (const key of allKeys) {
+        const localItem = localMap.get(key);
+        const backendItem = backendMap.get(key);
+
+        if (localItem && backendItem) {
+          // Item exists in both - compare quantities with stock validation
+          if (localItem.type === 'normal' && backendItem.type === 'normal') {
+            const localQty = localItem.quantity;
+            const backendQty = backendItem.quantity;
+            const availableStock = getAvailableStock(localItem);
+
+            // Determine the desired quantity (higher of the two)
+            const desiredQty = Math.max(localQty, backendQty);
+            
+            // Apply stock limit
+            const finalQty = Math.min(desiredQty, availableStock);
+
+            if (finalQty < desiredQty) {
+              const productName = localItem.product_name;
+              const variantInfo = localItem.selectedVariant ? ` (${localItem.selectedVariant.variant_name})` : '';
+              stockWarnings.push(`${productName}${variantInfo}: Reduced quantity from ${desiredQty} to ${finalQty} due to stock limit`);
+              console.log(`Stock limit applied for ${key}: desired ${desiredQty}, available ${availableStock}, final ${finalQty}`);
+            }
+
+            if (finalQty === 0) {
+              // Remove item completely if no stock
+              const productName = localItem.product_name;
+              const variantInfo = localItem.selectedVariant ? ` (${localItem.selectedVariant.variant_name})` : '';
+              stockWarnings.push(`${productName}${variantInfo}: Removed from cart - out of stock`);
+              console.log(`Removing item ${key} - no stock available`);
+              continue; // Skip adding to final cart
+            }
+
+            // Create the final item with validated quantity
+            const finalItem = { ...localItem, quantity: finalQty };
+
+            if (localQty > backendQty && finalQty !== backendQty) {
+              // Need to update backend
+              console.log(`Updating backend quantity for ${key}: ${backendQty} -> ${finalQty}`);
+              itemsToUpdateInBackend.push({ item: finalItem, newQuantity: finalQty });
+            }
+
+            finalCart.push(finalItem);
+          } else {
+            // For offers, use backend version (assuming it's authoritative)
+            finalCart.push(backendItem);
+          }
+        } else if (localItem && !backendItem) {
+          // Item exists only in local - validate stock before adding to backend
+          if (localItem.type === 'normal') {
+            const normalLocalItem = localItem as CartNormalItem;
+            const availableStock = getAvailableStock(normalLocalItem);
+            const finalQty = Math.min(normalLocalItem.quantity, availableStock);
+
+            if (finalQty < normalLocalItem.quantity) {
+              const productName = normalLocalItem.product_name;
+              const variantInfo = normalLocalItem.selectedVariant ? ` (${normalLocalItem.selectedVariant.variant_name})` : '';
+              stockWarnings.push(`${productName}${variantInfo}: Reduced quantity from ${normalLocalItem.quantity} to ${finalQty} due to stock limit`);
+            }
+
+            if (finalQty > 0) {
+              const finalItem = { ...normalLocalItem, quantity: finalQty };
+              console.log(`Adding local item to backend with stock validation: ${key} (qty: ${finalQty})`);
+              itemsToAddToBackend.push(finalItem);
+              finalCart.push(finalItem);
+            } else {
+              const productName = normalLocalItem.product_name;
+              const variantInfo = normalLocalItem.selectedVariant ? ` (${normalLocalItem.selectedVariant.variant_name})` : '';
+              stockWarnings.push(`${productName}${variantInfo}: Removed from cart - out of stock`);
+            }
+          } else {
+            // For offers, add as-is (offer stock validation is more complex)
+            const offerLocalItem = localItem as CartOfferItem;
+            itemsToAddToBackend.push(offerLocalItem);
+            finalCart.push(offerLocalItem);
+          }
+        } else if (!localItem && backendItem) {
+          // Item exists only in backend - validate stock before adding to local
+          if (backendItem.type === 'normal') {
+            const normalBackendItem = backendItem as CartNormalItem;
+            const availableStock = getAvailableStock(normalBackendItem);
+            const finalQty = Math.min(normalBackendItem.quantity, availableStock);
+
+            if (finalQty < normalBackendItem.quantity) {
+              const productName = normalBackendItem.product_name;
+              const variantInfo = normalBackendItem.selectedVariant ? ` (${normalBackendItem.selectedVariant.variant_name})` : '';
+              stockWarnings.push(`${productName}${variantInfo}: Reduced quantity from ${normalBackendItem.quantity} to ${finalQty} due to stock limit`);
+            }
+
+            if (finalQty > 0) {
+              const finalItem = { ...normalBackendItem, quantity: finalQty };
+              console.log(`Adding backend item to local with stock validation: ${key} (qty: ${finalQty})`);
+              finalCart.push(finalItem);
+            } else {
+              const productName = normalBackendItem.product_name;
+              const variantInfo = normalBackendItem.selectedVariant ? ` (${normalBackendItem.selectedVariant.variant_name})` : '';
+              stockWarnings.push(`${productName}${variantInfo}: Removed from cart - out of stock`);
+            }
+          } else {
+            // For offers, add as-is (offer stock validation is more complex)
+            const offerBackendItem = backendItem as CartOfferItem;
+            finalCart.push(offerBackendItem);
+          }
+        }
+      }
+
+      // Execute backend updates
+      for (const { item, newQuantity } of itemsToUpdateInBackend) {
+        try {
+          const backendItem = backendMap.get(createItemKey(item));
+          const currentQty = (backendItem && backendItem.type === 'normal') ? backendItem.quantity : 0;
+          const difference = newQuantity - currentQty;
+          
+          if (difference > 0) {
+            // Need to add more
+            for (let i = 0; i < difference; i++) {
+              await cartService.addToCart({
+                product_id: item.product_id.replace(/-/g, ''),
+                mode: '+',
+                ...(item.selectedVariant && {
+                  variant_id: item.selectedVariant.id.replace(/-/g, ''),
+                }),
+              });
+            }
+          }
+        } catch (error) {
+          console.error('Error updating backend quantity:', error);
+          // Continue with other items
+        }
+      }
+
+      // Execute backend additions
+      for (const item of itemsToAddToBackend) {
+        try {
+          if (item.type === 'normal') {
+            for (let i = 0; i < item.quantity; i++) {
+              await cartService.addToCart({
+                product_id: item.product_id.replace(/-/g, ''),
+                mode: '+',
+                ...(item.selectedVariant && {
+                  variant_id: item.selectedVariant.id.replace(/-/g, ''),
+                }),
+              });
+            }
+          } else if (item.type === 'offer') {
+            const productsPayload: { product_id: string; variant_id?: string }[] = [];
+            item.offer_items.forEach(p => {
+              const productIdClean = p.id.replace(/-/g, '');
+              const variantIdClean = p.selectedVariant?.id?.replace(/-/g, '');
+              for (let q = 0; q < p.quantity; q++) {
+                productsPayload.push({
+                  product_id: productIdClean,
+                  ...(variantIdClean && { variant_id: variantIdClean }),
+                });
+              }
+            });
+            await apiService.addToCartOffer({
+              offer_id: item.offer.replace(/-/g, ''),
+              products: productsPayload,
+            });
+          }
+        } catch (error) {
+          console.error('Error adding item to backend:', error);
+          // Continue with other items
+        }
+      }
+
+      // Update local storage with final cart
+      console.log('Final synced cart items:', finalCart.length);
+      dispatch({ type: 'SET_CART_ITEMS', payload: finalCart });
+
+      // Show stock warnings to user if any
+      if (stockWarnings.length > 0) {
+        console.warn('Stock validation warnings:', stockWarnings);
+        // You can dispatch a notification action here or show an alert
+        const warningMessage = `Cart updated due to stock limitations:\n${stockWarnings.join('\n')}`;
+        // For now, using alert - you can replace with your notification system
+        if (typeof window !== 'undefined') {
+          setTimeout(() => alert(warningMessage), 100);
+        }
+      }
+
     } catch (error) {
       console.error('Cart sync failed:', error);
-      // On sync failure, don't clear the cart, just log the error
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
       isSyncing.current = false;
       setSyncRequested(false);
     }
   }, [state.cartItems]);
+
+  // Debounced sync function - SINGLE DECLARATION
+  const debouncedSync = useDebounce(() => {
+    setSyncRequested(true);
+  }, 1000);
 
   // Auto-sync when requested
   useEffect(() => {
@@ -427,7 +690,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Enhanced dispatch function with better backend sync
   const customDispatch: React.Dispatch<CartAction> = useCallback(
-    async (action) => {
+    async (action: CartAction) => {
       const accessToken = localStorage.getItem('accessToken');
 
       if (action.type === 'TRIGGER_SYNC') {
@@ -482,20 +745,17 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
                 console.log(`Updating quantity: ${currentQuantity} -> ${newQuantity} (diff: ${quantityDifference})`);
 
                 const normalItem = itemToUpdate as CartNormalItem;
-                const absQuantityDiff = Math.abs(quantityDifference);
                 const mode = quantityDifference > 0 ? '+' : '-';
 
-                // Make single API calls for each unit change (matching old logic)
-                for (let i = 0; i < absQuantityDiff; i++) {
-                  await cartService.addToCart({
-                    product_id: normalItem.product_id.replace(/-/g, ''),
-                    mode: mode,
-                    ...(normalItem.selectedVariant && {
-                      variant_id: normalItem.selectedVariant.id.replace(/-/g, ''),
-                    }),
-                  });
-                }
-                console.log('Quantity updated on backend successfully');
+                // Make single API call with proper product_id and variant_id matching
+                await cartService.addToCart({
+                  product_id: normalItem.product_id.replace(/-/g, ''),
+                  mode: mode,
+                  ...(normalItem.selectedVariant && {
+                    variant_id: normalItem.selectedVariant.id.replace(/-/g, ''),
+                  }),
+                });
+                console.log('Quantity updated on backend successfully with variant matching');
               }
             } finally {
               pendingOperations.current.delete(operationKey);
@@ -510,8 +770,9 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
             pendingOperations.current.add(operationKey);
 
             try {
-              console.log('Adding item to backend:', action.payload.product_id);
-              // Add each quantity unit separately (matching old logic)
+              console.log('Adding item to backend:', action.payload.product_id, 'quantity:', action.payload.quantity);
+              
+              // For new items, add each unit individually (this is correct for your backend)
               for (let i = 0; i < action.payload.quantity; i++) {
                 await cartService.addToCart({
                   product_id: action.payload.product_id.replace(/-/g, ''),
@@ -565,14 +826,10 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
         }
       }
 
-      // Always dispatch to local state
+      // Always dispatch to local state first
       dispatch(action);
 
-      // Schedule sync for authenticated users (but not immediately to prevent duplication)
-      if (accessToken && ['ADD_NORMAL_ITEM', 'ADD_OFFER_SET', 'REMOVE_ITEM', 'UPDATE_ITEM_QUANTITY'].includes(action.type)) {
-        console.log('Scheduling debounced sync for action:', action.type);
-        debouncedSync();
-      }
+      // Manual sync trigger is handled above, no additional logic needed here
     },
     [state.cartItems, debouncedSync]
   );
