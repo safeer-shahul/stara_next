@@ -115,7 +115,81 @@ export default function OfferCartSidebar({
             }
         });
 
-        const aggregatedOfferItems: (ProductItemDetails & { quantity: number; selectedVariant?: ProductVariant })[] = Array.from(aggregatedOfferItemsMap.values());
+        let aggregatedOfferItems: (ProductItemDetails & { quantity: number; selectedVariant?: ProductVariant; isPaid?: boolean })[] = Array.from(aggregatedOfferItemsMap.values());
+        
+        // For guest users, assign paid/free status based on price
+        if (!isAuthenticated) {
+            console.log("OfferCartSidebar: Guest user detected - assigning paid/free status based on price");
+            
+            // Create individual product units for sorting
+            const individualProducts: (ProductItemDetails & { quantity: number; selectedVariant?: ProductVariant; originalIndex: number })[] = [];
+            
+            aggregatedOfferItems.forEach((product, originalIndex) => {
+                for (let i = 0; i < product.quantity; i++) {
+                    individualProducts.push({
+                        ...product,
+                        quantity: 1,
+                        originalIndex
+                    });
+                }
+            });
+            
+            // Sort by price (highest to lowest)
+            const sortedProducts = individualProducts.sort((a, b) => {
+                const priceA = parseFloat(a.product_price || '0');
+                const priceB = parseFloat(b.product_price || '0');
+                return priceB - priceA; // Descending order
+            });
+            
+            console.log('OfferCartSidebar: Sorted products by price:', sortedProducts.map(p => ({
+                name: p.product_name,
+                price: p.product_price
+            })));
+            
+            // Assign paid/free status
+            const processedProducts: (ProductItemDetails & { quantity: number; selectedVariant?: ProductVariant; isPaid?: boolean })[] = [];
+            
+            sortedProducts.forEach((product, index) => {
+                const isPaid = index < offerData.buy_count; // First buy_count items are paid
+                processedProducts.push({
+                    ...product,
+                    isPaid
+                });
+            });
+            
+            // Aggregate back to final structure
+            const finalAggregatedMap = new Map<string, (ProductItemDetails & { quantity: number; selectedVariant?: ProductVariant; isPaid?: boolean })>();
+            
+            processedProducts.forEach(product => {
+                const productId = product.id.replace(/-/g, '');
+                const variantId = product.selectedVariant?.id?.replace(/-/g, '');
+                const isPaidStatus = product.isPaid ? 'paid' : 'free';
+                const key = variantId ? `${productId}-${variantId}-${isPaidStatus}` : `${productId}-${isPaidStatus}`;
+
+                if (finalAggregatedMap.has(key)) {
+                    const existingProduct = finalAggregatedMap.get(key)!;
+                    finalAggregatedMap.set(key, {
+                        ...existingProduct,
+                        quantity: existingProduct.quantity + 1,
+                    });
+                } else {
+                    finalAggregatedMap.set(key, {
+                        ...product,
+                        quantity: 1,
+                    });
+                }
+            });
+            
+            aggregatedOfferItems = Array.from(finalAggregatedMap.values());
+            console.log("OfferCartSidebar: Guest offer items with paid/free status:", 
+                aggregatedOfferItems.map(item => ({
+                    name: item.product_name,
+                    isPaid: item.isPaid,
+                    quantity: item.quantity
+                }))
+            );
+        }
+
         const temporaryId = uuidv4();
 
         const offerSetPayload: CartOfferItem = {
@@ -142,7 +216,7 @@ export default function OfferCartSidebar({
         } finally {
             setLoading(false);
         }
-    }, [dispatchCart, offerData, isOfferComplete, onOpenCartDrawer, slots]);
+    }, [dispatchCart, offerData, isOfferComplete, onOpenCartDrawer, slots, isAuthenticated]);
 
     const filledSlots = slots.filter(slot => slot.product !== null);
     const totalRequiredItems = offerData.buy_count + offerData.get_count;

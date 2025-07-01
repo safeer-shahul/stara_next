@@ -330,19 +330,38 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       isInitialized.current = true;
 
       if (currentAccessToken) {
-        // For authenticated users, always sync first to get backend cart
-        console.log('Authenticated user detected - syncing with backend');
-        setSyncRequested(true);
-
-        // Only set stored items temporarily if they exist, but sync will replace them
+        // For authenticated users, load local items first, then sync
         if (storedItems.length > 0) {
-          console.log('Setting temporary local items, will be replaced by backend sync');
+          console.log('Setting local items before sync (including offers):', storedItems.length);
           dispatch({ type: 'SET_CART_ITEMS', payload: storedItems });
         }
+        
+        // Always sync to merge local items with backend
+        console.log('Authenticated user detected - syncing with backend (preserving local offers)');
+        setSyncRequested(true);
       } else {
-        // For guest users, load from localStorage
+        // For guest users, load from localStorage and process offers immediately
         if (storedItems.length > 0) {
-          dispatch({ type: 'SET_CART_ITEMS', payload: storedItems });
+          console.log('Guest user - processing cart items including offers');
+          
+          // Check if there are unsynced offers that need processing
+          const hasUnsyncedOffers = storedItems.some(item => 
+            item.type === 'offer' && !item.isSynced
+          );
+          
+          if (hasUnsyncedOffers) {
+            console.log('Found unsynced guest offers - processing for paid/free assignment');
+            // Process guest offers immediately
+            cartService.processGuestOffers(storedItems).then(processedItems => {
+              console.log('Guest offers processed on initialization');
+              dispatch({ type: 'SET_CART_ITEMS', payload: processedItems });
+            }).catch(error => {
+              console.error('Error processing guest offers on init:', error);
+              dispatch({ type: 'SET_CART_ITEMS', payload: storedItems });
+            });
+          } else {
+            dispatch({ type: 'SET_CART_ITEMS', payload: storedItems });
+          }
         }
         console.log('Guest user - cart loaded from localStorage');
       }
@@ -362,8 +381,18 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       console.log('Force refreshing cart from backend...');
       const freshCartItems = await cartService.refreshCartFromBackend();
-      console.log('Force refresh completed. Items:', freshCartItems.length);
-      dispatch({ type: 'SET_CART_ITEMS', payload: freshCartItems });
+      
+      // For guest users, also process offers for paid/free assignment
+      const accessToken = localStorage.getItem('accessToken');
+      if (!accessToken) {
+        console.log('Guest user detected - processing offers for paid/free assignment');
+        const processedCartItems = await cartService.processGuestOffers(freshCartItems);
+        console.log('Force refresh completed with guest offer processing. Items:', processedCartItems.length);
+        dispatch({ type: 'SET_CART_ITEMS', payload: processedCartItems });
+      } else {
+        console.log('Force refresh completed. Items:', freshCartItems.length);
+        dispatch({ type: 'SET_CART_ITEMS', payload: freshCartItems });
+      }
     } catch (error) {
       console.error('Force refresh failed:', error);
     } finally {
@@ -399,13 +428,70 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       console.log('Local cart items:', localCart.length);
       console.log('Backend cart items:', backendCart.length);
 
-      // For offers, always trust backend data since it's more complex
-      // For normal items, use intelligent merge
-      const finalCart: CartItemType[] = [];
+      // For offers, we need a different strategy since they're complex
+      // 1. Always trust backend for synced offers
+      // 2. Push local unsynced offers to backend
+      // 3. Don't do intelligent merge for offers - too complex
 
-      // Get all offer items from backend (always trust backend for offers)
+      const finalCart: CartItemType[] = [];
+      
+      // Get all offer items from backend (always trust backend for synced offers)
       const backendOfferItems = backendCart.filter(item => item.type === 'offer') as CartOfferItem[];
+      console.log('Backend offer items:', backendOfferItems.length);
+      
+      // Get local offer items that need to be pushed to backend
+      const localOfferItems = localCart.filter(item => item.type === 'offer' && !item.isSynced) as CartOfferItem[];
+      console.log('Local unsynced offer items:', localOfferItems.length);
+      
+      // Add all backend offers to final cart
       finalCart.push(...backendOfferItems);
+      
+      // Push local unsynced offers to backend
+      for (const localOffer of localOfferItems) {
+        try {
+          console.log('Pushing local offer to backend:', localOffer.offer_name.offer_name);
+          
+          const productsPayloadForBackend: { product_id: string; variant_id?: string }[] = [];
+          localOffer.offer_items.forEach((p) => {
+            const productIdClean = p.id.replace(/-/g, '');
+            const variantIdClean = p.selectedVariant?.id?.replace(/-/g, '');
+
+            for (let q = 0; q < p.quantity; q++) {
+              productsPayloadForBackend.push({
+                product_id: productIdClean,
+                ...(variantIdClean && { variant_id: variantIdClean }),
+              });
+            }
+          });
+
+          await apiService.addToCartOffer({
+            offer_id: localOffer.offer.replace(/-/g, ''),
+            products: productsPayloadForBackend,
+          });
+          
+          console.log('Successfully pushed local offer to backend');
+        } catch (error) {
+          console.error('Error pushing local offer to backend:', error);
+          // If push fails, keep the local offer in cart
+          finalCart.push(localOffer);
+        }
+      }
+      
+      // After pushing offers, fetch fresh backend data to get the complete state
+      try {
+        console.log('Fetching fresh cart after pushing local offers...');
+        const freshBackendCart = await cartService.fetchCartFromBackend();
+        const freshBackendOffers = freshBackendCart.filter(item => item.type === 'offer') as CartOfferItem[];
+        
+        // Replace backend offers with fresh data
+        const cartWithoutOffers = finalCart.filter(item => item.type !== 'offer');
+        finalCart.length = 0; // Clear array
+        finalCart.push(...cartWithoutOffers, ...freshBackendOffers);
+        
+        console.log('Updated cart with fresh backend offers:', freshBackendOffers.length);
+      } catch (error) {
+        console.error('Error fetching fresh backend data:', error);
+      }
 
       // For normal items, do intelligent merge
       const localNormalItems = localCart.filter(item => item.type === 'normal') as CartNormalItem[];

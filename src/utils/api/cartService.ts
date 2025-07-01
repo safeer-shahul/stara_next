@@ -50,8 +50,83 @@ interface OfferDetailsFromBackend {
   offer_image: string;
 }
 
-// Helper to aggregate products WITHIN a single offer item (not across offer items)
-// IMPORTANT: Do NOT aggregate products with different isPaid status
+// Helper to determine paid/free items for guest users based on price
+const _assignPaidFreeForGuestOffer = (
+  offerProducts: (ProductItemDetails & { quantity: number; selectedVariant?: ProductVariant })[],
+  buyCount: number,
+  getCount: number
+): (ProductItemDetails & { quantity: number; selectedVariant?: ProductVariant; isPaid?: boolean })[] => {
+  console.log('cartService: Assigning paid/free for guest offer:', { buyCount, getCount, totalProducts: offerProducts.length });
+  
+  // Create individual product units for sorting
+  const individualProducts: (ProductItemDetails & { quantity: number; selectedVariant?: ProductVariant; originalIndex: number })[] = [];
+  
+  offerProducts.forEach((product, originalIndex) => {
+    for (let i = 0; i < product.quantity; i++) {
+      individualProducts.push({
+        ...product,
+        quantity: 1,
+        originalIndex
+      });
+    }
+  });
+  
+  // Sort by price (highest to lowest)
+  const sortedProducts = individualProducts.sort((a, b) => {
+    const priceA = parseFloat(a.product_price || '0');
+    const priceB = parseFloat(b.product_price || '0');
+    return priceB - priceA; // Descending order
+  });
+  
+  console.log('cartService: Sorted products by price:', sortedProducts.map(p => ({
+    name: p.product_name,
+    price: p.product_price
+  })));
+  
+  // Assign paid/free status
+  const totalItems = buyCount + getCount;
+  const processedProducts: (ProductItemDetails & { quantity: number; selectedVariant?: ProductVariant; isPaid?: boolean })[] = [];
+  
+  sortedProducts.forEach((product, index) => {
+    const isPaid = index < buyCount; // First buyCount items are paid
+    processedProducts.push({
+      ...product,
+      isPaid
+    });
+  });
+  
+  // Aggregate back to original structure
+  const aggregatedMap = new Map<string, (ProductItemDetails & { quantity: number; selectedVariant?: ProductVariant; isPaid?: boolean })>();
+  
+  processedProducts.forEach(product => {
+    const productId = product.id.replace(/-/g, '');
+    const variantId = product.selectedVariant?.id?.replace(/-/g, '');
+    const isPaidStatus = product.isPaid ? 'paid' : 'free';
+    const key = variantId ? `${productId}-${variantId}-${isPaidStatus}` : `${productId}-${isPaidStatus}`;
+
+    if (aggregatedMap.has(key)) {
+      const existingProduct = aggregatedMap.get(key)!;
+      aggregatedMap.set(key, {
+        ...existingProduct,
+        quantity: existingProduct.quantity + 1,
+      });
+    } else {
+      aggregatedMap.set(key, {
+        ...product,
+        quantity: 1,
+      });
+    }
+  });
+  
+  const result = Array.from(aggregatedMap.values());
+  console.log('cartService: Guest offer assignment result:', result.map(p => ({
+    name: p.product_name,
+    quantity: p.quantity,
+    isPaid: p.isPaid
+  })));
+  
+  return result;
+};
 const _aggregateProductsWithinOffer = (productsToAggregate: (ProductItemDetails & { 
   quantity: number; 
   selectedVariant?: ProductVariant;
@@ -116,13 +191,78 @@ export const cartService = {
         if (storedItems) {
           try {
             const parsedItems = JSON.parse(storedItems);
-            // For guest users, return stored items as-is since they're already in the correct format
-            return parsedItems.filter((item: any) => 
+            // For guest users, process offer items to assign paid/free status
+            const processedItems = await Promise.all(parsedItems.filter((item: any) => 
               typeof item === 'object' && 
               item !== null && 
               item.type && 
               (item.type === 'normal' || item.type === 'offer')
-            );
+            ).map(async (item: any) => {
+              if (item.type === 'offer' && (!item.isSynced || item.isSynced === false)) {
+                console.log('cartService: Processing guest offer item for paid/free assignment:', item.offer_name?.offer_name);
+                
+                try {
+                  // Fetch valid offers to get buy/get counts
+                  const offersResponse = await apiService.getValidOffers();
+                  const validOffer = offersResponse.data.find((o: any) => 
+                    o.id.replace(/-/g, '') === item.offer.replace(/-/g, '')
+                  );
+                  
+                  if (validOffer) {
+                    console.log('cartService: Found valid offer:', {
+                      offerName: validOffer.offer_name,
+                      buyCount: validOffer.buy_count,
+                      getCount: validOffer.get_count
+                    });
+                    
+                    // Remove isPaid from existing offer_items and reassign based on price
+                    const offerProductsWithoutPaidStatus = item.offer_items.map((p: any) => {
+                      const cleanProduct = { ...p };
+                      delete cleanProduct.isPaid; // Remove existing isPaid status
+                      return cleanProduct;
+                    });
+                    
+                    console.log('cartService: Products before paid/free assignment:', 
+                      offerProductsWithoutPaidStatus.map((p: any) => ({
+                        name: p.product_name,
+                        price: p.product_price,
+                        quantity: p.quantity
+                      }))
+                    );
+                    
+                    const updatedOfferItems = _assignPaidFreeForGuestOffer(
+                      offerProductsWithoutPaidStatus,
+                      validOffer.buy_count,
+                      validOffer.get_count
+                    );
+                    
+                    console.log('cartService: Products after paid/free assignment:', 
+                      updatedOfferItems.map((p: any) => ({
+                        name: p.product_name,
+                        price: p.product_price,
+                        quantity: p.quantity,
+                        isPaid: p.isPaid
+                      }))
+                    );
+                    
+                    return {
+                      ...item,
+                      offer_items: updatedOfferItems,
+                      buy_count: validOffer.buy_count,
+                      get_count: validOffer.get_count,
+                      isSynced: false // Mark as not synced since this is guest processing
+                    };
+                  } else {
+                    console.warn('cartService: Valid offer not found for guest offer:', item.offer);
+                  }
+                } catch (error) {
+                  console.error('cartService: Error processing guest offer:', error);
+                }
+              }
+              return item;
+            }));
+            
+            return processedItems;
           } catch (parseError) {
             console.error('cartService: Error parsing localStorage items:', parseError);
             localStorage.removeItem('cartItems');
@@ -440,6 +580,81 @@ export const cartService = {
     console.log("cartService: Finished pushing local items to backend");
   },
 
+  // Method specifically for processing guest offers
+  processGuestOffers: async (cartItems: CartItemType[]): Promise<CartItemType[]> => {
+    console.log("cartService: Processing guest offers for paid/free assignment");
+    
+    const accessToken = localStorage.getItem('accessToken');
+    if (accessToken) {
+      console.log("cartService: User is authenticated, skipping guest offer processing");
+      return cartItems;
+    }
+    
+    try {
+      // Fetch valid offers once
+      const offersResponse = await apiService.getValidOffers();
+      
+      const processedItems = await Promise.all(cartItems.map(async (item) => {
+        if (item.type === 'offer' && !item.isSynced) {
+          console.log('cartService: Processing guest offer for paid/free:', item.offer_name?.offer_name);
+          
+          const validOffer = offersResponse.data.find((o: any) => 
+            o.id.replace(/-/g, '') === item.offer.replace(/-/g, '')
+          );
+          
+          if (validOffer) {
+            console.log('cartService: Found valid offer with counts:', {
+              buyCount: validOffer.buy_count,
+              getCount: validOffer.get_count
+            });
+            
+            // Remove isPaid from existing offer_items
+            const offerProductsWithoutPaidStatus = item.offer_items.map((p: any) => {
+              const cleanProduct = { ...p };
+              delete cleanProduct.isPaid;
+              return cleanProduct;
+            });
+            
+            console.log('cartService: Products before assignment:', 
+              offerProductsWithoutPaidStatus.map((p: any) => ({
+                name: p.product_name,
+                price: p.product_price,
+                quantity: p.quantity
+              }))
+            );
+            
+            const updatedOfferItems = _assignPaidFreeForGuestOffer(
+              offerProductsWithoutPaidStatus,
+              validOffer.buy_count,
+              validOffer.get_count
+            );
+            
+            console.log('cartService: Products after assignment:', 
+              updatedOfferItems.map((p: any) => ({
+                name: p.product_name,
+                isPaid: p.isPaid,
+                quantity: p.quantity
+              }))
+            );
+            
+            return {
+              ...item,
+              offer_items: updatedOfferItems,
+              buy_count: validOffer.buy_count,
+              get_count: validOffer.get_count,
+            } as CartOfferItem;
+          }
+        }
+        return item;
+      }));
+      
+      return processedItems;
+    } catch (error) {
+      console.error('cartService: Error processing guest offers:', error);
+      return cartItems;
+    }
+  },
+
   addToCart: async (payload: { product_id?: string; mode: string; item_id?: string; variant_id?: string; is_cart?: string }) => {
     console.log("cartService: Calling apiService.addToCart with payload:", payload);
     const response = await apiService.addToCart(payload);
@@ -453,7 +668,7 @@ export const cartService = {
     const payload = {
       mode: 'delete',
       item_id: offerItemId.replace(/-/g, ''),
-      is_offer: 'yes'
+      is_cart: 'yes'
     };
     console.log("cartService: Remove offer payload:", payload);
     const response = await apiService.addToCart(payload);
