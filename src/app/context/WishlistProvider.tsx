@@ -1,13 +1,16 @@
 // app/context/WishlistProvider.tsx
 'use client';
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import apiService from '@/utils/api/apiService';
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
+import { wishlistService } from '@/utils/api/wishlistService';
+import { showToast } from '@/utils/toast';
 
 interface WishlistContextType {
   wishlistItems: string[];
   isInWishlist: (productId: string) => boolean;
   toggleWishlist: (productId: string) => Promise<void>;
+  refreshWishlist: () => Promise<void>;
+  syncWishlistAfterLogin: () => Promise<void>;
   isLoading: boolean;
 }
 
@@ -29,81 +32,135 @@ export function WishlistProvider({ children }: WishlistProviderProps) {
   const [wishlistItems, setWishlistItems] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    fetchWishlist();
-  }, []);
-
-  const fetchWishlist = async () => {
+  const fetchWishlist = useCallback(async () => {
     setIsLoading(true);
     try {
-      const token = localStorage.getItem('accessToken');
+      console.log('WishlistProvider: Fetching wishlist...');
+      const items = await wishlistService.getUnifiedWishlist();
+      console.log('WishlistProvider: Raw wishlist items:', items);
       
-      if (token) {
-        // User is logged in, fetch from API
-        const results = await apiService.getWishlist();
-        setWishlistItems(results || []);
-      } else {
-        // User is not logged in, get from localStorage
-        const localWishlist = localStorage.getItem('wishlist');
-        if (localWishlist) {
-          setWishlistItems(JSON.parse(localWishlist));
-        } else {
-          setWishlistItems([]);
-        }
-      }
+      // Remove duplicates and get unique product IDs
+      const uniqueProductIds = Array.from(new Set(
+        items.map(id => id.replace(/-/g, ''))
+      )).map(cleanId => {
+        // Find the original ID format from the items array
+        const originalId = items.find(id => id.replace(/-/g, '') === cleanId);
+        return originalId || cleanId;
+      });
+      
+      console.log('WishlistProvider: Unique product IDs:', uniqueProductIds);
+      setWishlistItems(uniqueProductIds);
     } catch (error) {
-      console.error('Error fetching wishlist:', error);
+      console.error('WishlistProvider: Error fetching wishlist:', error);
       setWishlistItems([]);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const isInWishlist = (productId: string): boolean => {
-    return wishlistItems.includes(productId);
-  };
+  useEffect(() => {
+    fetchWishlist();
+  }, [fetchWishlist]);
 
-  const toggleWishlist = async (productId: string): Promise<void> => {
+  // Listen for auth state changes to refresh wishlist and sync
+  useEffect(() => {
+    const handleUserLogin = async () => {
+      console.log('WishlistProvider: User logged in, syncing wishlist...');
+      try {
+        // Sync localStorage wishlist to backend
+        await wishlistService.syncLocalWishlistToBackend();
+        // Refresh wishlist from backend
+        await fetchWishlist();
+        showToast.success('Wishlist synced successfully!');
+      } catch (error) {
+        console.error('WishlistProvider: Error syncing wishlist after login:', error);
+        showToast.error('Failed to sync wishlist');
+        // Still refresh to get backend wishlist
+        await fetchWishlist();
+      }
+    };
+
+    const handleUserLogout = () => {
+      console.log('WishlistProvider: User logged out, refreshing wishlist...');
+      fetchWishlist();
+    };
+
+    window.addEventListener('userLoggedIn', handleUserLogin);
+    window.addEventListener('userLoggedOut', handleUserLogout);
+
+    return () => {
+      window.removeEventListener('userLoggedIn', handleUserLogin);
+      window.removeEventListener('userLoggedOut', handleUserLogout);
+    };
+  }, [fetchWishlist]);
+
+  const isInWishlist = useCallback((productId: string): boolean => {
+    const cleanProductId = productId.replace(/-/g, '');
+    return wishlistItems.some(id => id.replace(/-/g, '') === cleanProductId);
+  }, [wishlistItems]);
+
+  const toggleWishlist = useCallback(async (productId: string): Promise<void> => {
     try {
-      const token = localStorage.getItem('accessToken');
-      const cleanProductId = productId.replace(/-/g, '');
+      console.log('WishlistProvider: Toggling wishlist for product:', productId);
       
-      if (token) {
-        // User is logged in, use API
-        await apiService.addToWishlist({
-          product: cleanProductId,
-        });
+      const result = await wishlistService.toggleWishlistItem(productId);
+      console.log('WishlistProvider: Toggle result:', result);
+      
+      // Update local state immediately for responsive UI
+      setWishlistItems(prevItems => {
+        const cleanProductId = productId.replace(/-/g, '');
+        
+        if (result.isInWishlist) {
+          // Add to wishlist (avoid duplicates)
+          const alreadyExists = prevItems.some(id => id.replace(/-/g, '') === cleanProductId);
+          if (!alreadyExists) {
+            return [...prevItems, productId];
+          }
+          return prevItems;
+        } else {
+          // Remove from wishlist
+          return prevItems.filter(id => id.replace(/-/g, '') !== cleanProductId);
+        }
+      });
+
+      // Show success toast
+      if (result.action === 'added') {
+        showToast.success('Added to wishlist');
+      } else {
+        showToast.success('Removed from wishlist');
       }
       
-      // Update local state
-      setWishlistItems(prevItems => {
-        let newItems: string[];
-        
-        if (prevItems.includes(productId)) {
-          // Remove from wishlist
-          newItems = prevItems.filter(id => id !== productId);
-        } else {
-          // Add to wishlist
-          newItems = [...prevItems, productId];
-        }
-        
-        // If not logged in, store in localStorage
-        if (!token) {
-          localStorage.setItem('wishlist', JSON.stringify(newItems));
-        }
-        
-        return newItems;
-      });
-      
     } catch (error) {
-      console.error('Error updating wishlist:', error);
+      console.error('WishlistProvider: Error updating wishlist:', error);
+      showToast.error('Failed to update wishlist. Please try again.');
     }
-  };
+  }, []);
+
+  const refreshWishlist = useCallback(async (): Promise<void> => {
+    console.log('WishlistProvider: Manually refreshing wishlist...');
+    await fetchWishlist();
+  }, [fetchWishlist]);
+
+  const syncWishlistAfterLogin = useCallback(async (): Promise<void> => {
+    console.log('WishlistProvider: Manual sync after login...');
+    try {
+      await wishlistService.syncLocalWishlistToBackend();
+      await fetchWishlist();
+      showToast.success('Wishlist synced successfully!');
+    } catch (error) {
+      console.error('WishlistProvider: Error during manual sync:', error);
+      showToast.error('Failed to sync wishlist');
+      // Still refresh to get current state
+      await fetchWishlist();
+    }
+  }, [fetchWishlist]);
 
   const value = {
     wishlistItems,
     isInWishlist,
     toggleWishlist,
+    refreshWishlist,
+    syncWishlistAfterLogin,
     isLoading
   };
 

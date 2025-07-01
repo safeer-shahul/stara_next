@@ -15,6 +15,7 @@ import CartDrawer from '@/components/CartDrawer';
 import { useCart, CartNormalItem, ProductItemDetails, ProductVariant } from '@/context/cartContext';
 import { v4 as uuidv4 } from 'uuid';
 import VariantSelectionModal from '@/components/VariantSelectionModal';
+import { showToast } from '@/utils/toast';
 
 interface Product extends ProductItemDetails {}
 
@@ -76,38 +77,45 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
     router.prefetch(`/shop/products/${productId}`);
   }, [router]);
 
-  // NEW: handleAddProductToCart (handles both simple and variant products)
+  // UPDATED: handleAddProductToCart with toast notifications
   const handleAddProductToCart = useCallback((productToAdd: ProductItemDetails, selectedVariantToAdd: ProductVariant | null = null): void => {
     const effectiveStock = getEffectiveProductStock(productToAdd, selectedVariantToAdd?.id);
+    
     if (effectiveStock <= 0) {
-        alert('This item is currently out of stock or you have reached the maximum quantity allowed in your cart.');
-        return;
+      const variantText = selectedVariantToAdd ? ` (${selectedVariantToAdd.variant_name})` : '';
+      showToast.warning(`${productToAdd.product_name}${variantText} is currently out of stock or you have reached the maximum quantity allowed.`);
+      return;
     }
 
     setSelectedProductId(productToAdd.id);
 
     const tempCartItemId = uuidv4();
 
+    const cartItem: CartNormalItem = {
+      id: tempCartItemId,
+      product_id: productToAdd.id,
+      quantity: 1,
+      type: 'normal',
+      isSynced: false,
+      product_name: productToAdd.product_name,
+      product_price: productToAdd.product_price,
+      strike_price: productToAdd.strike_price,
+      images: productToAdd.images,
+      isInStock: selectedVariantToAdd ? selectedVariantToAdd.quantity > 0 : (productToAdd.isInStock || (productToAdd.product_status && productToAdd.quantity > 0)),
+      stock_quantity: selectedVariantToAdd?.quantity ?? productToAdd.quantity,
+      ...(selectedVariantToAdd && { selectedVariant: selectedVariantToAdd }),
+      productDetails: productToAdd,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
     dispatchCart({
       type: 'ADD_NORMAL_ITEM',
-      payload: {
-        id: tempCartItemId,
-        product_id: productToAdd.id,
-        quantity: 1,
-        type: 'normal',
-        isSynced: false,
-        product_name: productToAdd.product_name,
-        product_price: productToAdd.product_price,
-        strike_price: productToAdd.strike_price,
-        images: productToAdd.images,
-        isInStock: selectedVariantToAdd ? selectedVariantToAdd.quantity > 0 : productToAdd.isInStock,
-        stock_quantity: selectedVariantToAdd?.quantity ?? productToAdd.quantity,
-        ...(selectedVariantToAdd && { selectedVariant: selectedVariantToAdd }),
-        productDetails: productToAdd,
-        created_at: new Date().toISOString(), // Add timestamps
-        updated_at: new Date().toISOString(),
-      } as CartNormalItem,
+      payload: cartItem,
     });
+
+    const variantText = selectedVariantToAdd ? ` (${selectedVariantToAdd.variant_name})` : '';
+    showToast.success(`${productToAdd.product_name}${variantText} added to cart!`);
 
     setIsCartOpen(true);
     setIsVariantModalOpen(false);
@@ -220,8 +228,36 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
             const discount = calculateDiscount(product.product_price, product.strike_price);
             const mainImage = product.images[0]?.product_image || "";
             const hoverImage = product.images[1]?.product_image || product.images[0]?.product_image || "";
-            const inStock = product.isInStock;
+            
+            // Calculate if product is in stock based on the data structure
+            let inStock = false;
+            if (product.have_variants && product.product_variant && product.product_variant.length > 0) {
+              // For variant products, check if any variant has stock
+              inStock = product.product_status && product.product_variant.some(v => v.quantity > 0);
+            } else {
+              // For non-variant products, check regular stock
+              inStock = product.product_status && product.quantity > 0;
+            }
+            
             const isCurrentlyNavigating = isNavigating === product.id;
+            
+            // Check effective stock - for variant products, check if any variant has stock
+            let effectiveStock = 0;
+            let hasAvailableVariant = false;
+            
+            if (product.have_variants && product.product_variant && product.product_variant.length > 0) {
+              // For variant products, check if any variant has effective stock
+              hasAvailableVariant = product.product_variant.some(variant => {
+                const variantEffectiveStock = getEffectiveProductStock(product, variant.id);
+                return variant.quantity > 0 && variantEffectiveStock > 0;
+              });
+              effectiveStock = hasAvailableVariant ? 1 : 0; // Set to 1 if any variant is available
+            } else {
+              // For non-variant products, check regular effective stock
+              effectiveStock = getEffectiveProductStock(product, undefined);
+            }
+            
+            const isEffectivelyOutOfStock = effectiveStock <= 0;
 
             return (
               <SwiperSlide key={product.id}>
@@ -265,15 +301,14 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
                       loading="lazy"
                     />
 
-                    {!inStock && (
-                      <div className="absolute top-2 left-2 bg-red-100 text-red-800 px-2 py-1 text-xs font-medium z-10">
-                        Out of Stock
-                      </div>
-                    )}
-
-                    {discount && inStock && (
+                    {/* Top left badge - Always show discount if available, otherwise show out of stock */}
+                    {discount ? (
                       <div className="absolute top-2 left-2 bg-green-100 text-green-800 px-2 py-1 text-xs font-medium z-10">
                         {discount}
+                      </div>
+                    ) : (!inStock || isEffectivelyOutOfStock) && (
+                      <div className="absolute top-2 left-2 bg-red-100 text-red-800 px-2 py-1 text-xs font-medium z-10">
+                        Out of Stock
                       </div>
                     )}
 
@@ -288,9 +323,16 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
                       />
                     </div>
 
-                    {inStock && (
+                    {/* Shopping Cart Button or Out of Stock Text */}
+                    {(!inStock || isEffectivelyOutOfStock) ? (
+                      <div className={`absolute bottom-3 right-3 px-3 py-2 bg-red-500 text-white text-xs font-medium rounded-md transition-opacity ${
+                        hoveredProduct === product.id ? 'opacity-100' : 'opacity-0'
+                      }`}>
+                        Out of Stock
+                      </div>
+                    ) : (
                       <button
-                        className={`absolute bottom-3 cursor-pointer right-3 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 text-white shadow-sm transition-opacity ${
+                        className={`absolute bottom-3 cursor-pointer right-3 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 text-white shadow-sm transition-opacity hover:bg-gray-700 ${
                           hoveredProduct === product.id ? 'opacity-100' : 'opacity-0'
                         }`}
                         onClick={(e) => handleAddToBag(e, product)}

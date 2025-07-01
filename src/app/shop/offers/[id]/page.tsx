@@ -12,6 +12,7 @@ import CartDrawer from '@/components/CartDrawer';
 import { useCart, ProductItemDetails, ProductVariant } from '@/context/cartContext';
 import VariantSelectionModal from '@/components/VariantSelectionModal';
 import { v4 as uuidv4 } from 'uuid';
+import { showToast } from '@/utils/toast';
 
 interface ProductItem extends ProductItemDetails {}
 
@@ -139,9 +140,23 @@ export default function OfferProductsPage() {
   const handleAddProductToSlot = useCallback((productToAdd: ProductItem, selectedVariantToAdd: ProductVariant | null = null) => {
     const emptySlot = offerSlots.find(slot => !slot.product);
 
-    if (!emptySlot || !canAddProductToOfferSlot(productToAdd, selectedVariantToAdd)) {
-        console.warn(`OfferProductsPage: Cannot add product ${productToAdd.product_name} (variant: ${selectedVariantToAdd?.variant_name || 'N/A'}). No empty slots or out of stock.`);
-        return;
+    if (!emptySlot) {
+      showToast.warning('All offer slots are filled. Please remove an item first.');
+      return;
+    }
+
+    // Check effective stock before adding
+    const currentEffectiveStock = getEffectiveProductStock(productToAdd, selectedVariantToAdd?.id);
+    
+    if (currentEffectiveStock <= 0) {
+      const variantText = selectedVariantToAdd ? ` (${selectedVariantToAdd.variant_name})` : '';
+      showToast.warning(`${productToAdd.product_name}${variantText} is currently out of stock or you have reached the maximum quantity allowed.`);
+      return;
+    }
+
+    if (!canAddProductToOfferSlot(productToAdd, selectedVariantToAdd)) {
+      showToast.warning('This item cannot be added to the offer at the moment.');
+      return;
     }
 
     setOfferSlots(prev =>
@@ -155,10 +170,13 @@ export default function OfferProductsPage() {
           : slot
       )
     );
+    
+    const variantText = selectedVariantToAdd ? ` (${selectedVariantToAdd.variant_name})` : '';
+    showToast.success(`${productToAdd.product_name}${variantText} added to offer!`);
+    
     setIsVariantModalOpen(false);
     setProductForVariantSelection(null);
-
-  }, [offerSlots, canAddProductToOfferSlot]);
+  }, [offerSlots, canAddProductToOfferSlot, getEffectiveProductStock]);
 
 
   const handleProductAdd = useCallback((product: ProductItem) => {
@@ -216,20 +234,49 @@ export default function OfferProductsPage() {
   const ProductSelectionButton = ({ product }: { product: ProductItem }) => {
     const selectedCount = getTotalProductCount(product.id);
     const isProductAvailableForOffer = product.isInStock;
+    const emptySlots = offerSlots.filter(slot => !slot.product);
+    const hasEmptySlots = emptySlots.length > 0;
 
-    const isDisabled = !isProductAvailableForOffer || getFilledSlots().length >= (offerData?.buy_count || 0) + (offerData?.get_count || 0);
+    // Check effective stock for the product
+    const effectiveStock = getEffectiveProductStock(product, undefined);
+    const isEffectivelyOutOfStock = effectiveStock <= 0;
+
+    const isDisabled = !isProductAvailableForOffer || !hasEmptySlots || isEffectivelyOutOfStock;
+
+    const getButtonText = () => {
+      if (isEffectivelyOutOfStock) return 'Out of Stock';
+      if (!hasEmptySlots) return 'Slots Full';
+      return `Add ${selectedCount > 0 ? `(${selectedCount})` : ''}`;
+    };
+
+    const handleClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      
+      if (isEffectivelyOutOfStock) {
+        showToast.warning(`${product.product_name} is currently out of stock or you have reached the maximum quantity allowed.`);
+        return;
+      }
+      
+      if (!hasEmptySlots) {
+        showToast.info('All offer slots are filled. Please remove an item first to add this product.');
+        return;
+      }
+      
+      handleProductAdd(product);
+    };
 
     return (
       <button
-        onClick={(e) => {
-          e.stopPropagation();
-          handleProductAdd(product);
-        }}
+        onClick={handleClick}
         disabled={isDisabled}
-        className="w-full flex items-center cursor-pointer justify-center gap-2 py-2 px-3 bg-[var(--color-primary-950)] text-white rounded-md hover:bg-[#0f4c67] disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
+        className={`w-full flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
+          isDisabled
+            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            : 'bg-[var(--color-primary-950)] text-white hover:bg-[#0f4c67] cursor-pointer'
+        }`}
       >
         <ShoppingBag size={14} />
-        Add {selectedCount > 0 && `(${selectedCount})`}
+        {getButtonText()}
       </button>
     );
   };
@@ -301,7 +348,9 @@ export default function OfferProductsPage() {
 
               const totalSelected = getTotalProductCount(product.id);
 
-              const isProductEffectivelyOutOfStockForOffer = !product.isInStock;
+              // Check effective stock
+              const effectiveStock = getEffectiveProductStock(product, undefined);
+              const isProductEffectivelyOutOfStockForOffer = !product.isInStock || effectiveStock <= 0;
 
 
               return (
@@ -352,7 +401,7 @@ export default function OfferProductsPage() {
                       </div>
                     ) : null}
 
-                    {discount && (
+                    {discount && !isProductEffectivelyOutOfStockForOffer && (
                       <div className="absolute top-2 left-2 bg-green-500 text-white text-xs px-2 py-1 rounded z-10">
                         {discount}
                       </div>

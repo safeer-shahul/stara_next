@@ -9,6 +9,7 @@ import UserDropdown from './auth/UserDropdown';
 import AuthModal from './auth/AuthModal';
 import apiService from '@/utils/api/apiService';
 import { useCart, CartItemType } from '@/context/cartContext';
+import { useWishlist } from '@/app/context/WishlistProvider';
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
@@ -20,31 +21,20 @@ export default function Header() {
   const [categories, setCategories] = useState<any[]>([]);
   const [loadingCategories, setLoadingCategories] = useState<boolean>(false);
   const [categoryError, setCategoryError] = useState<string | null>(null);
-  const [wishlistCount, setWishlistCount] = useState<number>(0);
 
   const { cartItems } = useCart();
+  const { wishlistItems } = useWishlist();
+
+  // Get wishlist count from context
+  const wishlistCount = wishlistItems.length;
 
   const totalCartUnits = cartItems.reduce((total: number, item: CartItemType) => {
-  if (item.type === 'normal') {
-    return total + item.quantity;
-  } else {
-    return total + item.offer_items.reduce((offerTotal, p) => offerTotal + p.quantity, 0);
-  }
-}, 0);
-
-  const getWishlistCountFromLocalStorage = () => {
-    try {
-      const wishList = localStorage.getItem('wishlist');
-      if (wishList) {
-        const parsedWishlist = JSON.parse(wishList);
-        return Array.isArray(parsedWishlist) ? parsedWishlist.length : 0;
-      }
-      return 0;
-    } catch (error) {
-      console.error('Error reading wishlist from localStorage:', error);
-      return 0;
+    if (item.type === 'normal') {
+      return total + item.quantity;
+    } else {
+      return total + item.offer_items.reduce((offerTotal, p) => offerTotal + p.quantity, 0);
     }
-  };
+  }, 0);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -82,7 +72,6 @@ export default function Header() {
       } else {
         setIsLoggedIn(false);
         setUserProfile(null);
-        setWishlistCount(getWishlistCountFromLocalStorage());
       }
     };
 
@@ -91,11 +80,6 @@ export default function Header() {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'accessToken') {
         checkAuthStatus();
-      } 
-      else if (e.key === 'wishlist') {
-        if (!isLoggedIn) {
-          setWishlistCount(getWishlistCountFromLocalStorage());
-        }
       }
     };
 
@@ -114,23 +98,16 @@ export default function Header() {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('userLoggedIn', handleUserLogin);
     };
-  }, [isLoggedIn]);
+  }, []);
 
   const fetchUserProfile = async () => {
     try {
       const response = await apiService.getUserProfile();
       setUserProfile(response);
-      
-      if (response?.wishlist_item_count !== undefined) {
-        setWishlistCount(response.wishlist_item_count);
-      } else {
-        setWishlistCount(getWishlistCountFromLocalStorage());
-      }
     } catch (error) {
       console.error('Failed to fetch user profile:', error);
       setUserProfile(null);
       setIsLoggedIn(false);
-      setWishlistCount(getWishlistCountFromLocalStorage());
     }
   };
 

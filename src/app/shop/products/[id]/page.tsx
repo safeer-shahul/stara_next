@@ -11,6 +11,7 @@ import apiService from '@/utils/api/apiService';
 import { useCart } from '@/context/cartContext';
 import { v4 as uuidv4 } from 'uuid';
 import { ProductItemDetails, CartNormalItem, ProductVariant } from '@/context/cartContext';
+import { showToast } from '@/utils/toast';
 
 // Import missing Lucide React icons
 import { AlertCircle, CheckCircle2, Star } from 'lucide-react';
@@ -108,60 +109,75 @@ export default function ProductDetailPage() {
 
 
   const handleAddToBag = async () => {
-    if (product && isProductAvailable) {
-      const currentEffectiveStock = getEffectiveProductStock(product, selectedVariant?.id);
-      if (currentEffectiveStock <= 0) {
-          alert('This item is currently out of stock or you have reached the maximum quantity allowed in your cart.');
-          return;
-      }
-
-      setSelectedProductId(product.id);
-      const tempCartItemId = uuidv4();
-      dispatchCart({
-        type: 'ADD_NORMAL_ITEM',
-        payload: {
-          id: tempCartItemId,
-          product_id: product.id,
-          quantity: 1,
-          type: 'normal',
-          isSynced: false,
-          product_name: product.product_name,
-          product_price: product.product_price,
-          strike_price: product.strike_price,
-          images: product.images,
-          isInStock: selectedVariant ? selectedVariant.quantity > 0 : product.isInStock,
-          stock_quantity: selectedVariant?.quantity ?? product.quantity,
-          ...(selectedVariant && { selectedVariant: selectedVariant }),
-          productDetails: product, // Store full product details
-          created_at: new Date().toISOString(), // Add timestamps
-          updated_at: new Date().toISOString(),
-        } as CartNormalItem,
-      });
-      setIsCartOpen(true);
-      setIsDirectBuyCheckoutMode(false);
+    if (!product || !isProductAvailable) {
+      showToast.warning('This product is currently unavailable.');
+      return;
     }
+
+    const currentEffectiveStock = getEffectiveProductStock(product, selectedVariant?.id);
+    if (currentEffectiveStock <= 0) {
+      const variantText = selectedVariant ? ` (${selectedVariant.variant_name})` : '';
+      showToast.warning(`${product.product_name}${variantText} is currently out of stock or you have reached the maximum quantity allowed.`);
+      return;
+    }
+
+    setSelectedProductId(product.id);
+    const tempCartItemId = uuidv4();
+    
+    const cartItem: CartNormalItem = {
+      id: tempCartItemId,
+      product_id: product.id,
+      quantity: 1,
+      type: 'normal',
+      isSynced: false,
+      product_name: product.product_name,
+      product_price: product.product_price,
+      strike_price: product.strike_price,
+      images: product.images,
+      isInStock: selectedVariant ? selectedVariant.quantity > 0 : product.isInStock,
+      stock_quantity: selectedVariant?.quantity ?? product.quantity,
+      ...(selectedVariant && { selectedVariant: selectedVariant }),
+      productDetails: product,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    dispatchCart({
+      type: 'ADD_NORMAL_ITEM',
+      payload: cartItem,
+    });
+
+    const variantText = selectedVariant ? ` (${selectedVariant.variant_name})` : '';
+    showToast.success(`${product.product_name}${variantText} added to cart!`);
+    
+    setIsCartOpen(true);
+    setIsDirectBuyCheckoutMode(false);
   };
 
   const handleBuyNow = async () => {
-    if (product && isProductAvailable) {
-        const currentEffectiveStock = getEffectiveProductStock(product, selectedVariant?.id);
-        if (currentEffectiveStock <= 0) {
-            alert('This item is currently out of stock or you have reached the maximum quantity allowed in your cart.');
-            return;
-        }
-
-      const productForDirectBuy = {
-        ...product,
-        ...(selectedVariant && {
-          quantity: selectedVariant.quantity,
-          selectedVariant: selectedVariant,
-        }),
-      } as ProductItemDetails;
-
-      setDirectBuyProductData(productForDirectBuy);
-      setIsDirectBuyCheckoutMode(true);
-      setIsCheckoutToOpen(true);
+    if (!product || !isProductAvailable) {
+      showToast.warning('This product is currently unavailable for purchase.');
+      return;
     }
+
+    const currentEffectiveStock = getEffectiveProductStock(product, selectedVariant?.id);
+    if (currentEffectiveStock <= 0) {
+      const variantText = selectedVariant ? ` (${selectedVariant.variant_name})` : '';
+      showToast.warning(`${product.product_name}${variantText} is currently out of stock or you have reached the maximum quantity allowed.`);
+      return;
+    }
+
+    const productForDirectBuy = {
+      ...product,
+      ...(selectedVariant && {
+        quantity: selectedVariant.quantity,
+        selectedVariant: selectedVariant,
+      }),
+    } as ProductItemDetails;
+
+    setDirectBuyProductData(productForDirectBuy);
+    setIsDirectBuyCheckoutMode(true);
+    setIsCheckoutToOpen(true);
   };
 
   const handleCheckoutClose = () => {
@@ -221,9 +237,11 @@ export default function ProductDetailPage() {
     return `${Math.round(discount)}%`;
   };
 
+  const effectiveStock = getEffectiveProductStock(product, selectedVariant?.id);
   const isActionButtonDisabled = !isProductAvailable || fromOffer ||
                                  (product.have_variants && !selectedVariant) ||
-                                 (selectedVariant && selectedVariant.quantity <= 0);
+                                 (selectedVariant && selectedVariant.quantity <= 0) ||
+                                 effectiveStock <= 0;
 
 
   return (
@@ -277,32 +295,43 @@ export default function ProductDetailPage() {
               <div className="pt-4">
                 <h3 className="text-base font-medium mb-2">Select Size:</h3>
                 <div className="flex flex-wrap gap-2">
-                  {product.product_variant.map((variant) => (
-                    <button
-                      key={variant.id}
-                      className={`px-4 py-2 text-sm rounded-md border ${
-                        selectedVariant?.id === variant.id
-                          ? 'border-black bg-black text-white'
-                          : 'border-gray-300 text-gray-700'
-                      } ${variant.quantity === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      onClick={() => setSelectedVariant(variant)}
-                      disabled={variant.quantity === 0}
-                    >
-                      {variant.variant_name} {variant.quantity === 0 && '(Out of Stock)'}
-                    </button>
-                  ))}
+                  {product.product_variant.map((variant) => {
+                    const variantEffectiveStock = getEffectiveProductStock(product, variant.id);
+                    const isVariantDisabled = variant.quantity === 0 || variantEffectiveStock <= 0;
+                    
+                    return (
+                      <button
+                        key={variant.id}
+                        className={`px-4 py-2 text-sm rounded-md border transition-colors ${
+                          selectedVariant?.id === variant.id
+                            ? 'border-black bg-black text-white'
+                            : 'border-gray-300 text-gray-700 hover:border-gray-400'
+                        } ${isVariantDisabled ? 'opacity-50 cursor-not-allowed hover:border-gray-300' : ''}`}
+                        onClick={() => {
+                          if (!isVariantDisabled) {
+                            setSelectedVariant(variant);
+                          } else {
+                            showToast.warning(`${variant.variant_name} is currently out of stock or unavailable.`);
+                          }
+                        }}
+                        disabled={isVariantDisabled}
+                      >
+                        {variant.variant_name} {isVariantDisabled && '(Out of Stock)'}
+                      </button>
+                    );
+                  })}
                 </div>
                 {!selectedVariant && product.product_variant.length > 0 && (
                   <p className="text-sm text-red-500 mt-2">Please select a size.</p>
                 )}
-                {selectedVariant && selectedVariant.quantity === 0 && (
-                    <p className="text-sm text-red-500 mt-2">Selected size is out of stock.</p>
+                {selectedVariant && (selectedVariant.quantity === 0 || getEffectiveProductStock(product, selectedVariant.id) <= 0) && (
+                  <p className="text-sm text-red-500 mt-2">Selected size is out of stock.</p>
                 )}
               </div>
             )}
 
 
-            {isProductAvailable ? (
+            {isProductAvailable && effectiveStock > 0 ? (
               <div className="flex items-center text-sm space-x-2">
                 <CheckCircle2 className="text-[#2e7e52] flex-shrink-0" />
                 <span className="text-[14px]">In stock - ready to ship</span>

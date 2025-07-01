@@ -11,6 +11,7 @@ import CartDrawer from '@/components/CartDrawer';
 import { useCart, CartNormalItem, ProductItemDetails, ProductVariant } from '@/context/cartContext';
 import { v4 as uuidv4 } from 'uuid';
 import VariantSelectionModal from '@/components/VariantSelectionModal';
+import { showToast } from '@/utils/toast';
 
 interface ProductItem extends ProductItemDetails {}
 
@@ -159,39 +160,46 @@ export default function CategoryPage() {
     console.log('Added to wishlist:', productId);
   }, []);
 
-  // NEW: handleAddProductToCart (handles both simple and variant products)
+  // UPDATED: handleAddProductToCart with toast notifications
   const handleAddProductToCart = useCallback((productToAdd: ProductItemDetails, selectedVariantToAdd: ProductVariant | null = null): void => {
     const effectiveStock = getEffectiveProductStock(productToAdd, selectedVariantToAdd?.id);
+    
     if (effectiveStock <= 0) {
-        alert('This item is currently out of stock or you have reached the maximum quantity allowed in your cart.');
-        return;
+      const variantText = selectedVariantToAdd ? ` (${selectedVariantToAdd.variant_name})` : '';
+      showToast.warning(`${productToAdd.product_name}${variantText} is currently out of stock or you have reached the maximum quantity allowed.`);
+      return;
     }
 
     setSelectedProductId(productToAdd.id);
 
     const tempCartItemId = uuidv4();
 
+    const cartItem: CartNormalItem = {
+      id: tempCartItemId,
+      product_id: productToAdd.id,
+      quantity: 1,
+      type: 'normal',
+      isSynced: false,
+      product_name: productToAdd.product_name,
+      product_price: productToAdd.product_price,
+      strike_price: productToAdd.strike_price,
+      images: productToAdd.images,
+      isInStock: selectedVariantToAdd ? selectedVariantToAdd.quantity > 0 : productToAdd.isInStock,
+      stock_quantity: selectedVariantToAdd?.quantity ?? productToAdd.quantity,
+      ...(selectedVariantToAdd && { selectedVariant: selectedVariantToAdd }),
+      productDetails: productToAdd,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
     dispatchCart({
       type: 'ADD_NORMAL_ITEM',
-      payload: {
-        id: tempCartItemId,
-        product_id: productToAdd.id,
-        quantity: 1,
-        type: 'normal',
-        isSynced: false,
-        product_name: productToAdd.product_name,
-        product_price: productToAdd.product_price,
-        strike_price: productToAdd.strike_price,
-        images: productToAdd.images,
-        isInStock: selectedVariantToAdd ? selectedVariantToAdd.quantity > 0 : productToAdd.isInStock,
-        stock_quantity: selectedVariantToAdd?.quantity ?? productToAdd.quantity,
-        ...(selectedVariantToAdd && { selectedVariant: selectedVariantToAdd }),
-        productDetails: productToAdd, // Store full product details
-        created_at: new Date().toISOString(), // Add timestamps for consistency
-        updated_at: new Date().toISOString(),
-      } as CartNormalItem,
+      payload: cartItem,
     });
 
+    const variantText = selectedVariantToAdd ? ` (${selectedVariantToAdd.variant_name})` : '';
+    showToast.success(`${productToAdd.product_name}${variantText} added to cart!`);
+    
     setIsCartOpen(true);
     setIsVariantModalOpen(false);
     setProductForVariantSelection(null);
@@ -329,7 +337,8 @@ export default function CategoryPage() {
               const isCurrentlyNavigating = isNavigating === product.id;
 
               const productHasNoInStockVariants = product.have_variants && !product.product_variant.some(v => v.quantity > 0);
-              const isButtonDisabled = !product.product_status || (product.have_variants ? productHasNoInStockVariants : product.quantity <= 0);
+              const effectiveStock = getEffectiveProductStock(product, undefined);
+              const isButtonDisabled = !product.product_status || (product.have_variants ? productHasNoInStockVariants : product.quantity <= 0) || effectiveStock <= 0;
 
               return (
                 <div
@@ -398,16 +407,24 @@ export default function CategoryPage() {
                       />
                     </div>
 
-                    <button
-                      className={`absolute bottom-3 right-3 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 text-white shadow-sm transition-opacity ${
+                    {/* Shopping Cart Button or Out of Stock Text */}
+                    {isButtonDisabled ? (
+                      <div className={`absolute bottom-3 right-3 px-3 py-2 bg-red-500 text-white text-xs font-medium rounded-md transition-opacity ${
                         hoveredProduct === product.id ? 'opacity-100' : 'opacity-0'
-                      }`}
-                      onClick={(e) => handleAddToCartButtonClick(e, product)}
-                      aria-label="Add to bag"
-                      disabled={isButtonDisabled}
-                    >
-                      <ShoppingCart size={18} />
-                    </button>
+                      }`}>
+                        Out of Stock
+                      </div>
+                    ) : (
+                      <button
+                        className={`absolute bottom-3 right-3 w-10 h-10 flex items-center justify-center rounded-full shadow-sm transition-opacity bg-gray-800 text-white hover:bg-gray-700 ${
+                          hoveredProduct === product.id ? 'opacity-100' : 'opacity-0'
+                        }`}
+                        onClick={(e) => handleAddToCartButtonClick(e, product)}
+                        aria-label="Add to bag"
+                      >
+                        <ShoppingCart size={18} />
+                      </button>
+                    )}
                   </div>
 
                   <div className="mt-4">

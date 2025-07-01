@@ -1,64 +1,43 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react'; // Added useCallback
+import { useState, useEffect, useCallback } from 'react';
 import { Heart, ShoppingCart } from 'lucide-react';
 import Image from 'next/image';
-import apiService from '@/utils/api/apiService';
 import { useRouter } from 'next/navigation';
 import CartDrawer from '@/components/CartDrawer';
-import { useCart, CartNormalItem } from '@/context/cartContext'; // FIX: Import useCart and CartNormalItem
-import { v4 as uuidv4 } from 'uuid'; // FIX: Import uuidv4 for temporary local IDs
+import VariantSelectionModal from '@/components/VariantSelectionModal';
+import { useCart, CartNormalItem, ProductItemDetails, ProductVariant } from '@/context/cartContext';
+import { useWishlist } from '@/app/context/WishlistProvider';
+import { wishlistService, WishlistItemFromBackend } from '@/utils/api/wishlistService';
+import { v4 as uuidv4 } from 'uuid';
+import { showToast } from '@/utils/toast';
 
 // Define the type for wishlist items based on your API response
-type WishlistItem = {
-  id: string;
-  products: {
-    id: string;
-    images: {
-      id: string;
-      product_image: string;
-      product: string;
-    }[];
-    product_code: string;
-    product_name: string;
-    product_description: string;
-    product_price: string;
-    strike_price: string;
-    quantity: number;
-    product_weight: string;
-    product_box_weight: string;
-    product_status: boolean;
-    created_at: string;
-    updated_at: string;
-    sub_category: string;
-  };
-  created_at: string;
-  updated_at: string;
-  product: string;
-  user: number;
-};
+type WishlistItem = WishlistItemFromBackend;
 
 export default function WishlistPage() {
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
-  // Removed selectedProductId as it's no longer needed for CartDrawer
-  // const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [isVariantModalOpen, setIsVariantModalOpen] = useState(false);
+  const [productForVariantSelection, setProductForVariantSelection] = useState<ProductItemDetails | null>(null);
 
-  // FIX: Access dispatchCart from useCart context
-  const { dispatchCart } = useCart();
+  const { dispatchCart, getEffectiveProductStock } = useCart();
+  const { toggleWishlist, refreshWishlist } = useWishlist();
+  const router = useRouter();
 
   useEffect(() => {
     const fetchWishlist = async () => {
       try {
         setLoading(true);
-        const response = await apiService.getMyWishlist();
+        const response = await wishlistService.getDetailedWishlist();
         console.log('Wishlist response:', response);
-        setWishlistItems(response || []);
-        setLoading(false);
+        setWishlistItems(response);
       } catch (error) {
         console.error('Error fetching wishlist:', error);
         setWishlistItems([]);
+        showToast.error('Failed to load wishlist. Please try again.');
+      } finally {
         setLoading(false);
       }
     };
@@ -69,63 +48,85 @@ export default function WishlistPage() {
   // Handle removing item from wishlist
   const handleRemoveFromWishlist = useCallback(async (productId: string) => {
     try {
-      const cleanProductId = productId.replace(/-/g, '');
-      await apiService.addToWishlist({
-        product: cleanProductId,
-      });
-
-      // Refresh wishlist after removing item
-      const response = await apiService.getMyWishlist();
-      setWishlistItems(response || []);
+      await toggleWishlist(productId);
+      
+      // Remove from local state immediately
+      setWishlistItems(prev => prev.filter(item => item.products.id !== productId));
+      
+      // Refresh the wishlist context
+      await refreshWishlist();
     } catch (error) {
       console.error('Error removing item from wishlist:', error);
+      showToast.error('Failed to remove item from wishlist.');
+    }
+  }, [toggleWishlist, refreshWishlist]);
+
+  // Handle adding item to cart
+  const handleAddToCart = useCallback((product: WishlistItem['products']) => {
+    // Convert to ProductItemDetails format
+    const productDetails: ProductItemDetails = {
+      ...product,
+      isInStock: product.have_variants 
+        ? product.product_variant?.some(v => v.quantity > 0) && product.product_status
+        : product.product_status && product.quantity > 0
+    };
+
+    if (product.have_variants && product.product_variant && product.product_variant.length > 0) {
+      // Product has variants, show variant selection modal
+      setProductForVariantSelection(productDetails);
+      setIsVariantModalOpen(true);
+    } else {
+      // Product has no variants, add directly to cart
+      handleAddProductToCart(productDetails);
     }
   }, []);
 
-  // FIX: Updated handleAddToCart function to use cartContext dispatch
-  const handleAddToCart = useCallback((productId: string): void => {
-    // Find the product details from the `wishlistItems` state
-    const productToAdd = wishlistItems.find(item => item.products.id === productId)?.products;
-
-    if (!productToAdd) {
-      console.error(`Product with ID ${productId} not found in wishlist data.`);
+  // Handle adding product to cart (with or without variants)
+  const handleAddProductToCart = useCallback((productToAdd: ProductItemDetails, selectedVariantToAdd: ProductVariant | null = null): void => {
+    const effectiveStock = getEffectiveProductStock(productToAdd, selectedVariantToAdd?.id);
+    
+    if (effectiveStock <= 0) {
+      const variantText = selectedVariantToAdd ? ` (${selectedVariantToAdd.variant_name})` : '';
+      showToast.warning(`${productToAdd.product_name}${variantText} is currently out of stock or you have reached the maximum quantity allowed.`);
       return;
     }
 
-    // FIX: Assign a new UUID to the `id` field for local identification.
     const tempCartItemId = uuidv4();
 
-    // Dispatch ADD_NORMAL_ITEM action to update cart context and local storage
+    const cartItem: CartNormalItem = {
+      id: tempCartItemId,
+      product_id: productToAdd.id,
+      quantity: 1,
+      type: 'normal',
+      isSynced: false,
+      product_name: productToAdd.product_name,
+      product_price: productToAdd.product_price,
+      strike_price: productToAdd.strike_price,
+      images: productToAdd.images,
+      isInStock: selectedVariantToAdd ? selectedVariantToAdd.quantity > 0 : productToAdd.isInStock,
+      stock_quantity: selectedVariantToAdd?.quantity ?? productToAdd.quantity,
+      ...(selectedVariantToAdd && { selectedVariant: selectedVariantToAdd }),
+      productDetails: productToAdd,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
     dispatchCart({
       type: 'ADD_NORMAL_ITEM',
-      payload: {
-        id: tempCartItemId, // Use the temporary UUID here
-        product_id: productToAdd.id,
-        quantity: 1, // Always add 1 at a time from this button
-        type: 'normal',
-        isSynced: false, // Mark as unsynced
-        product_name: productToAdd.product_name,
-        product_price: productToAdd.product_price,
-        strike_price: productToAdd.strike_price,
-        images: productToAdd.images,
-        // Ensure isInStock and stock_quantity are populated from fetched product data
-        isInStock: productToAdd.product_status && productToAdd.quantity > 0,
-        stock_quantity: productToAdd.quantity,
-      } as CartNormalItem,
+      payload: cartItem,
     });
 
-    setIsCartOpen(true); // Open the cart drawer
-  }, [wishlistItems, dispatchCart]); // Depend on wishlistItems (to find productToAdd) and dispatchCart
+    const variantText = selectedVariantToAdd ? ` (${selectedVariantToAdd.variant_name})` : '';
+    showToast.success(`${productToAdd.product_name}${variantText} added to cart!`);
+    
+    setIsCartOpen(true);
+    setIsVariantModalOpen(false);
+    setProductForVariantSelection(null);
+  }, [dispatchCart, getEffectiveProductStock]);
 
-
-  // Handle cart drawer close
   const handleCartClose = useCallback(() => {
     setIsCartOpen(false);
-    // Removed reset selectedProductId as it's no longer needed
-    // setSelectedProductId(null);
   }, []);
-
-  const router = useRouter();
 
   const handleProductClick = useCallback((productId: string): void => {
     router.push(`/shop/products/${productId}`);
@@ -160,13 +161,30 @@ export default function WishlistPage() {
 
   return (
     <div className="bg-white mt-5 rounded-lg shadow py-6 px-2">
-      <h2 className="text-[16px] font-semibold mb-6">Your Wishlist</h2>
+      <h2 className="text-[16px] font-semibold mb-6">Your Wishlist ({wishlistItems.length})</h2>
 
       <div className="space-y-4">
         {wishlistItems.map((item: WishlistItem) => {
           const product = item.products;
           const isOnSale = parseFloat(product.strike_price) > 0;
-          const inStock = product.quantity > 0;
+          
+          // Calculate stock status
+          let inStock = false;
+          let effectiveStock = 0;
+          
+          if (product.have_variants && product.product_variant && product.product_variant.length > 0) {
+            // For variant products, check if any variant has effective stock
+            const hasAvailableVariant = product.product_variant.some(variant => {
+              const variantEffectiveStock = getEffectiveProductStock(product as ProductItemDetails, variant.id);
+              return variant.quantity > 0 && variantEffectiveStock > 0;
+            });
+            inStock = product.product_status && hasAvailableVariant;
+            effectiveStock = hasAvailableVariant ? 1 : 0;
+          } else {
+            // For non-variant products
+            effectiveStock = getEffectiveProductStock(product as ProductItemDetails, undefined);
+            inStock = product.product_status && product.quantity > 0 && effectiveStock > 0;
+          }
 
           return (
             <div key={item.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
@@ -181,58 +199,71 @@ export default function WishlistPage() {
                       style={{ objectFit: 'cover' }}
                     />
                   ) : (
-                    <div className="w-full h-full bg-gray-200"></div>
+                    <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                      <span className="text-gray-400 text-xs">No Image</span>
+                    </div>
                   )}
                 </div>
 
                 <div className="flex-1">
                   <div className="flex justify-between items-start mb-2">
-                    <h3 className="text-[16px] font-medium text-gray-900">{product.product_name}</h3>
+                    <h3 className="text-[16px] font-medium text-gray-900 line-clamp-2">{product.product_name}</h3>
                   </div>
 
                   <div className="mb-2">
                     {isOnSale ? (
                       <div className="flex items-center gap-2">
                         <span className="text-[16px] font-medium text-gray-900">
-                          ₹{parseFloat(product.product_price).toFixed(2)}
+                          ₹{parseFloat(product.product_price).toLocaleString()}
                         </span>
                         <span className="text-[14px] text-gray-500 line-through">
-                          ₹{parseFloat(product.strike_price).toFixed(2)}
+                          ₹{parseFloat(product.strike_price).toLocaleString()}
+                        </span>
+                        <span className="text-[12px] bg-green-100 text-green-800 px-2 py-0.5 rounded">
+                          {Math.round(((parseFloat(product.strike_price) - parseFloat(product.product_price)) / parseFloat(product.strike_price)) * 100)}% OFF
                         </span>
                       </div>
                     ) : (
                       <span className="text-[16px] font-medium text-gray-900">
-                        ₹{parseFloat(product.product_price).toFixed(2)}
+                        ₹{parseFloat(product.product_price).toLocaleString()}
                       </span>
                     )}
                   </div>
 
-                  {inStock ? (
-                    <span className="text-[13px] text-green-600">In Stock</span>
-                  ) : (
-                    <span className="text-[13px] text-red-600">Out of Stock</span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {inStock ? (
+                      <span className="text-[13px] text-green-600 font-medium">✓ In Stock</span>
+                    ) : (
+                      <span className="text-[13px] text-red-600 font-medium">✗ Out of Stock</span>
+                    )}
+                    
+                    {product.have_variants && (
+                      <span className="text-[11px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                        Multiple sizes available
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              <div className="mt-4 pt-3 cursor-pointer border-t border-gray-100">
+              <div className="mt-4 pt-3 border-t border-gray-100">
                 <div className="flex flex-wrap gap-2">
                   <button
-                    onClick={() => handleAddToCart(product.id)}
+                    onClick={() => handleAddToCart(product)}
                     disabled={!inStock}
-                    className={`flex cursor-pointer items-center px-3 py-1 text-[12px] border rounded transition-colors ${
+                    className={`flex items-center px-3 py-1.5 text-[12px] border rounded transition-colors ${
                       inStock
-                        ? "border-black text-white bg-black hover:bg-gray-800"
+                        ? "border-black text-white bg-black hover:bg-gray-800 cursor-pointer"
                         : "border-gray-300 text-gray-400 bg-gray-100 cursor-not-allowed"
                     }`}
                   >
                     <ShoppingCart className="w-3 h-3 mr-1" />
-                    Add to Cart
+                    {product.have_variants ? 'Select & Add to Cart' : 'Add to Cart'}
                   </button>
 
                   <button
                     onClick={() => handleRemoveFromWishlist(product.id)}
-                    className="flex items-center cursor-pointer px-3 py-1 text-[12px] border border-red-500 text-red-500 rounded hover:bg-red-50 transition-colors"
+                    className="flex items-center px-3 py-1.5 text-[12px] border border-red-500 text-red-500 rounded hover:bg-red-50 transition-colors cursor-pointer"
                   >
                     <Heart className="w-3 h-3 mr-1 fill-current" />
                     Remove
@@ -244,11 +275,16 @@ export default function WishlistPage() {
         })}
       </div>
 
-      {/* Cart Drawer - Same as in ProductDetailPage */}
       <CartDrawer
         isOpen={isCartOpen}
         onClose={handleCartClose}
-        // FIX: Removed productId prop as CartDrawer should rely on global cartItems context
+      />
+
+      <VariantSelectionModal
+        isOpen={isVariantModalOpen}
+        onClose={() => setIsVariantModalOpen(false)}
+        product={productForVariantSelection}
+        onVariantSelected={handleAddProductToCart}
       />
     </div>
   );
