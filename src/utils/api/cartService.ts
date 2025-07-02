@@ -84,7 +84,7 @@ const _assignPaidFreeForGuestOffer = (
   })));
   
   // Assign paid/free status
-  const totalItems = buyCount + getCount;
+  // const totalItems = buyCount + getCount;
   const processedProducts: (ProductItemDetails & { quantity: number; selectedVariant?: ProductVariant; isPaid?: boolean })[] = [];
   
   sortedProducts.forEach((product, index) => {

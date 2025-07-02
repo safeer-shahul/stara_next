@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+// import { useRouter } from 'next/navigation';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { auth } from './firebase/config';
 import apiService from '@/utils/api/apiService';
@@ -12,7 +12,7 @@ interface RegisterProps {
 }
 
 const Register = ({ switchToLogin, onRegisterSuccess }: RegisterProps) => {
-  const router = useRouter();
+  // const router = useRouter();
 
   const [formData, setFormData] = useState({
     username: '',

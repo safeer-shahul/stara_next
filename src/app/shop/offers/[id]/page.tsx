@@ -332,7 +332,7 @@ export default function OfferProductsPage() {
               <Info size={16} className="text-blue-600 mt-0.5 flex-shrink-0" />
               <div className="text-xs text-blue-800">
                 <p className="font-medium mb-1">How pricing works:</p>
-                <p>Select {totalRequiredItems} items total. You'll only pay for the {offerData.buy_count} most expensive items. The remaining {offerData.get_count} item{offerData.get_count > 1 ? 's' : ''} will be free!</p>
+                <p>Select {totalRequiredItems} items total. You&#39;ll only pay for the {offerData.buy_count} most expensive items. The remaining {offerData.get_count} item{offerData.get_count > 1 ? 's' : ''} will be free!</p>
               </div>
             </div>
           </div>

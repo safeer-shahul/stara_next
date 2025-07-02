@@ -49,7 +49,7 @@ export default function ProductDetailPage() {
   const [product, setProduct] = useState<ProductItemDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  // const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
 
   // NEW STATES FOR DIRECT BUY NOW
   const [isDirectBuyCheckoutMode, setIsDirectBuyCheckoutMode] = useState<boolean>(false);
@@ -121,7 +121,7 @@ export default function ProductDetailPage() {
       return;
     }
 
-    setSelectedProductId(product.id);
+    // setSelectedProductId(product.id);
     const tempCartItemId = uuidv4();
     
     const cartItem: CartNormalItem = {
@@ -207,7 +207,7 @@ export default function ProductDetailPage() {
 
   const handleCartClose = () => {
     setIsCartOpen(false);
-    setSelectedProductId(null);
+    // setSelectedProductId(null);
   };
 
   if (isLoading) {

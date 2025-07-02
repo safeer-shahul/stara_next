@@ -1,11 +1,11 @@
 'use client';
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import Image from 'next/image';
 import { ShoppingBag, X } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { useCart, CartOfferItem, ProductItemDetails, ProductVariant } from '@/context/cartContext';
 
-interface ProductItem extends ProductItemDetails {}
+// interface ProductItem extends ProductItemDetails {}
 
 interface OfferData {
     id: string;
@@ -15,12 +15,12 @@ interface OfferData {
     start_date: string;
     end_date: string;
     offer_image: string;
-    products: ProductItem[];
+    products: ProductItemDetails[]; 
 }
 
 interface OfferSlot {
     id: string;
-    product: ProductItem | null;
+    product: ProductItemDetails | null;
     selectedVariant?: ProductVariant | null;
     slotIndex: number;
 }
@@ -41,7 +41,7 @@ export default function OfferCartSidebar({
     isAuthenticated = false
 }: OfferCartSidebarProps) {
     const { dispatchCart } = useCart();
-    const [loading, setLoading] = useState(false);
+    // const [loading, setLoading] = useState(false);
 
     const calculateTotals = useCallback(() => {
         const filledSlots = slots.filter(slot => slot.product);
@@ -85,7 +85,7 @@ export default function OfferCartSidebar({
     const handleBuyNow = useCallback(async () => {
         if (!isOfferComplete()) return;
 
-        setLoading(true);
+        // setLoading(true);
 
         const filledSlots = slots.filter(slot => slot.product);
 
@@ -214,7 +214,7 @@ export default function OfferCartSidebar({
             console.error('OfferCartSidebar: Failed to add to cart (local dispatch failed?):', error);
             alert('Failed to add offer. Please try again.');
         } finally {
-            setLoading(false);
+            // setLoading(false);
         }
     }, [dispatchCart, offerData, isOfferComplete, onOpenCartDrawer, slots, isAuthenticated]);
 

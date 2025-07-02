@@ -58,8 +58,8 @@ export default function ChangePassword() {
       setNewPassword('');
       setConfirmPassword('');
       
-    } catch (error) {
-      setError('An error occurred while changing your password. Please try again.');
+    } catch (error: any) {
+      setError(error.message || 'An error occurred while changing your password. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react'; // Added useCallback
 import Link from 'next/link';
 // Import all necessary icons for consistent design
-import { Image as ImageIcon, Plus, Edit, ArrowLeft, Info, Trash2, LayoutGrid } from 'lucide-react';
+import { Image as ImageIcon, Plus, Edit, ArrowLeft, Info, LayoutGrid } from 'lucide-react';
 import apiService from '@/utils/api/apiService';
 import Image from 'next/image';
 
@@ -43,15 +43,14 @@ export default function HeroBannersListPage() {
   }, [fetchBanners]); // Depend on memoized fetchBanners
 
   // Placeholder for delete functionality
-  const handleDeleteBanner = useCallback((bannerId: string) => {
-    if (confirm(`Are you sure you want to delete banner "${bannerId}"?`)) {
-      // Implement actual API call for deletion here
-      console.log(`Deleting banner with ID: ${bannerId}`);
-      // After successful deletion, refetch banners to update the list
-      // apiService.deleteHeroBanner(bannerId).then(() => fetchBanners());
-      alert('Delete functionality not yet implemented in API.');
-    }
-  }, [fetchBanners]); // Depend on fetchBanners to re-run it after deletion
+//   const handleDeleteBanner = useCallback((bannerId: string) => {
+//   if (confirm(`Are you sure you want to delete banner "${bannerId}"?`)) {
+//     console.log(`Deleting banner with ID: ${bannerId}`);
+//     // await apiService.deleteHeroBanner(bannerId);
+//     // await fetchBanners();
+//     alert('Delete functionality not yet implemented in API.');
+//   }
+// }, []);
 
 
   return (
@@ -163,13 +162,13 @@ export default function HeroBannersListPage() {
                             >
                               <Edit className="w-5 h-5" />
                             </Link>
-                            <button
+                            {/* <button
                               onClick={() => handleDeleteBanner(banner.id)}
                               className="text-red-600 hover:text-red-800 transition-colors duration-200"
                               title="Delete Banner"
                             >
                               <Trash2 className="w-5 h-5" />
-                            </button>
+                            </button> */}
                           </div>
                         </td>
                       </tr>

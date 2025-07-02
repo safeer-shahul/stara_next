@@ -17,7 +17,7 @@ interface HomeCategory {
 export default function Home() {
   const [homeCategories, setHomeCategories] = useState<HomeCategory[]>([]);
   const [offers, setOffers] = useState<any[]>([]);
-  const [userProfile, setUserProfile] = useState<any>(null);
+  // const [userProfile, setUserProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -78,8 +78,8 @@ export default function Home() {
     if (accessToken) {
       try {
         // Call getUserProfile API
-        const profile = await apiService.getUserProfile();
-        setUserProfile(profile);
+        await apiService.getUserProfile();
+        // setUserProfile(profile);
       } catch (err) {
         console.error('Failed to fetch user profile:', err);
         // On error, remove accessToken from localStorage

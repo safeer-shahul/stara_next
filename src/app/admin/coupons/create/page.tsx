@@ -558,7 +558,7 @@ function AddCouponPage() {
                 </div>
                 {isStartDateDisabled() && (
                   <p className="text-xs text-gray-500 mt-1">
-                    Start date cannot be changed as it's today or in the past.
+                    Start date cannot be changed as it&#39;s today or in the past.
                   </p>
                 )}
               </div>

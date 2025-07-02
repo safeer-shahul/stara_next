@@ -84,7 +84,7 @@ export default function ReplacementOrderModal({ orderId, orderItems, onClose, on
     try {
       // Prepare replacement items data
       const itemsToReplace = Object.entries(replacementItems)
-        .filter(([_, qty]) => qty > 0)
+        .filter(([, qty]) => qty > 0)
         .map(([itemId, quantity]) => ({
           item_id: itemId,
           quantity: quantity

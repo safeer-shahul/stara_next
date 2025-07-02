@@ -50,18 +50,18 @@ export default function OrdersList() {
   };
 
   // Check if order can be returned or replaced (within 2 days of delivery)
-  const canReturnOrReplace = (status: string, deliveryDate: string | null) => {
-    if (status == 'Delivered' || !deliveryDate) return false;
+  // const canReturnOrReplace = (status: string, deliveryDate: string | null) => {
+  //   if (status == 'Delivered' || !deliveryDate) return false;
     
-    const delivered = new Date(deliveryDate);
-    const today = new Date();
+  //   const delivered = new Date(deliveryDate);
+  //   const today = new Date();
     
-    // Calculate difference in days
-    const diffTime = Math.abs(today.getTime() - delivered.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  //   // Calculate difference in days
+  //   const diffTime = Math.abs(today.getTime() - delivered.getTime());
+  //   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
-    return diffDays <= 2;
-  };
+  //   return diffDays <= 2;
+  // };
 
   // Handle refreshing orders after an action
   const handleOrderUpdate = async () => {

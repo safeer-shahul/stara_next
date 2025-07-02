@@ -85,7 +85,7 @@ export default function ReturnOrderModal({ orderId, orderItems, onClose, onSucce
     try {
       // Prepare return items data
       const itemsToReturn = Object.entries(returnItems)
-        .filter(([_, qty]) => qty > 0)
+        .filter(([, qty]) => qty > 0)
         .map(([itemId, quantity]) => ({
           item_id: itemId,
           quantity: quantity

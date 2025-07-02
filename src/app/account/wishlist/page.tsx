@@ -61,25 +61,7 @@ export default function WishlistPage() {
     }
   }, [toggleWishlist, refreshWishlist]);
 
-  // Handle adding item to cart
-  const handleAddToCart = useCallback((product: WishlistItem['products']) => {
-    // Convert to ProductItemDetails format
-    const productDetails: ProductItemDetails = {
-      ...product,
-      isInStock: product.have_variants 
-        ? product.product_variant?.some(v => v.quantity > 0) && product.product_status
-        : product.product_status && product.quantity > 0
-    };
-
-    if (product.have_variants && product.product_variant && product.product_variant.length > 0) {
-      // Product has variants, show variant selection modal
-      setProductForVariantSelection(productDetails);
-      setIsVariantModalOpen(true);
-    } else {
-      // Product has no variants, add directly to cart
-      handleAddProductToCart(productDetails);
-    }
-  }, []);
+  
 
   // Handle adding product to cart (with or without variants)
   const handleAddProductToCart = useCallback((productToAdd: ProductItemDetails, selectedVariantToAdd: ProductVariant | null = null): void => {
@@ -123,6 +105,27 @@ export default function WishlistPage() {
     setIsVariantModalOpen(false);
     setProductForVariantSelection(null);
   }, [dispatchCart, getEffectiveProductStock]);
+
+
+  // Handle adding item to cart
+  const handleAddToCart = useCallback((product: WishlistItem['products']) => {
+    // Convert to ProductItemDetails format
+    const productDetails: ProductItemDetails = {
+      ...product,
+      isInStock: product.have_variants 
+        ? product.product_variant?.some(v => v.quantity > 0) && product.product_status
+        : product.product_status && product.quantity > 0
+    };
+
+    if (product.have_variants && product.product_variant && product.product_variant.length > 0) {
+      // Product has variants, show variant selection modal
+      setProductForVariantSelection(productDetails);
+      setIsVariantModalOpen(true);
+    } else {
+      // Product has no variants, add directly to cart
+      handleAddProductToCart(productDetails);
+    }
+  }, [handleAddProductToCart]);
 
   const handleCartClose = useCallback(() => {
     setIsCartOpen(false);

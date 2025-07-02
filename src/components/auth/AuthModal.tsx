@@ -7,15 +7,15 @@ import Login from './Login';
 import Register from './Register';
 import ForgotPassword from './ForgotPassword';
 
-interface AuthUserProfile {
-  id?: string;
-  name?: string;
-  email?: string;
-  username?: string;
-  is_superuser?: boolean;
-  is_staff?: boolean;
-  [key: string]: any;
-}
+// interface AuthUserProfile {
+//   id?: string;
+//   name?: string;
+//   email?: string;
+//   username?: string;
+//   is_superuser?: boolean;
+//   is_staff?: boolean;
+//   [key: string]: any;
+// }
 
 interface AuthModalProps {
   isOpen: boolean;

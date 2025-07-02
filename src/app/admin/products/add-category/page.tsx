@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Folder, ArrowLeft, Upload, Image as ImageIcon, XCircle } from 'lucide-react'; // Added CheckCircle, XCircle for validation feedback
 import Link from 'next/link';
 import apiService from '@/utils/api/apiService';
+import Image from 'next/image';
 
 export default function AddEditCategoryPage() {
   const router = useRouter();
@@ -20,7 +21,7 @@ export default function AddEditCategoryPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null); // Renamed to avoid conflict with Image error
   const [imageError, setImageError] = useState<string | null>(null); // Specific error for image aspect ratio
-  const [existingImagePath, setExistingImagePath] = useState<string | null>(null);
+  // const [existingImagePath, setExistingImagePath] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Memoize fetchCategoryDetails for better performance if used in dependency arrays
@@ -32,7 +33,7 @@ export default function AddEditCategoryPage() {
       const category = await apiService.getCategoryById(categoryId);
       setCategoryName(category.category_name);
       if (category.category_image) {
-        setExistingImagePath(category.category_image);
+        // setExistingImagePath(category.category_image);
         setImagePreview(`${process.env.NEXT_PUBLIC_API_BASE_URL}${category.category_image}`);
       }
       setFormError(null);
@@ -56,14 +57,14 @@ export default function AddEditCategoryPage() {
     if (!file) {
       setImagePreview(null);
       setImageFile(null);
-      setExistingImagePath(null);
+      // setExistingImagePath(null);
       setImageError(null);
       return;
     }
 
     // Clear previous image errors and existing path when new file is selected
     setImageError(null);
-    setExistingImagePath(null);
+    // setExistingImagePath(null);
 
     const reader = new FileReader();
     reader.onload = () => {
@@ -237,14 +238,14 @@ export default function AddEditCategoryPage() {
               {imagePreview ? (
                 <div className="flex flex-col items-center">
                   <div className="w-48 h-48 sm:w-60 sm:h-60 rounded-lg overflow-hidden border border-gray-200 bg-gray-100 flex items-center justify-center mb-4 shadow-sm">
-                    {/* Using Next.js Image for optimization, ensure your images are hosted properly */}
-                    <img
+                    <Image
                       src={imagePreview}
                       alt="Category preview"
-                      width={240} // Max dimensions for preview
+                      width={240}
                       height={240}
                       className="w-full h-full object-cover"
-                      style={{ filter: imageError ? 'grayscale(100%)' : 'none' }} // Indicate error visually
+                      style={{ filter: imageError ? 'grayscale(100%)' : 'none' }}
+                      unoptimized={imagePreview.startsWith('data:')} // Use unoptimized for data URLs
                     />
                   </div>
                   <button
@@ -254,7 +255,7 @@ export default function AddEditCategoryPage() {
                       e.stopPropagation(); // Prevent re-triggering file input
                       setImagePreview(null);
                       setImageFile(null);
-                      setExistingImagePath(null);
+                      // setExistingImagePath(null);
                       setImageError(null); // Clear image error on removal
                       if (fileInputRef.current) {
                         fileInputRef.current.value = ''; // Clear file input

@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useCallback, memo } from 'react';
+import { useEffect, useCallback, memo } from 'react';
 import Image from 'next/image';
 import { X, ShoppingBag } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';

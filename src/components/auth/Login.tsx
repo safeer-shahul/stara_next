@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+// import { useRouter } from 'next/navigation';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { auth } from './firebase/config';
 import apiService from '@/utils/api/apiService';
@@ -13,7 +13,7 @@ interface LoginProps {
 }
 
 const Login = ({ switchToRegister, onLoginSuccess, switchToForgotPassword }: LoginProps) => {
-  const router = useRouter();
+  // const router = useRouter();
 
   const [formData, setFormData] = useState({
     username: '',
@@ -204,7 +204,7 @@ const Login = ({ switchToRegister, onLoginSuccess, switchToForgotPassword }: Log
       </form>
 
       <p className="mt-6 text-center text-sm text-gray-600">
-        Don't have an account?{' '}
+        Don&#39;t have an account?{' '}
         <button
           onClick={switchToRegister}
           className="text-[var(--color-primary-950)] hover:underline focus:outline-none font-medium"

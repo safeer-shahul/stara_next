@@ -30,6 +30,7 @@ export default function Support() {
       
     } catch (err) {
       // Handle error
+      console.log(err)
     } finally {
       setIsSubmitting(false);
     }
@@ -95,7 +96,7 @@ export default function Support() {
             {success ? (
               <div className="bg-green-50 border border-green-100 rounded-lg p-4 text-center">
                 <h4 className="font-medium text-green-800 mb-2">Message Sent!</h4>
-                <p className="text-green-700 text-[14px]">We've received your message and will get back to you shortly.</p>
+                <p className="text-green-700 text-[14px]">We&#39;ve received your message and will get back to you shortly.</p>
                 <button 
                   onClick={() => setSuccess(false)}
                   className="mt-3 text-[14px] font-medium text-green-700 hover:underline"
