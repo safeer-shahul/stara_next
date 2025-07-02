@@ -186,13 +186,13 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
         <div className="absolute inset-0 bg-gradient-to-br from-black/90 via-black/80 to-black/70 backdrop-blur-sm" onClick={onClose}></div>
 
         {/* Enhanced cart drawer */}
-        <div className="absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-2xl transform transition-transform rounded-tl-3xl rounded-bl-3xl border-l-4 border-yellow-400">
+        <div className="absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-2xl transform transition-transform rounded-tl-3xl rounded-bl-3xl">
           <div className="flex flex-col h-full relative overflow-hidden">
             
             {/* Decorative background elements */}
-            <div className="absolute top-4 right-6 w-20 h-20 rounded-full border-2 border-yellow-200 opacity-30 animate-pulse"></div>
+            {/* <div className="absolute top-4 right-6 w-20 h-20 rounded-full border-2 border-yellow-200 opacity-30 animate-pulse"></div>
             <div className="absolute top-12 right-10 w-8 h-8 rounded-full border border-amber-300 opacity-40 animate-bounce" style={{ animationDelay: '0.5s' }}></div>
-            <div className="absolute bottom-32 left-6 w-6 h-6 rounded-full bg-yellow-100 opacity-50 animate-pulse" style={{ animationDelay: '1s' }}></div>
+            <div className="absolute bottom-32 left-6 w-6 h-6 rounded-full bg-yellow-100 opacity-50 animate-pulse" style={{ animationDelay: '1s' }}></div> */}
 
             {/* Enhanced Header */}
             <div className="relative bg-gradient-to-r from-[var(--color-primary-950)] via-[#1a5f7a] to-[var(--color-primary-950)] text-white shadow-lg">
@@ -240,7 +240,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
 
             {/* Enhanced Cart Items */}
             <div className="flex-1 overflow-y-auto bg-gradient-to-b from-gray-50 to-white">
-              {contextLoading ? (
+              {/* {contextLoading ? (
                 <div className="flex justify-center items-center h-40">
                   <div className="relative">
                     <div className="w-12 h-12 border-4 border-gray-200 border-t-[var(--color-primary-950)] rounded-full animate-spin"></div>
@@ -248,7 +248,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                   </div>
                   <p className="ml-4 text-gray-600 font-medium">Loading cart items...</p>
                 </div>
-              ) : (
+              ) : ( */}
                 <>
                   {cartItems.length > 0 ? (
                     <div className="p-4 space-y-4">
@@ -330,7 +330,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                     </div>
                   )}
                 </>
-              )}
+               {/* )}*/}
             </div>
 
             {/* Enhanced Cart Summary & Actions */}

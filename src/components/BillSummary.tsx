@@ -184,46 +184,52 @@ const BillSummary: React.FC<BillSummaryProps> = ({
   }, [normalItems, offerSets, destinationPincode, checkoutMode]);
 
   const handlePlaceOrder = async () => {
-    if (!responseData || !addressID) return;
+  if (!responseData || !addressID) return;
 
-    safeSetState(setProcessingOrder, true);
-    safeSetState(setError, null);
+  safeSetState(setProcessingOrder, true);
+  safeSetState(setError, null);
 
-    try {
-      const payload: any = {
-        payment_mode: paymentMethod,
-        address: addressID.replace(/-/g, ''),
-        is_cart: checkoutMode === 'cart' ? 'yes' : 'no',
-      };
+  try {
+    const payload: any = {
+      payment_mode: paymentMethod,
+      address: addressID.replace(/-/g, ''),
+      is_cart: checkoutMode === 'cart' ? 'yes' : 'no',
+    };
 
-      if (checkoutMode === 'buy_now') {
-        payload.items = normalItems.map((item) => ({
-          product_id: item.product_id.replace(/-/g, ''),
-          quantity: item.quantity,
-          ...(item.selectedVariant && { variant_id: item.selectedVariant.id.replace(/-/g, '') }) // Include variant_id for direct buy
-        }));
-      }
-
-      console.log('BillSummary: Order creation payload:', payload);
-
-      const response = await apiService.createProductsOrder(payload);
-
-      console.log('BillSummary: Order creation response:', response);
-
-      if (response && response.razorpay_order_id) {
-        onPlaceOrder(paymentMethod, response.razorpay_order_id, response.order_details.order_id);
-      } else {
-        throw new Error('Invalid order response');
-      }
-    } catch (error) {
-      console.error('BillSummary: Error placing order:', error);
-      const errorMsg = 'Failed to place your order. Please try again.';
-      safeSetState(setError, errorMsg);
-      onError(errorMsg);
-    } finally {
-      safeSetState(setProcessingOrder, false);
+    if (checkoutMode === 'buy_now') {
+      // For 'buy_now', include the items in the payload
+      payload.items = normalItems.map((item) => ({
+        product_id: item.product_id.replace(/-/g, ''),
+        quantity: item.quantity,
+        ...(item.selectedVariant && { variant_id: item.selectedVariant.id.replace(/-/g, '') })
+      }));
     }
-  };
+    // For 'cart' mode, items are omitted and backend retrieves from user's cart
+
+    console.log('BillSummary: Order creation payload:', payload);
+
+    const response = await apiService.createProductsOrder(payload);
+
+    console.log('BillSummary: Order creation response:', response);
+
+    // Fixed condition to handle both COD and Razorpay orders
+    if (response && response.order_details && response.order_details.order_id) {
+      // For COD orders, razorpay_order_id will be null
+      // For Razorpay orders, razorpay_order_id will have a value
+      const razorpayOrderId = response.razorpay_order_id || '';
+      onPlaceOrder(paymentMethod, razorpayOrderId, response.order_details.order_id);
+    } else {
+      throw new Error('Invalid order response - missing order details');
+    }
+  } catch (error) {
+    console.error('BillSummary: Error placing order:', error);
+    const errorMsg = 'Failed to place your order. Please try again.';
+    safeSetState(setError, errorMsg);
+    onError(errorMsg);
+  } finally {
+    safeSetState(setProcessingOrder, false);
+  }
+};
 
   // Calculate totals from the response data for display
   const calculateTotals = () => {

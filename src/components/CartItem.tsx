@@ -47,7 +47,7 @@ const CartItem = ({ product, onRemove, onQuantityChange, fromProductSummary = fa
       fromProductSummary 
         ? 'border-gray-100 bg-white shadow-sm hover:shadow-md' 
         : 'border-gray-200 bg-white shadow-lg hover:shadow-xl hover:border-[var(--color-primary-950)]/30'
-    } p-4 mb-3 overflow-hidden`}>
+    } p-3 overflow-hidden`}>
       
       {/* Decorative corner accent */}
       {!fromProductSummary && (
@@ -130,9 +130,8 @@ const CartItem = ({ product, onRemove, onQuantityChange, fromProductSummary = fa
               </div>
             )
           ) : (
-            <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-200 mb-3">
-              <div className="w-2 h-2 bg-[var(--color-primary-950)] rounded-full"></div>
-              <span className="text-[var(--color-primary-950)] text-sm font-medium">
+            <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
+              <span className="text-[var(--color-primary-950)] text-xs font-medium">
                 Quantity: {product.quantity}
               </span>
             </div>
@@ -182,14 +181,14 @@ const CartItem = ({ product, onRemove, onQuantityChange, fromProductSummary = fa
           )}
 
           {/* Product Summary Total */}
-          {fromProductSummary && (
+          {/* {fromProductSummary && (
             <div className="flex justify-between items-center pt-2 border-t border-gray-200">
-              <span className="text-sm text-gray-600">Item Total:</span>
-              <span className="text-lg font-bold text-[var(--color-primary-950)]">
+              <span className="text-xs text-gray-600">Item Total:</span>
+              <span className="text-sm font-bold text-[var(--color-primary-950)]">
                 ₹{(parseFloat(product.product_price) * product.quantity).toLocaleString('en-IN')}
               </span>
             </div>
-          )}
+          )} */}
         </div>
       </div>
 

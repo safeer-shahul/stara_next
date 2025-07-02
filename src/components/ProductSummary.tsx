@@ -69,11 +69,11 @@ const ProductSummary: React.FC<ProductSummaryProps> = ({
           <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center mr-3">
             <span className="text-white text-sm font-bold">📦</span>
           </div>
-          <h4 className="font-semibold text-lg text-white">Order Summary</h4>
+          <h4 className="font-semibold text-sm text-white">Order Summary</h4>
         </div>
       </div>
 
-      <div className="p-6">
+      <div className="p-3">
         {/* Items Container */}
         <div className="max-h-64 overflow-y-auto mb-6 space-y-3">
           {normalItems.length === 0 && offerSets.length === 0 && (
@@ -169,9 +169,9 @@ const ProductSummary: React.FC<ProductSummaryProps> = ({
 
             {/* Offer Savings */}
             {totals.offerSavings > 0 && (
-              <div className="flex justify-between items-center text-sm bg-green-100 -mx-2 px-2 py-2 rounded-lg">
+              <div className="flex justify-between items-center text-xs bg-green-100 -mx-2 px-2 py-2 rounded-lg">
                 <span className="text-green-700 font-medium flex items-center">
-                  <span className="text-lg mr-2">🎉</span>
+                  <span className="text-sm mr-2">🎉</span>
                   You Save (Free Items)
                 </span>
                 <span className="font-bold text-green-700">-₹{totals.offerSavings.toFixed(2)}</span>
@@ -185,7 +185,7 @@ const ProductSummary: React.FC<ProductSummaryProps> = ({
                 <span className="text-xs text-gray-500 ml-1">({totals.totalItems} items)</span>
               </div>
               <div className="text-right">
-                <div className="text-xl font-bold text-[var(--color-primary-950)]">
+                <div className="text-lg font-bold text-[var(--color-primary-950)]">
                   ₹{totals.grandTotal.toFixed(2)}
                 </div>
                 {totals.offerSavings > 0 && (
