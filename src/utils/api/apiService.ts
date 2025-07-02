@@ -806,8 +806,23 @@ class ApiService {
 
   public async updateStaffStatus(id: any, data: any): Promise<any> {
     try {
-      // Corrected URL: Use template literal for ID
       return await this.put<any>(`/user/update_user_is_active/${id}`, data);
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  public async getOrderByIdUser(id: any): Promise<any> {
+    try {
+      return await this.get<any>(`/order/get_order_by_id_user/${id}`);
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  public async cancelOrder(id: any, data: any): Promise<any> {
+    try {
+      return await this.put<any>(`/order/order_cancel/${id}`, data);
     } catch (error) {
       throw error;
     }

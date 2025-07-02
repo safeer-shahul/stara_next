@@ -5,21 +5,32 @@ import { X, ChevronDown, ChevronUp, AlertTriangle, Gift } from 'lucide-react';
 import Image from 'next/image';
 import apiService from '@/utils/api/apiService';
 
-interface ReplacementOrderModalProps {
+interface ComplaintModalProps {
   orderId: string;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: ReplacementOrderModalProps) {
+export default function ComplaintModal({ orderId, onClose, onSuccess }: ComplaintModalProps) {
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [orderData, setOrderData] = useState<any>(null);
   const [offers, setOffers] = useState<any>([]);
   const [selectedItems, setSelectedItems] = useState<Record<string, boolean>>({});
-  const [replacementReason, setReplacementReason] = useState('');
+  const [complaintReason, setComplaintReason] = useState('');
   const [error, setError] = useState('');
   const [showPolicy, setShowPolicy] = useState(false);
+
+  const complaintReasons = [
+    'Received damaged item',
+    'Product doesn\'t match description',
+    'Poor product quality',
+    'Missing items from order',
+    'Late delivery',
+    'Wrong item received',
+    'Defective product',
+    'Other'
+  ];
 
   // Fetch order and offers data when component mounts
   useEffect(() => {
@@ -38,6 +49,15 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
         
         setOrderData(orderResponse);
         setOffers(offersResponse?.data || []);
+        
+        // Initialize selected items with false for all items
+        const allItems = getAllOrderItems(orderResponse);
+        const initialSelectedItems: Record<string, boolean> = {};
+        allItems.forEach(item => {
+          initialSelectedItems[item.id] = false;
+        });
+        setSelectedItems(initialSelectedItems);
+        
         setLoading(false);
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -102,16 +122,16 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Check if any items are selected for replacement
+    // Check if any items are selected for complaint
     const hasSelectedItems = Object.values(selectedItems).some(selected => selected);
     if (!hasSelectedItems) {
-      setError('Please select at least one item to replace');
+      setError('Please select at least one item to register complaint for');
       return;
     }
     
     // Check if a reason is provided
-    if (!replacementReason.trim()) {
-      setError('Please provide a reason for replacement');
+    if (!complaintReason.trim()) {
+      setError('Please provide a reason for your complaint');
       return;
     }
 
@@ -132,26 +152,26 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
         };
       }).filter(product => product.product_id); // Remove any items without product_id
       
-      // Replacement request data in the required format
-      const replacementData = {
+      // Complaint request data in the required format
+      const complaintData = {
         orderID: orderId,
         products: products,
-        reason: replacementReason
+        reason: complaintReason
       };
       
-      console.log('Replacement request data:', replacementData);
+      console.log('Complaint request data:', complaintData);
       
-      // Call your API to process the replacement
+      // Call your API to process the complaint
       // In a real application, uncomment this:
-      // await apiService.createReplacementRequest(replacementData);
+      // await apiService.createComplaintRequest(complaintData);
       
       // For demo purposes, simulate API call
       await new Promise(resolve => setTimeout(resolve, 1500));
-      console.log('Replacement request submitted:', replacementData);
+      console.log('Complaint request submitted:', complaintData);
       
       onSuccess();
     } catch (error: any) {
-      setError(error.message || 'Failed to submit replacement request. Please try again.');
+      setError(error.message || 'Failed to submit complaint. Please try again.');
       setSubmitting(false);
     }
   };
@@ -211,7 +231,7 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
         <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
           <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-medium text-gray-900">Replace Items</h3>
+              <h3 className="text-lg font-medium text-gray-900">Register Complaint</h3>
               <button onClick={onClose} className="text-gray-400 hover:text-gray-500">
                 <X size={20} />
               </button>
@@ -224,24 +244,25 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
                   className="w-full flex justify-between items-center p-3 bg-gray-50 text-sm font-medium text-gray-700"
                   onClick={() => setShowPolicy(!showPolicy)}
                 >
-                  Replacement Policy
+                  Complaint Policy
                   {showPolicy ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                 </button>
                 {showPolicy && (
                   <div className="p-3 text-sm text-gray-600 bg-white">
                     <ul className="list-disc pl-5 space-y-1">
-                      <li>Replacements must be requested within 2 days of delivery</li>
-                      <li>Original items must be returned in their packaging</li>
-                      <li>Shipping for replacement items is free</li>
-                      <li>Processing may take 7-10 business days after we receive your original items</li>
-                      <li>Replacement items will be of the same product and quantity</li>
+                      <li>Complaints can be registered for delivered orders</li>
+                      <li>We aim to resolve complaints within 3-5 business days</li>
+                      <li>You will receive updates via email/SMS on complaint status</li>
+                      <li>Our customer support team will contact you for further details if needed</li>
+                      <li>Provide accurate information to help us resolve your issue quickly</li>
+                      <li>Keep your order details handy for reference</li>
                     </ul>
                   </div>
                 )}
               </div>
 
               <div className="mb-5">
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Select Items to Replace</h4>
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Select Items for Complaint</h4>
                 
                 {error && (
                   <div className="mb-3 p-2 bg-red-50 border border-red-200 text-red-600 text-sm rounded flex items-start">
@@ -363,16 +384,16 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
               </div>
             
               <div className="mb-4">
-                <label htmlFor="replacementReason" className="block text-sm font-medium text-gray-700 mb-2">
-                  Reason for Replacement
+                <label htmlFor="complaintReason" className="block text-sm font-medium text-gray-700 mb-2">
+                  Reason for Complaint
                 </label>
                 <textarea
-                  id="replacementReason"
-                  value={replacementReason}
-                  onChange={(e) => setReplacementReason(e.target.value)}
+                  id="complaintReason"
+                  value={complaintReason}
+                  onChange={(e) => setComplaintReason(e.target.value)}
                   rows={3}
                   className="shadow-sm focus:ring-[#175e7a] focus:border-[var(--color-primary-950)] block w-full sm:text-sm border-gray-300 rounded-md"
-                  placeholder="Please explain why you want to replace these items..."
+                  placeholder="Please explain the reason for your complaint..."
                   required
                 />
               </div>
@@ -385,7 +406,7 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
                     submitting ? 'opacity-70 cursor-not-allowed' : ''
                   }`}
                 >
-                  {submitting ? 'Processing...' : 'Submit Replacement Request'}
+                  {submitting ? 'Submitting...' : 'Submit Complaint'}
                 </button>
                 <button
                   type="button"

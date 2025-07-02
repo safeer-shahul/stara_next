@@ -84,7 +84,7 @@ const AuthModal = ({ isOpen, onClose, initialView = 'login' }: AuthModalProps) =
             <div className="flex border-b border-gray-200 mb-6">
               <button
                 id="auth-modal-title"
-                className={`flex-1 py-3 px-4 text-center text-lg focus:outline-none transition-colors duration-200
+                className={`flex-1 py-3 px-4 text-center text-sm focus:outline-none transition-colors duration-200
                   ${view === 'login' 
                     ? 'border-b-2 border-[var(--color-primary-950)] text-[var(--color-primary-950)] font-semibold' 
                     : 'text-gray-500 hover:text-gray-700'
@@ -94,7 +94,7 @@ const AuthModal = ({ isOpen, onClose, initialView = 'login' }: AuthModalProps) =
                 Log In
               </button>
               <button
-                className={`flex-1 py-3 px-4 text-center text-lg focus:outline-none transition-colors duration-200
+                className={`flex-1 py-3 px-4 text-center text-sm focus:outline-none transition-colors duration-200
                   ${view === 'register' 
                     ? 'border-b-2 border-[var(--color-primary-950)] text-[var(--color-primary-950)] font-semibold' 
                     : 'text-gray-500 hover:text-gray-700'

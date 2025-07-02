@@ -1,38 +1,48 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { MapPin, PackageOpen } from 'lucide-react';
+import { MapPin, PackageOpen, Gift } from 'lucide-react';
 import Image from 'next/image';
 import apiService from '@/utils/api/apiService';
 import CancelOrderModal from './CancelOrderModal';
-import ReturnOrderModal from './ReturnOrderModal';
 import ReplacementOrderModal from './ReplacementOrderModal';
-
+import ComplaintModal from './ComplaintModal';
 
 export default function OrdersList() {
   const [orders, setOrders] = useState<any>([]);
+  const [offers, setOffers] = useState<any>([]);
   const [loading, setLoading] = useState(true);
   const [showCancelModal, setShowCancelModal] = useState(false);
-  const [showReturnModal, setShowReturnModal] = useState(false);
+  const [showComplaintModal, setShowComplaintModal] = useState(false);
   const [showReplacementModal, setShowReplacementModal] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchOrders = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
-        const response = await apiService.getMyOrders();
-        console.log('Orders response:', response);
-        setOrders(response || []);
+        
+        // Fetch both orders and offers concurrently
+        const [ordersResponse, offersResponse] = await Promise.all([
+          apiService.getMyOrders(),
+          apiService.getValidOffers()
+        ]);
+        
+        console.log('Orders response:', ordersResponse);
+        console.log('Offers response:', offersResponse);
+        
+        setOrders(ordersResponse || []);
+        setOffers(offersResponse?.data || []);
         setLoading(false);
       } catch (error) {
-        console.error('Error fetching orders:', error);
+        console.error('Error fetching data:', error);
         setOrders([]);
+        setOffers([]);
         setLoading(false);
       }
     };
 
-    fetchOrders();
+    fetchData();
   }, []);
 
   // Helper function to format dates
@@ -44,24 +54,67 @@ export default function OrdersList() {
     });
   };
 
-  // Check if order can be cancelled (not delivered or cancelled)
+  // Check if order can be cancelled (only pending orders)
   const canCancelOrder = (status: string) => {
-    return status !== 'Delivered' && status !== 'Cancelled';
+    return status === 'Pending';
   };
 
-  // Check if order can be returned or replaced (within 2 days of delivery)
-  // const canReturnOrReplace = (status: string, deliveryDate: string | null) => {
-  //   if (status == 'Delivered' || !deliveryDate) return false;
+  // Check if order can be replaced (only delivered orders)
+  const canReplaceOrder = (status: string) => {
+    return status === 'Delivered';
+  };
+
+  // Check if order can have complaint registered (only delivered orders)
+  const canRegisterComplaint = (status: any) => {
+    return status === 'Delivered';
+  };
+
+  // Get all items for an order (including bundle items)
+  const getAllOrderItems = (order: any) => {
+    let allItems = [...order.order_items];
     
-  //   const delivered = new Date(deliveryDate);
-  //   const today = new Date();
+    // Add bundle items if they exist
+    if (order.bundles) {
+      Object.keys(order.bundles).forEach(bundleId => {
+        allItems = allItems.concat(order.bundles[bundleId]);
+      });
+    }
     
-  //   // Calculate difference in days
-  //   const diffTime = Math.abs(today.getTime() - delivered.getTime());
-  //   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return allItems;
+  };
+
+  // Get total item count for an order
+  const getTotalItemCount = (order: any) => {
+    const allItems = getAllOrderItems(order);
+    return allItems.reduce((sum: any, item: any) => sum + item.quantity, 0);
+  };
+
+  // Get offer name for a bundle
+  const getOfferName = (bundleItems: any[]) => {
+    if (!bundleItems.length || !offers.length) return 'Special Offer';
     
-  //   return diffDays <= 2;
-  // };
+    // Get product IDs from bundle items
+    const bundleProductIds = bundleItems.map(item => item.product_id);
+    
+    // Find matching offer based on products
+    const matchingOffer = offers.find((offer: any) => {
+      // Check if all bundle products are included in the offer's products
+      return bundleProductIds.every(productId => offer.products.includes(productId));
+    });
+    
+    return matchingOffer ? matchingOffer.offer_name : 'Special Offer';
+  };
+
+  // Group bundle items by bundle ID with offer names
+  const getBundleGroups = (order: any) => {
+    if (!order.bundles) return [];
+    
+    return Object.keys(order.bundles).map((bundleId, index) => ({
+      bundleId,
+      items: order.bundles[bundleId],
+      offerName: getOfferName(order.bundles[bundleId])
+    }));
+  };
 
   // Handle refreshing orders after an action
   const handleOrderUpdate = async () => {
@@ -79,10 +132,10 @@ export default function OrdersList() {
     setShowCancelModal(true);
   };
 
-  // Handle opening return modal
-  const handleOpenReturnModal = (orderId: string) => {
+  // Handle opening complaint modal
+  const handleOpenComplaintModal = (orderId: string) => {
     setSelectedOrderId(orderId);
-    setShowReturnModal(true);
+    setShowComplaintModal(true);
   };
 
   // Handle opening replacement modal
@@ -125,20 +178,29 @@ export default function OrdersList() {
         
         <div className="space-y-4">
           {orders.map((order: any) => {
-            const itemsCount = order.order_items.reduce((sum: any, item: any) => sum + item.quantity, 0);
-            // For demo purposes, let's assume delivery date is 2 days after order creation
-            // In production, you should use the actual delivery date from the API
+            const itemsCount = getTotalItemCount(order);
             const deliveryDate = order.delivery_date || (order.status === 'Delivered' ? 
               new Date(new Date(order.created_at).getTime() + (2 * 24 * 60 * 60 * 1000)).toISOString() : 
               null);
             
             const canCancel = canCancelOrder(order.status);
-            // const canReturn = canReturnOrReplace(order.status, deliveryDate);
+            const canReplace = canReplaceOrder(order.status);
+            const canComplaint = canRegisterComplaint(order.status);
+            const bundleGroups = getBundleGroups(order);
+            const hasOffers = bundleGroups.length > 0;
             
             return (
               <div key={order.order_id} className="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-2">
-                  <h3 className="text-[14px] font-medium">Order #{order.order_id.replace(/-/g, '')}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-[14px] font-medium">Order #{order.order_id.replace(/-/g, '')}</h3>
+                    {hasOffers && (
+                      <div className="flex items-center gap-1 text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                        <Gift size={12} />
+                        <span>Offer</span>
+                      </div>
+                    )}
+                  </div>
                   <span className={`text-xs px-2 py-1 rounded-full font-medium mt-1 sm:mt-0 inline-flex self-start ${
                     order.status === "Pending" 
                       ? "bg-orange-100 text-orange-800" 
@@ -165,11 +227,11 @@ export default function OrdersList() {
                   <span>•</span>
                   <span>{itemsCount} {itemsCount === 1 ? 'item' : 'items'}</span>
                   <span>•</span>
-                  <span className="font-medium text-gray-900">₹{parseFloat(order.total_price).toFixed(2)}</span>
+                  <span className="font-medium text-gray-900">₹{parseFloat(order.total_price || order.payable_price).toFixed(2)}</span>
                 </div>
 
                 {order.address_details && (
-                  <div className="py-4 bg-gray-50 rounded-lg">
+                  <div className="py-4 bg-gray-50 rounded-lg mb-3">
                     <div className="flex items-center">
                       <MapPin className="w-4 h-4 text-gray-500 mr-2" />
                       <h4 className="text-sm font-bold text-gray-700">Delivering to:</h4>
@@ -184,37 +246,106 @@ export default function OrdersList() {
                   </div>
                 )}
                 
-                <div className="mt-3 space-y-2">
-                  {order.order_items.map((item: any) => (
-                    <div key={item.id} className="flex bg-white p-2 rounded-lg border border-gray-200">
-                      <div className="w-16 h-16 rounded-md overflow-hidden mr-3 bg-gray-100 flex-shrink-0 relative">
-                        {item.product_details.images && item.product_details.images.length > 0 ? (
-                          <Image 
-                            src={`${process.env.NEXT_PUBLIC_API_BASE_URL}${item.product_details.images[0].product_image}`} 
-                            alt={item.product_details.product_name}
-                            fill
-                            sizes="(max-width: 64px) 100vw, 64px"
-                            style={{objectFit: 'cover'}}
-                          />
-                        ) : (
-                          <div className="w-full h-full bg-gray-200"></div>
-                        )}
-                      </div>
-                      
-                      <div className="flex-1">
-                        <div className="flex justify-between items-start mb-1">
-                          <h4 className="text-[14px] font-medium text-gray-900 line-clamp-1">{item.product_details.product_name}</h4>
-                        </div>
-                        
-                        <div className="flex justify-between">
-                          <div>
-                            <p className="text-[13px] text-gray-600">Qty: {item.quantity}</p>
+                <div className="mt-3 space-y-3">
+                  {/* Regular Items */}
+                  {order.order_items.length > 0 && (
+                    <div>
+                      {order.order_items.map((item: any) => (
+                        <div key={item.id} className="flex bg-white p-2 rounded-lg border border-gray-200 mb-2">
+                          <div className="w-16 h-16 rounded-md overflow-hidden mr-3 bg-gray-100 flex-shrink-0 relative">
+                            {item.product_details.images && item.product_details.images.length > 0 ? (
+                              <Image 
+                                src={`${process.env.NEXT_PUBLIC_API_BASE_URL}${item.product_details.images[0].product_image}`} 
+                                alt={item.product_details.product_name}
+                                fill
+                                sizes="(max-width: 64px) 100vw, 64px"
+                                style={{objectFit: 'cover'}}
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-gray-200"></div>
+                            )}
                           </div>
                           
-                          <div className="text-right">
-                            <p className="text-[14px] font-medium">₹{parseFloat(item.price)}</p>
+                          <div className="flex-1">
+                            <div className="flex justify-between items-start mb-1">
+                              <h4 className="text-[14px] font-medium text-gray-900 line-clamp-1">{item.product_details.product_name}</h4>
+                            </div>
+                            
+                            <div className="flex justify-between">
+                              <div>
+                                <p className="text-[13px] text-gray-600">Qty: {item.quantity}</p>
+                                {item.mode && item.mode !== 'Normal' && (
+                                  <span className="text-[11px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded">
+                                    {item.mode}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              <div className="text-right">
+                                <p className="text-[14px] font-medium">₹{parseFloat(item.price || item.total_price).toFixed(2)}</p>
+                              </div>
+                            </div>
                           </div>
                         </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Bundle/Offer Items */}
+                  {bundleGroups.map((bundleGroup, bundleIndex) => (
+                    <div key={bundleGroup.bundleId} className="border-2 border-dashed border-green-200 rounded-lg p-3 bg-green-50">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Gift size={16} className="text-green-600" />
+                        <h5 className="text-[13px] font-semibold text-green-800">{bundleGroup.offerName}</h5>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        {bundleGroup.items.map((item: any) => (
+                          <div key={item.id} className="flex bg-white p-2 rounded-lg border border-green-200">
+                            <div className="w-14 h-14 rounded-md overflow-hidden mr-3 bg-gray-100 flex-shrink-0 relative">
+                              {item.product_details.images && item.product_details.images.length > 0 ? (
+                                <Image 
+                                  src={`${process.env.NEXT_PUBLIC_API_BASE_URL}${item.product_details.images[0].product_image}`} 
+                                  alt={item.product_details.product_name}
+                                  fill
+                                  sizes="(max-width: 56px) 100vw, 56px"
+                                  style={{objectFit: 'cover'}}
+                                />
+                              ) : (
+                                <div className="w-full h-full bg-gray-200"></div>
+                              )}
+                            </div>
+                            
+                            <div className="flex-1">
+                              <div className="flex justify-between items-start mb-1">
+                                <h4 className="text-[13px] font-medium text-gray-900 line-clamp-1">{item.product_details.product_name}</h4>
+                              </div>
+                              
+                              <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-2">
+                                  <p className="text-[12px] text-gray-600">Qty: {item.quantity}</p>
+                                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                                    item.mode === 'Buy' 
+                                      ? 'bg-blue-100 text-blue-700' 
+                                      : 'bg-green-100 text-green-700'
+                                  }`}>
+                                    {item.mode}
+                                  </span>
+                                </div>
+                                
+                                <div className="text-right">
+                                  <p className="text-[13px] font-medium">
+                                    {item.mode === 'Get' ? (
+                                      <span className="text-green-600">FREE</span>
+                                    ) : (
+                                      `₹${parseFloat(item.price || item.total_price).toFixed(2)}`
+                                    )}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   ))}
@@ -229,7 +360,7 @@ export default function OrdersList() {
                       </span>
                     </div>
                     <div className="text-[13px] font-medium">
-                      Total: ₹{parseFloat(order.total_price).toFixed(2)}
+                      Total: ₹{parseFloat(order.total_price || order.payable_price).toFixed(2)}
                     </div>
                   </div>
                   
@@ -243,23 +374,23 @@ export default function OrdersList() {
                       </button>
                     )}
                     
-                    {/* {canReturn && ( */}
+                    {canComplaint && (
                       <button 
-                        onClick={() => handleOpenReturnModal(order.order_id)}
+                        onClick={() => handleOpenComplaintModal(order.order_id)}
                         className="px-3 py-1 cursor-pointer text-[12px] border border-black text-black rounded hover:bg-gray-50 transition-colors"
                       >
-                        Return Order
+                        Register Complaint
                       </button>
-                    {/* )} */}
+                    )}
                     
-                    {/* {canReturn && ( */}
+                    {canReplace && (
                       <button 
                         onClick={() => handleOpenReplacementModal(order.order_id)}
                         className="px-3 py-1 cursor-pointer text-[12px] border border-black text-black rounded hover:bg-gray-50 transition-colors"
                       >
                         Replace Order
                       </button>
-                    {/* )} */}
+                    )}
                   </div>
                 </div>
               </div>
@@ -279,13 +410,12 @@ export default function OrdersList() {
         />
       )}
 
-      {showReturnModal && selectedOrderId && (
-        <ReturnOrderModal
+      {showComplaintModal && selectedOrderId && (
+        <ComplaintModal
           orderId={selectedOrderId}
-          orderItems={orders.find((order:any) => order.order_id === selectedOrderId)?.order_items || []}
-          onClose={() => setShowReturnModal(false)}
+          onClose={() => setShowComplaintModal(false)}
           onSuccess={() => {
-            setShowReturnModal(false);
+            setShowComplaintModal(false);
             handleOrderUpdate();
           }}
         />
@@ -294,7 +424,6 @@ export default function OrdersList() {
       {showReplacementModal && selectedOrderId && (
         <ReplacementOrderModal
           orderId={selectedOrderId}
-          orderItems={orders.find((order:any) => order.order_id === selectedOrderId)?.order_items || []}
           onClose={() => setShowReplacementModal(false)}
           onSuccess={() => {
             setShowReplacementModal(false);
