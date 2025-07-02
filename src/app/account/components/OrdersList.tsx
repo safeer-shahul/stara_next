@@ -133,7 +133,7 @@ export default function OrdersList() {
               null);
             
             const canCancel = canCancelOrder(order.status);
-            const canReturn = canReturnOrReplace(order.status, deliveryDate);
+            // const canReturn = canReturnOrReplace(order.status, deliveryDate);
             
             return (
               <div key={order.order_id} className="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">

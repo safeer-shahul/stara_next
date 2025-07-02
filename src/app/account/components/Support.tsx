@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Mail, MessageSquare, Phone, Clock, ExternalLink, Send } from 'lucide-react';
+import { Mail, Phone, Clock, Send } from 'lucide-react';
 
 export default function Support() {
   const [subject, setSubject] = useState('');

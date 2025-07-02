@@ -92,91 +92,139 @@ export default function OfferCartItem({ offerSet, onRemove, fromProductSummary =
   })));
 
   return (
-    <div className="bg-white rounded-lg py-2 px-4 mb-4 border border-gray-200">
-      {/* Offer Header */}
-      <div className="flex justify-between items-center mb-2">
-        <div>
-          <h4 className="font-medium text-sm">{offerName}</h4>
-          <p className="text-xs text-gray-500">
-            Buy {offerSet.buy_count} Get {offerSet.get_count} Free
-          </p>
+    <div className={`relative rounded-xl border-2 transition-all duration-300 overflow-hidden ${
+      fromProductSummary 
+        ? 'border-green-200 bg-gradient-to-br from-green-50 to-emerald-50' 
+        : 'border-green-300 bg-gradient-to-br from-green-50 to-emerald-50 shadow-lg hover:shadow-xl hover:border-green-400'
+    } p-4 mb-4`}>
+      
+      {/* Sparkle effects */}
+      <div className="absolute top-2 left-4 w-2 h-2 bg-yellow-400 rounded-full animate-ping" style={{ animationDelay: '0s' }}></div>
+      <div className="absolute bottom-4 right-8 w-1 h-1 bg-amber-300 rounded-full animate-pulse" style={{ animationDelay: '1s' }}></div>
+      <div className="absolute top-6 right-12 w-1.5 h-1.5 bg-yellow-300 rounded-full animate-bounce" style={{ animationDelay: '2s' }}></div>
+
+      {/* Enhanced Offer Header */}
+      <div className="flex justify-between items-start mb-4 relative">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full flex items-center justify-center">
+              <span className="text-white text-sm font-bold">🎁</span>
+            </div>
+            <h4 className="font-bold text-lg text-green-800">{offerName}</h4>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            <p className="text-sm font-semibold text-green-700 bg-white px-3 py-1 rounded-full shadow-sm">
+              Buy {offerSet.buy_count} Get {offerSet.get_count} Free
+            </p>
+            
+            {savings > 0 && (
+              <div className="bg-gradient-to-r from-yellow-400 to-amber-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-sm animate-pulse">
+                Save ₹{savings.toLocaleString('en-IN')}
+              </div>
+            )}
+          </div>
         </div>
+        
         {!fromProductSummary && onRemove && (
           <button
             onClick={handleRemove}
-            className="bg-red-500 text-white cursor-pointer rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
+            className="w-8 h-8 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-full flex items-center justify-center text-xs hover:from-red-600 hover:to-red-700 transition-all duration-300 transform hover:scale-110 shadow-md relative z-10"
           >
-            <X size={12} />
+            <X size={14} />
           </button>
         )}
       </div>
 
-      {/* Offer Items */}
-      <div className="space-y-2">
+      {/* Enhanced Offer Items Grid */}
+      <div className="space-y-3 mb-4">
         {offerSet.offer_items.map((product, index) => {
           const discountText = calculateDiscountPercentage(product.product_price, product.strike_price);
           const { isPaid, quantity } = getProductStatus(product);
           
           return (
-            <div key={`${product.id}-${product.selectedVariant?.id || 'no-variant'}-${index}`} className="flex items-center gap-2">
-              <div className="relative w-12 h-12 flex-shrink-0 rounded overflow-hidden">
-                <Image
-                  src={product.images[0]?.product_image
-                    ? `${process.env.NEXT_PUBLIC_API_BASE_URL}${product.images[0].product_image}`
-                    : '/images/placeholder.png'}
-                  alt={product.product_name}
-                  fill
-                  className="object-cover"
-                  sizes="48px"
-                />
-                {/* Free badge for free items - Fix: Check isPaid correctly */}
-                {!isPaid && (
-                  <div className="absolute top-0 right-0 bg-green-500 text-white text-[8px] px-1 py-0.5 rounded-bl">
-                    FREE
-                  </div>
-                )}
-                {/* Paid badge for paid items */}
-                {isPaid && (
-                  <div className="absolute top-0 right-0 bg-blue-500 text-white text-[8px] px-1 py-0.5 rounded-bl">
-                    PAID
-                  </div>
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium line-clamp-2">
-                  {product.product_name}
-                  {product.selectedVariant && (
-                    <span className="text-gray-500 text-[10px] ml-1"> (Size: {product.selectedVariant.variant_name})</span>
-                  )}
-                </p>
-                
-                {/* Show status and quantity - Fix: Use correct isPaid logic */}
-                <div className="text-[10px] mt-1">
-                  {isPaid ? (
-                    <span className="text-blue-600 font-medium">Paid: {quantity}</span>
-                  ) : (
-                    <span className="text-green-600 font-medium">Free: {quantity}</span>
-                  )}
-                </div>
-
-                <div className="flex items-center mt-1">
-                  {/* Fix: Show pricing based on isPaid status */}
+            <div key={`${product.id}-${product.selectedVariant?.id || 'no-variant'}-${index}`} 
+                 className="bg-white rounded-lg p-3 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300">
+              
+              <div className="flex items-center gap-3">
+                {/* Enhanced Product Image */}
+                <div className="relative w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100">
+                  <Image
+                    src={product.images[0]?.product_image
+                      ? `${process.env.NEXT_PUBLIC_API_BASE_URL}${product.images[0].product_image}`
+                      : '/images/placeholder.png'}
+                    alt={product.product_name}
+                    fill
+                    className="object-cover transition-transform duration-300 hover:scale-110"
+                    sizes="64px"
+                  />
+                  
+                  {/* Enhanced Status Badges */}
                   {!isPaid ? (
-                    <p className="text-xs font-bold text-green-600 mr-1">FREE</p>
+                    <div className="absolute -top-1 -right-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white text-xs px-2 py-1 rounded-full font-bold shadow-lg animate-bounce">
+                      FREE
+                    </div>
                   ) : (
-                    <p className="text-xs font-bold mr-1">₹{parseFloat(product.product_price).toLocaleString('en-IN')}</p>
+                    <div className="absolute -top-1 -right-1 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-xs px-2 py-1 rounded-full font-bold shadow-lg">
+                      PAID
+                    </div>
                   )}
                   
-                  {parseFloat(product.strike_price || '0') > parseFloat(product.product_price || '0') && (
-                    <p className="text-[10px] text-gray-500 line-through mr-1">
-                      ₹{parseFloat(product.strike_price).toLocaleString('en-IN')}
-                    </p>
-                  )}
-                  {discountText && isPaid && (
-                    <span className="bg-black text-white text-[9px] px-1 py-0.5 rounded">
-                      {discountText}
-                    </span>
-                  )}
+                  {/* Sparkle effect on image */}
+                  <div className="absolute top-1 left-1 w-2 h-2 bg-yellow-400 rounded-full opacity-60 animate-pulse"></div>
+                </div>
+                
+                {/* Product Details */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-800 line-clamp-2 leading-tight">
+                    {product.product_name}
+                    {product.selectedVariant && (
+                      <span className="block text-xs text-[var(--color-primary-950)] font-medium mt-1 bg-blue-50 px-2 py-0.5 rounded-full inline-block">
+                        Size: {product.selectedVariant.variant_name}
+                      </span>
+                    )}
+                  </p>
+                  
+                  {/* Quantity and Status */}
+                  <div className="flex items-center gap-3 mt-2">
+                    <div className={`text-xs font-bold px-2 py-1 rounded-full ${
+                      isPaid 
+                        ? 'bg-blue-100 text-blue-700' 
+                        : 'bg-green-100 text-green-700'
+                    }`}>
+                      {isPaid ? `Paid: ${quantity}` : `Free: ${quantity}`}
+                    </div>
+                    
+                    <div className="text-xs text-gray-500">
+                      Qty: {quantity}
+                    </div>
+                  </div>
+
+                  {/* Enhanced Pricing */}
+                  <div className="flex items-center gap-2 mt-2">
+                    {!isPaid ? (
+                      <div className="flex items-center gap-1">
+                        <p className="text-sm font-bold text-green-600">FREE</p>
+                        <span className="text-xs text-green-500">🎉</span>
+                      </div>
+                    ) : (
+                      <p className="text-sm font-bold text-[var(--color-primary-950)]">
+                        ₹{parseFloat(product.product_price).toLocaleString('en-IN')}
+                      </p>
+                    )}
+                    
+                    {parseFloat(product.strike_price || '0') > parseFloat(product.product_price || '0') && (
+                      <p className="text-xs text-gray-500 line-through">
+                        ₹{parseFloat(product.strike_price).toLocaleString('en-IN')}
+                      </p>
+                    )}
+                    
+                    {discountText && isPaid && (
+                      <span className="bg-gradient-to-r from-red-500 to-red-600 text-white text-xs px-2 py-1 rounded-full font-bold shadow-sm">
+                        {discountText}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -184,37 +232,48 @@ export default function OfferCartItem({ offerSet, onRemove, fromProductSummary =
         })}
       </div>
 
-      {/* Offer Summary */}
-      <div className="mt-3 pt-2 border-t border-gray-100">
-        {savings > 0 && (
-          <div className="flex justify-between text-green-600 mb-1">
-            <span className="text-xs">
-              You Save ({totalFreeItems} free item{totalFreeItems !== 1 ? 's' : ''}):
+      {/* Enhanced Offer Summary */}
+      <div className="bg-white rounded-xl p-4 border-2 border-green-200 shadow-inner">
+        <div className="space-y-2">
+          {/* Savings Display */}
+          {savings > 0 && (
+            <div className="flex justify-between items-center p-2 bg-green-100 rounded-lg">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">🎊</span>
+                <span className="text-sm font-semibold text-green-700">
+                  You Save ({totalFreeItems} free item{totalFreeItems !== 1 ? 's' : ''}):
+                </span>
+              </div>
+              <span className="text-lg font-bold text-green-700">
+                ₹{savings.toLocaleString('en-IN')}
+              </span>
+            </div>
+          )}
+          
+          {/* Payment Summary */}
+          <div className="flex justify-between items-center p-2 bg-gradient-to-r from-[var(--color-primary-950)]/10 to-indigo-100 rounded-lg">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">💳</span>
+              <span className="text-base font-bold text-[var(--color-primary-950)]">You Pay:</span>
+            </div>
+            <span className="text-xl font-bold text-[var(--color-primary-950)]">
+              ₹{payableTotal.toLocaleString('en-IN')}
             </span>
-            <span className="text-xs font-medium">₹{savings.toLocaleString('en-IN')}</span>
           </div>
-        )}
-        <div className="flex justify-between font-semibold text-sm">
-          <span>You Pay:</span>
-          <span>₹{payableTotal.toLocaleString('en-IN')}</span>
+          
+          {/* Item Count Summary */}
+          {totalPaidItems > 0 && (
+            <div className="text-center text-xs text-gray-600 bg-gray-50 rounded-lg p-2">
+              <span className="font-medium">
+                {totalPaidItems} paid item{totalPaidItems !== 1 ? 's' : ''}{totalFreeItems > 0 ? ` + ${totalFreeItems} free item${totalFreeItems !== 1 ? 's' : ''}` : ''}
+              </span>
+            </div>
+          )}
         </div>
-        {totalPaidItems > 0 && (
-          <div className="text-[10px] text-gray-500 mt-1">
-            ({totalPaidItems} paid item{totalPaidItems !== 1 ? 's' : ''}{totalFreeItems > 0 ? ` + ${totalFreeItems} free` : ''})
-          </div>
-        )}
       </div>
 
-      {/* Debug Info (remove in production) */}
-      {/* {process.env.NODE_ENV === 'development' && (
-        <div className="mt-2 p-2 bg-yellow-50 rounded text-[10px]">
-          <div>Debug Info:</div>
-          <div>Paid Total: ₹{payableTotal}, Free Total: ₹{savings}</div>
-          <div>Items: {offerSet.offer_items.map((item, i) => 
-            `${i + 1}. ${item.product_name}: isPaid=${item.isPaid}`
-          ).join(', ')}</div>
-        </div>
-      )} */}
+      {/* Decorative bottom accent */}
+      <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-green-400 via-emerald-500 to-green-400 opacity-50"></div>
     </div>
   );
 }

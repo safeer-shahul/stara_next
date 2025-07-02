@@ -382,14 +382,20 @@ class ApiService {
 
   // --- Existing Methods ---
 
-  public async createCategory(categoryName: string, categoryImage: File, categoryId?: string): Promise<any> {
+  public async createCategory(categoryName: string, categoryImage: File | null, categoryId?: string): Promise<any> {
     try {
       const formData = new FormData();
       formData.append('category_name', categoryName);
-      formData.append('category_image', categoryImage);
+      
+      // Only append image if it exists
+      if (categoryImage) {
+        formData.append('category_image', categoryImage);
+      }
+      
       if (categoryId) {
         formData.append('id', categoryId);
       }
+      
       return await this.post<any>('/category/create_category', formData, true);
     } catch (error) {
       console.error('Error creating category:', error);

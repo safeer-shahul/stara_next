@@ -106,8 +106,8 @@ export default function ReplacementOrderModal({ orderId, orderItems, onClose, on
       console.log('Replacement request submitted:', replacementData);
       
       onSuccess();
-    } catch (err: any) {
-      setError(err.message || 'Failed to submit replacement request. Please try again.');
+    } catch (error: any) {
+      setError(error.message || 'Failed to submit replacement request. Please try again.');
       setSubmitting(false);
     }
   };
