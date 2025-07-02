@@ -21,11 +21,9 @@ interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialView?: 'login' | 'register' | 'forgot-password';
-  userProfile?: AuthUserProfile | null;
-  isAdminOrStaff?: boolean;
 }
 
-const AuthModal = ({ isOpen, onClose, initialView = 'login', userProfile, isAdminOrStaff }: AuthModalProps) => {
+const AuthModal = ({ isOpen, onClose, initialView = 'login' }: AuthModalProps) => {
   const [view, setView] = useState<'login' | 'register' | 'forgot-password'>(initialView);
   
   // Close on escape key
@@ -110,14 +108,12 @@ const AuthModal = ({ isOpen, onClose, initialView = 'login', userProfile, isAdmi
           
           {view === 'login' ? (
             <Login 
-              onClose={onClose} 
               switchToRegister={() => setView('register')} 
               onLoginSuccess={handleAuthSuccess}
               switchToForgotPassword={() => setView('forgot-password')}
             />
           ) : view === 'register' ? (
             <Register 
-              onClose={onClose} 
               switchToLogin={() => setView('login')}
               onRegisterSuccess={handleAuthSuccess}
             />

@@ -11,7 +11,6 @@ interface OrderConfirmationProps {
   errorMessage?: string | null;
   onContinueShopping: () => void;
   onRetryPayment?: () => void;
-  cartCleared?: boolean;
 }
 
 const OrderConfirmation: React.FC<OrderConfirmationProps> = ({
@@ -22,7 +21,6 @@ const OrderConfirmation: React.FC<OrderConfirmationProps> = ({
   errorMessage,
   onContinueShopping,
   onRetryPayment,
-  cartCleared
 }) => {
   const [showAnimation, setShowAnimation] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);

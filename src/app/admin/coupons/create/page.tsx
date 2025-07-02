@@ -2,8 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-// Importing additional icons for better UX and consistency
-import { Ticket, ArrowLeft, Search, X, Calendar, Percent, IndianRupee, Info, Loader2, Hash, Plus, CheckCircle, XCircle } from 'lucide-react';
+import { Ticket, ArrowLeft, Search, X, Calendar, Percent, IndianRupee, Info, Loader2, XCircle } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import apiService from '@/utils/api/apiService';
@@ -176,11 +175,10 @@ function AddCouponPage() {
     if (isEditMode) {
       fetchCouponData();
     }
-    // Load initial products (first page) when component mounts or search term changes
     if (!isFetchingInitialData) {
-        loadProducts(1, searchTerm); // Re-load products if search term changes or initial fetch finishes
+      loadProducts(1, searchTerm);
     }
-  }, [isEditMode, fetchCouponData, isFetchingInitialData, searchTerm]);
+  }, [isEditMode, fetchCouponData, isFetchingInitialData, searchTerm, loadProducts]);
 
 
   // Handle clicks outside the dropdown to close it

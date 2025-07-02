@@ -31,7 +31,7 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
   const [windowWidth, setWindowWidth] = useState<number>(0);
   const [hoveredProduct, setHoveredProduct] = useState<string | null>(null);
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
-  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  // const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [isNavigating, setIsNavigating] = useState<string | null>(null);
 
   // NEW STATES FOR VARIANT SELECTION POPUP
@@ -87,7 +87,7 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
       return;
     }
 
-    setSelectedProductId(productToAdd.id);
+    // setSelectedProductId(productToAdd.id);
 
     const tempCartItemId = uuidv4();
 
@@ -138,7 +138,7 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
 
   const handleCartClose = useCallback(() => {
     setIsCartOpen(false);
-    setSelectedProductId(null);
+    // setSelectedProductId(null);
   }, []);
 
   const goNext = useCallback(() => {

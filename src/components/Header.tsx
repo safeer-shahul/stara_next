@@ -306,8 +306,6 @@ export default function Header() {
       <AuthModal 
         isOpen={isAuthModalOpen} 
         onClose={() => setIsAuthModalOpen(false)}
-        userProfile={userProfile}
-        isAdminOrStaff={isAdminOrStaff}
       />
     </>
   );

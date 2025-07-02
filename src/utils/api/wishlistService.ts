@@ -1,7 +1,6 @@
 // utils/api/wishlistService.ts
 import apiService from './apiService';
 import { ProductItemDetails } from '@/context/cartContext';
-import { showToast } from '@/utils/toast';
 
 // Define the type for wishlist items from backend
 export interface WishlistItemFromBackend {

@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 // Import relevant icons for consistent design
-import { Users, Plus, Edit, ChevronLeft, ChevronRight, Search, Trash2, UserCheck, UserX, Info, Loader2 } from 'lucide-react';
+import { Users, Plus, Edit, ChevronLeft, ChevronRight, Search, Trash2, Info, Loader2 } from 'lucide-react';
 import apiService from '@/utils/api/apiService';
 
 // Define an interface for StaffMember

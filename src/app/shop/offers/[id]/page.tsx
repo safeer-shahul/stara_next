@@ -14,7 +14,7 @@ import VariantSelectionModal from '@/components/VariantSelectionModal';
 import { v4 as uuidv4 } from 'uuid';
 import { showToast } from '@/utils/toast';
 
-interface ProductItem extends ProductItemDetails {}
+type ProductItem = ProductItemDetails;
 
 interface OfferData {
   id: string;
@@ -39,7 +39,7 @@ export default function OfferProductsPage() {
   const router = useRouter();
   const offerId = params?.id as string;
 
-  const { cartItems, getTotalProductQuantitiesInCart, getEffectiveProductStock } = useCart();
+  const { getEffectiveProductStock } = useCart();
 
   const [loading, setLoading] = useState(true);
   const [offerData, setOfferData] = useState<OfferData | null>(null);

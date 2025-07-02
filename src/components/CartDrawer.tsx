@@ -4,9 +4,8 @@ import { X, ShoppingCart, Trash2, RefreshCw } from 'lucide-react';
 import CartItem from './CartItem';
 import OfferCartItem from './OfferCartItem';
 import CheckoutModal from './CheckoutModal';
-import { useCart, CartItemType, CartNormalItem, CartOfferItem } from '@/context/cartContext';
+import { useCart, CartNormalItem, CartOfferItem } from '@/context/cartContext';
 import { cartUtils } from '@/utils/cartUtils';
-import { v4 as uuidv4 } from 'uuid';
 
 interface CartDrawerProps {
   isOpen: boolean;

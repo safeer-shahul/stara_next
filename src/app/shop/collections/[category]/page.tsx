@@ -13,7 +13,7 @@ import { v4 as uuidv4 } from 'uuid';
 import VariantSelectionModal from '@/components/VariantSelectionModal';
 import { showToast } from '@/utils/toast';
 
-interface ProductItem extends ProductItemDetails {}
+type ProductItem = ProductItemDetails;
 
 export default function CategoryPage() {
   const params = useParams();
@@ -39,7 +39,7 @@ export default function CategoryPage() {
 
   const [isNavigating, setIsNavigating] = useState<string | null>(null);
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
-  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  // const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
 
   // NEW STATES FOR VARIANT SELECTION POPUP
   const [isVariantModalOpen, setIsVariantModalOpen] = useState(false);
@@ -170,7 +170,7 @@ export default function CategoryPage() {
       return;
     }
 
-    setSelectedProductId(productToAdd.id);
+    // setSelectedProductId(productToAdd.id);
 
     const tempCartItemId = uuidv4();
 
@@ -221,7 +221,7 @@ export default function CategoryPage() {
 
   const handleCartClose = useCallback(() => {
     setIsCartOpen(false);
-    setSelectedProductId(null);
+    // setSelectedProductId(null);
   }, []);
 
   const calculateDiscount = useCallback((price: string, strikePrice: string): string => {

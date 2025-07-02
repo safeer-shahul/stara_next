@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Users, ArrowLeft, Info, Loader2, Mail, Lock, User, Eye, EyeOff, CheckCircle, XCircle } from 'lucide-react';
+import { Users, ArrowLeft, Info, Loader2, Mail, Lock, Eye, EyeOff, CheckCircle, XCircle } from 'lucide-react';
 import Link from 'next/link';
 import apiService from '@/utils/api/apiService';
 

@@ -134,7 +134,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [paymentId, setPaymentId] = useState<string | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<'success' | 'failed' | 'canceled'>('success');
   const [paymentMethod, setPaymentMethod] = useState<'Cod' | 'Razorpay'>('Razorpay');
-  const [cartCleared, setCartCleared] = useState(false);
+  // const [cartCleared, setCartCleared] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authModalClosed, setAuthModalClosed] = useState(false);
@@ -149,7 +149,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     setStaraOrderId(null);
     setPaymentId(null);
     setPaymentStatus('success');
-    setCartCleared(false);
+    // setCartCleared(false);
     setSelectedAddressId(null);
     setSelectedAddress(null);
     setLoading(true);
@@ -204,11 +204,11 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     if (checkoutMode === 'cart') {
       try {
         await clearCart();
-        setCartCleared(true);
+        // setCartCleared(true);
         console.log('Cart cleared successfully');
       } catch (error) {
         console.error('Error clearing cart:', error);
-        setCartCleared(false);
+        // setCartCleared(false);
       }
     }
   }, [checkoutMode, clearCart]);
@@ -558,7 +558,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   errorMessage={error}
                   onContinueShopping={handleContinueShopping}
                   onRetryPayment={handleRetryPayment}
-                  cartCleared={cartCleared}
+                  // cartCleared={cartCleared}
                 />
               )}
             </div>

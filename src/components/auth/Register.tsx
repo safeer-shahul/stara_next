@@ -7,12 +7,11 @@ import { auth } from './firebase/config';
 import apiService from '@/utils/api/apiService';
 
 interface RegisterProps {
-  onClose: () => void;
   switchToLogin: () => void;
   onRegisterSuccess: () => void;
 }
 
-const Register = ({ onClose, switchToLogin, onRegisterSuccess }: RegisterProps) => {
+const Register = ({ switchToLogin, onRegisterSuccess }: RegisterProps) => {
   const router = useRouter();
 
   const [formData, setFormData] = useState({

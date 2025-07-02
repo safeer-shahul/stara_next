@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Tag, ArrowLeft, Search, X, Upload, Image as ImageIcon, Calendar, Info, Loader2, DollarSign, Percent, CheckCircle, XCircle, Trash2 } from 'lucide-react';
+import { Tag, ArrowLeft, Search, X, Upload, Calendar, Info, Loader2, DollarSign, Percent, XCircle, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import apiService from '@/utils/api/apiService';
@@ -81,29 +81,18 @@ function AddOfferPage() {
     return startDateObj <= today;
   };
 
-  // Fetch offer data if in edit mode
-  useEffect(() => {
-    if (isEditMode) {
-      fetchOfferData();
-    } else {
-      // Load initial products only for new offers
-      loadProducts(1);
-    }
-  }, [offerId]); // Depend only on offerId, as per old code's logic
-
   // Fetch offer data for editing
-  const fetchOfferData = async () => {
+  const fetchOfferData = useCallback(async () => {
     if (!offerId) return;
 
     setIsLoading(true);
-    setFormError(null); // Clear previous errors
+    setFormError(null);
     try {
       const offerData: OfferData = await apiService.offerByID(offerId);
       setOfferName(offerData.offer_name);
       setBuyCount(offerData.buy_count.toString());
       setGetCount(offerData.get_count.toString());
 
-      // Set dates if they exist
       if (offerData.start_date) {
         const startDateFormatted = new Date(offerData.start_date).toISOString().split('T')[0];
         setStartDate(startDateFormatted);
@@ -113,22 +102,19 @@ function AddOfferPage() {
         setEndDate(endDateFormatted);
       }
 
-      // Set offer image preview if exists
       if (offerData.offer_image) {
         setOfferImagePreview(`${process.env.NEXT_PUBLIC_API_BASE_URL}${offerData.offer_image}`);
       } else {
-        setOfferImagePreview(''); // Ensure it's empty if no image
+        setOfferImagePreview('');
       }
 
-      // Set selected products from the fetched offer
-      let selectedProductsFromOffer: React.SetStateAction<Product[]> | undefined = [];
+      let selectedProductsFromOffer: Product[] = [];
       if (offerData.products && Array.isArray(offerData.products)) {
         selectedProductsFromOffer = offerData.products;
         setSelectedProducts(selectedProductsFromOffer);
-        setOriginalSelectedProducts([...selectedProductsFromOffer]); // Store original products
+        setOriginalSelectedProducts([...selectedProductsFromOffer]);
       }
 
-      // Load products after setting selected products (old logic calls this without waiting for new render)
       await loadProducts(1, selectedProductsFromOffer);
 
     } catch (err) {
@@ -137,7 +123,7 @@ function AddOfferPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [offerId]);
 
   // Handle clicks outside the dropdown
   useEffect(() => {
@@ -153,26 +139,20 @@ function AddOfferPage() {
     };
   }, []);
 
-  // Load products from API
-  // This function is the *old logic* for loading products
-  const loadProducts = async (page: number, excludeProducts: Product[] = []) => {
-    if (isLoading) return; // Prevent multiple loads if already loading
 
-    setIsLoading(true); // Set loading state
+  const loadProducts = useCallback(async (page: number, excludeProducts: Product[] = []) => {
+    if (isLoading) return;
+
+    setIsLoading(true);
     try {
       const response = await apiService.getPaginatedProducts(page, 10);
-
-      // Check if API returns data in expected format (response.products or direct array)
       const newProducts = response.products || response;
 
       if (newProducts.length === 0) {
         setHasMore(false);
       } else {
         setProducts(prev => {
-          // Use excludeProducts parameter if provided (from initial edit load), otherwise use current selectedProducts
           const productsToExclude = excludeProducts.length > 0 ? excludeProducts : selectedProducts;
-
-          // Filter out products that are already selected
           const filteredNewProducts = newProducts.filter(
             (newProduct: any) => !productsToExclude.some(selectedProduct => selectedProduct.id === newProduct.id)
           );
@@ -189,9 +169,20 @@ function AddOfferPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [isLoading]);
 
-
+  useEffect(() => {
+    const fetchData = async () => {
+      if (isEditMode) {
+        await fetchOfferData();
+      } else {
+        await loadProducts(1);
+      }
+    };
+    
+    fetchData();
+  }, [isEditMode, offerId]);
+  
   // Handle infinite scroll in dropdown
   const handleScroll = () => {
     if (productListRef.current) {

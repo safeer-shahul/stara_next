@@ -1,4 +1,4 @@
-import { Mail, MapPin, Phone, Facebook, Instagram, Twitter, Youtube, Linkedin } from "lucide-react";
+import { Mail, MapPin, Phone, Facebook, Instagram, Linkedin } from "lucide-react";
 import Image from 'next/image';
 
 export default function Footer() {

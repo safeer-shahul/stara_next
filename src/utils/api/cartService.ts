@@ -1,5 +1,5 @@
 'use client';
-import { v4 as uuidv4, validate } from 'uuid';
+import { validate } from 'uuid';
 import apiService from './apiService';
 import { CartItemType, CartNormalItem, CartOfferItem, ProductItemDetails, ProductVariant } from '@/context/cartContext';
 

@@ -58,7 +58,6 @@ export default memo(function OfferMobileSlider({
     }, [isOpen]);
 
     const { dispatchCart } = useCart();
-    const [loading, setLoading] = useState(false);
 
     const calculateTotals = useCallback(() => {
         const filledSlots = slots.filter(slot => slot.product);
@@ -101,7 +100,7 @@ export default memo(function OfferMobileSlider({
     const handleBuyNow = useCallback(async () => {
         if (!isOfferComplete()) return;
 
-        setLoading(true);
+        // setLoading(true);
 
         const filledSlots = slots.filter(slot => slot.product);
 
@@ -223,7 +222,7 @@ export default memo(function OfferMobileSlider({
             console.error('OfferMobileSlider: Failed to add to cart (local dispatch failed?):', error);
             alert('Failed to add offer. Please try again.');
         } finally {
-            setLoading(false);
+            // setLoading(false);
         }
     }, [dispatchCart, offerData, isOfferComplete, onOpenCartDrawer, slots, isAuthenticated]);
 

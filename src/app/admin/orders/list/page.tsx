@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import {
   Package, Eye, ChevronLeft, ChevronRight, Search, ShoppingCart, Info,
-  Box, UserRound, CheckCircle, Clock, CalendarDays, ArrowUpWideNarrow, ArrowDownWideNarrow, Edit, Copy, RotateCcw
+  Box, UserRound, CheckCircle, Clock, CalendarDays, Edit, Copy, RotateCcw
 } from 'lucide-react';
 import apiService from '@/utils/api/apiService';
 import { useAdminUser } from '../../context/AdminUserContext'; // Import the custom hook
@@ -103,12 +103,7 @@ export default function OrderListPage() {
   }, [adminUser]);
 
   // Effect to fetch orders whenever relevant filters/pagination/triggerFetch change
-  useEffect(() => {
-    if (adminUser) { // Only fetch if user data is loaded
-      fetchOrders();
-    }
-  }, [currentPage, selectedOrderMode, sortOrder, startDate, endDate, adminUser, triggerFetch]); // Now triggerFetch is a dependency
-
+ 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -166,6 +161,14 @@ export default function OrderListPage() {
     }
   }, [currentPage, pageSize, selectedOrderMode, sortOrder, startDate, endDate, adminUser, searchOrderId, searchPhoneNumber]); // Keep all dependencies for useCallback to be correct
 
+
+   useEffect(() => {
+    if (adminUser) {
+      fetchOrders();
+    }
+  }, [currentPage, selectedOrderMode, sortOrder, startDate, endDate, adminUser, triggerFetch, fetchOrders]); // Add fetchOrders
+
+  
   const handleNextPage = useCallback(() => {
     if (currentPage < totalPages) {
       setCurrentPage(prev => prev + 1);

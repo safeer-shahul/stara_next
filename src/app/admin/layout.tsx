@@ -5,7 +5,7 @@ import { ReactNode, useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import apiService from '@/utils/api/apiService';
-import { Menu, X, LogOut, LayoutDashboard, Package, ShoppingCart, Percent, Tag, Users, Settings, Eye } from 'lucide-react';
+import { Menu, X, LogOut, LayoutDashboard, Package, ShoppingCart, Percent, Tag, Users, Eye } from 'lucide-react';
 import { AdminUserProvider } from './context/AdminUserContext'; // Import the provider
 
 // Define the structure for an admin user, including staff-specific properties

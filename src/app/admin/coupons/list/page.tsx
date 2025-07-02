@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-// Import all necessary icons for consistent design
-import { Ticket, Plus, Edit, ArrowLeft, Calendar, Clock, Percent, Hash, Info, Trash2, DollarSign } from 'lucide-react';
+import { Ticket, Plus, Edit, Calendar, Clock, Percent, Hash, Info, Trash2, DollarSign } from 'lucide-react';
 import apiService from '@/utils/api/apiService';
 
 // Define a more specific interface for Coupon
@@ -103,13 +102,10 @@ export default function CouponListPage() {
   // Placeholder for delete functionality
   const handleDeleteCoupon = useCallback((couponId: string) => {
     if (confirm(`Are you sure you want to delete coupon "${couponId}"?`)) {
-      // Implement actual API call for deletion here
       console.log(`Deleting coupon with ID: ${couponId}`);
-      // After successful deletion, refetch coupons to update the list
-      // apiService.deleteCoupon(couponId).then(() => fetchCoupons());
       alert('Delete functionality not yet implemented in API.');
     }
-  }, [fetchCoupons]); // Depend on fetchCoupons to re-run it after deletion
+  }, []);
 
   return (
     <div className="space-y-8">

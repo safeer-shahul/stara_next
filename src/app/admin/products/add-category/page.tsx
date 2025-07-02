@@ -3,7 +3,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'; // Added useCallback
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Folder, ArrowLeft, Upload, Image as ImageIcon, CheckCircle, XCircle } from 'lucide-react'; // Added CheckCircle, XCircle for validation feedback
+import { Folder, ArrowLeft, Upload, Image as ImageIcon, XCircle } from 'lucide-react'; // Added CheckCircle, XCircle for validation feedback
 import Link from 'next/link';
 import apiService from '@/utils/api/apiService';
 
