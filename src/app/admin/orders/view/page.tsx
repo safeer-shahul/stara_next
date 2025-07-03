@@ -52,6 +52,15 @@ const INDIAN_STATES: { [key: string]: string } = {
 // --- Interfaces ---
 interface AddressData {
   id: string;
+  user_data: {
+    username: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    is_superuser: boolean;
+    is_active: boolean;
+    is_staff: boolean;
+  };
   created_at: string;
   updated_at: string;
   address: string;
@@ -482,6 +491,23 @@ export default function OrderDetailsPage() {
               </div>
             </div>
           </div>
+
+          {/* Customer Information */}
+          {order.address_details?.user_data && (
+            <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+              <h4 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                <Info className="w-6 h-6 text-[var(--color-primary-950)] mr-3" /> Customer Information
+              </h4>
+              <div className="text-gray-700 space-y-2">
+                <p className="text-base">
+                  <span className="font-medium">Name:</span> {order.address_details.user_data.first_name} {order.address_details.user_data.last_name}
+                </p>
+                <p className="text-base">
+                  <span className="font-medium">Email:</span> {order.address_details.user_data.email}
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Shipping Address */}
           {order.address_details && (
