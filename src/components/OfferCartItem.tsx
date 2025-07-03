@@ -46,8 +46,8 @@ export default function OfferCartItem({ offerSet, onRemove, fromProductSummary =
 
   const handleRemove = async () => {
     if (onRemove) {
-      console.log('OfferCartItem: Removing offer item with ID:', offerSet.id);
-      console.log('OfferCartItem: Offer details:', {
+      console.log('🗑️ OfferCartItem: Removing offer item with ID:', offerSet);
+      console.log('🗑️ OfferCartItem: Offer details:', {
         offerId: offerSet.offer,
         offerName: offerSet.offer_name.offer_name,
         itemId: offerSet.id
@@ -57,7 +57,7 @@ export default function OfferCartItem({ offerSet, onRemove, fromProductSummary =
   };
 
   if (offerSet.offer_items.length === 0) {
-    console.warn('OfferCartItem: offer_items is empty for offerSet:', offerSet);
+    console.warn('⚠️ OfferCartItem: offer_items is empty for offerSet:', offerSet);
     return null;
   }
 
@@ -78,14 +78,14 @@ export default function OfferCartItem({ offerSet, onRemove, fromProductSummary =
     isPaid?: boolean;
   }) => {
     // Fix: Check isPaid flag correctly
-    console.log('OfferCartItem: Product isPaid status:', product.product_name, 'isPaid:', product.isPaid);
+    console.log('💳 OfferCartItem: Product isPaid status:', product.product_name, 'isPaid:', product.isPaid);
     return {
       isPaid: product.isPaid === true, // Explicitly check for true
       quantity: product.quantity
     };
   };
 
-  console.log('OfferCartItem: Rendering offer with items:', offerSet.offer_items.map(item => ({
+  console.log('🎁 OfferCartItem: Rendering offer with items:', offerSet.offer_items.map(item => ({
     name: item.product_name,
     isPaid: item.isPaid,
     quantity: item.quantity
@@ -106,12 +106,12 @@ export default function OfferCartItem({ offerSet, onRemove, fromProductSummary =
       {/* Enhanced Offer Header */}
       <div className="flex justify-between items-start mb-4 relative">
         <div className="flex-1">
-          <div className="flex items-center gap-2 mb-2">
+          {/* <div className="flex items-center gap-2 mb-2">
             <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full flex items-center justify-center">
               <span className="text-white text-sm font-bold">🎁</span>
             </div>
             <h4 className="font-bold text-lg text-green-800">{offerName}</h4>
-          </div>
+          </div> */}
           
           <div className="flex items-center gap-4">
             <p className="text-sm font-semibold text-green-700 bg-white px-3 py-1 rounded-full shadow-sm">
@@ -198,33 +198,66 @@ export default function OfferCartItem({ offerSet, onRemove, fromProductSummary =
                     <div className="text-xs text-gray-500">
                       Qty: {quantity}
                     </div>
-                  </div>
 
-                  {/* Enhanced Pricing */}
-                  <div className="flex items-center gap-2 mt-2">
-                    {!isPaid ? (
-                      <div className="flex items-center gap-1">
-                        <p className="text-sm font-bold text-green-600">FREE</p>
-                        <span className="text-xs text-green-500">🎉</span>
-                      </div>
-                    ) : (
-                      <p className="text-sm font-bold text-[var(--color-primary-950)]">
-                        ₹{parseFloat(product.product_price).toLocaleString('en-IN')}
-                      </p>
-                    )}
-                    
-                    {parseFloat(product.strike_price || '0') > parseFloat(product.product_price || '0') && (
-                      <p className="text-xs text-gray-500 line-through">
-                        ₹{parseFloat(product.strike_price).toLocaleString('en-IN')}
-                      </p>
-                    )}
-                    
+                     {/* Show discount only for paid items */}
                     {discountText && isPaid && (
                       <span className="bg-gradient-to-r from-red-500 to-red-600 text-white text-xs px-2 py-1 rounded-full font-bold shadow-sm">
                         {discountText}
                       </span>
                     )}
                   </div>
+
+                  {/* FIXED: Enhanced Pricing Display */}
+                  <div className="flex items-center gap-2 mt-2">
+                    {!isPaid ? (
+                      // For FREE items, show FREE prominently
+                      <div className="flex items-center gap-2">
+                        {/* <p className="text-lg font-bold text-green-600">FREE</p>
+                        <span className="text-xs text-green-500">🎉</span> */}
+                        {quantity > 1 && (
+                          <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full">
+                            {quantity} items
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      // For PAID items, show total price for quantity
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-bold text-[var(--color-primary-950)]">
+                          ₹{(parseFloat(product.product_price) * quantity).toLocaleString('en-IN')}
+                        </p>
+                        {quantity > 1 && (
+                          <span className="text-xs text-gray-500">
+                            (₹{parseFloat(product.product_price).toLocaleString('en-IN')} each)
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Show strike price only for paid items */}
+                    {isPaid && parseFloat(product.strike_price || '0') > parseFloat(product.product_price || '0') && (
+                      <p className="text-xs text-gray-500 line-through">
+                        ₹{(parseFloat(product.strike_price) * quantity).toLocaleString('en-IN')}
+                      </p>
+                    )}
+                    
+                   
+                  </div>
+
+                  {/* ADDED: Value breakdown for clarity */}
+                  {!fromProductSummary && (
+                    <div className="text-xs text-gray-500 mt-1">
+                      {!isPaid ? (
+                        <span className="text-green-600 font-medium">
+                          💰 Saves ₹{(parseFloat(product.product_price) * quantity).toLocaleString('en-IN')}
+                        </span>
+                      ) : quantity > 1 && (
+                        <span>
+                          Total for {quantity} items
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -233,10 +266,10 @@ export default function OfferCartItem({ offerSet, onRemove, fromProductSummary =
       </div>
 
       {/* Enhanced Offer Summary */}
-      <div className="bg-white rounded-xl p-4 border-2 border-green-200 shadow-inner">
-        <div className="space-y-2">
+      {/* <div className="bg-white rounded-xl p-4 border-2 border-green-200 shadow-inner"> */}
+        {/* <div className="space-y-2"> */}
           {/* Savings Display */}
-          {savings > 0 && (
+          {/* {savings > 0 && (
             <div className="flex justify-between items-center p-2 bg-green-100 rounded-lg">
               <div className="flex items-center gap-2">
                 <span className="text-lg">🎊</span>
@@ -248,10 +281,10 @@ export default function OfferCartItem({ offerSet, onRemove, fromProductSummary =
                 ₹{savings.toLocaleString('en-IN')}
               </span>
             </div>
-          )}
+          )} */}
           
           {/* Payment Summary */}
-          <div className="flex justify-between items-center p-2 bg-gradient-to-r from-[var(--color-primary-950)]/10 to-indigo-100 rounded-lg">
+          {/* <div className="flex justify-between items-center p-2 bg-gradient-to-r from-[var(--color-primary-950)]/10 to-indigo-100 rounded-lg">
             <div className="flex items-center gap-2">
               <span className="text-lg">💳</span>
               <span className="text-base font-bold text-[var(--color-primary-950)]">You Pay:</span>
@@ -259,18 +292,18 @@ export default function OfferCartItem({ offerSet, onRemove, fromProductSummary =
             <span className="text-xl font-bold text-[var(--color-primary-950)]">
               ₹{payableTotal.toLocaleString('en-IN')}
             </span>
-          </div>
+          </div> */}
           
           {/* Item Count Summary */}
-          {totalPaidItems > 0 && (
+          {/* {totalPaidItems > 0 && (
             <div className="text-center text-xs text-gray-600 bg-gray-50 rounded-lg p-2">
               <span className="font-medium">
                 {totalPaidItems} paid item{totalPaidItems !== 1 ? 's' : ''}{totalFreeItems > 0 ? ` + ${totalFreeItems} free item${totalFreeItems !== 1 ? 's' : ''}` : ''}
               </span>
             </div>
-          )}
-        </div>
-      </div>
+          )} */}
+        {/* </div> */}
+      {/* </div> */}
 
       {/* Decorative bottom accent */}
       <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-green-400 via-emerald-500 to-green-400 opacity-50"></div>

@@ -428,11 +428,11 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       {currentStep === CheckoutStep.BILL_SUMMARY && 'Review your order details'}
                       {currentStep === CheckoutStep.PAYMENT_PROCESSING && 'Please wait while we process your payment'}
                     </p>
-                    {authMode === 'authenticated' && (
+                    {/* {authMode === 'authenticated' && (
                       <span className="inline-block mt-1 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
                         🔄 Synced
                       </span>
-                    )}
+                    )} */}
                   </div>
                 </div>
                 <button
@@ -514,10 +514,10 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                                 {addresses.map(address => (
                                   <div
                                     key={address.id}
-                                    className={`p-4 border-2 rounded-xl cursor-pointer transition-all duration-300 transform hover:scale-[1.02] ${
+                                    className={`p-4 border-2 rounded-xl ${
                                       selectedAddressId === address.id
                                         ? 'border-[var(--color-primary-950)] bg-gradient-to-r from-blue-50 to-indigo-50 shadow-lg'
-                                        : 'border-gray-200 hover:border-gray-300 hover:shadow-md bg-white'
+                                        : 'border-gray-200 hover:border-gray-300 hover:shadow-md bg-white cursor-pointer transition-all duration-300 transform hover:scale-[1.02] '
                                     }`}
                                     onClick={() => handleAddressSelection(address.id)}
                                   >

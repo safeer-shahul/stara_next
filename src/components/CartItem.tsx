@@ -83,7 +83,7 @@ const CartItem = ({ product, onRemove, onQuantityChange, fromProductSummary = fa
                 )}
               </h3>
               {/* Sync status indicator */}
-              {!fromProductSummary && (
+              {/* {!fromProductSummary && (
                 <div className="flex items-center mt-1">
                   {product.isSynced ? (
                     <span className="inline-flex items-center text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
@@ -97,7 +97,7 @@ const CartItem = ({ product, onRemove, onQuantityChange, fromProductSummary = fa
                     </span>
                   )}
                 </div>
-              )}
+              )} */}
             </div>
             
             {!fromProductSummary && (

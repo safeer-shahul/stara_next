@@ -84,6 +84,7 @@ export type CartAction =
   | { type: 'ADD_NORMAL_ITEM'; payload: CartNormalItem }
   | { type: 'REMOVE_ITEM'; payload: string }
   | { type: 'UPDATE_ITEM_QUANTITY'; payload: { id: string; quantity: number } }
+  | { type: 'UPDATE_OFFER_ID'; payload: { tempId: string; actualId: string } } // NEW ACTION
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'CLEAR_CART' }
   | { type: 'FORCE_REFRESH' };
@@ -217,6 +218,21 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
         updated_at: new Date().toISOString(),
       };
       newItems = [...state.cartItems, newOfferSet];
+      return { ...state, cartItems: newItems };
+
+    case 'UPDATE_OFFER_ID':
+      console.log('🔄 Reducer: UPDATE_OFFER_ID', `${action.payload.tempId} → ${action.payload.actualId}`);
+      newItems = state.cartItems.map((item) => {
+        if (item.type === 'offer' && item.id === action.payload.tempId) {
+          return {
+            ...item,
+            id: action.payload.actualId,
+            isSynced: true, // Mark as synced since it now has backend ID
+            updated_at: new Date().toISOString(),
+          };
+        }
+        return item;
+      });
       return { ...state, cartItems: newItems };
 
     case 'REMOVE_ITEM':
@@ -574,6 +590,9 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
               const offerItem = action.payload as CartOfferItem;
               console.log('🎁 Adding offer to backend:', offerItem.offer);
               
+              // Store temporary ID for updating later
+              const tempId = offerItem.id;
+              
               const productsPayload: { product_id: string; variant_id?: string }[] = [];
               offerItem.offer_items.forEach((p) => {
                 for (let q = 0; q < p.quantity; q++) {
@@ -586,15 +605,28 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
                 }
               });
 
-              await apiService.addToCartOffer({
+              // FIXED: Call backend API and get the actual ID
+              const backendResponse = await apiService.addToCartOffer({
                 offer_id: offerItem.offer.replace(/-/g, ''),
                 products: productsPayload,
               });
               
-              // OPTIMIZED: Update local state immediately
+              // Add offer to local state with temporary ID first
               dispatch(action);
               
-              console.log('✅ Offer added to backend and local state');
+              // CRITICAL FIX: Update the temporary ID with actual backend ID
+              if (backendResponse && backendResponse.id) {
+                console.log('🔄 Updating offer ID from temp to backend:', tempId, '→', backendResponse.id);
+                dispatch({ 
+                  type: 'UPDATE_OFFER_ID', 
+                  payload: { 
+                    tempId: tempId, 
+                    actualId: backendResponse.id 
+                  } 
+                });
+              }
+              
+              console.log('✅ Offer added to backend and local state with correct ID');
             } finally {
               pendingOperations.current.delete(operationKey);
             }

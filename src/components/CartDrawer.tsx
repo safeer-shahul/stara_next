@@ -237,11 +237,11 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                     <h3 className="text-lg font-bold">Your Cart</h3>
                     <p className="text-white/80 text-sm">
                       {totals.totalItems} {totals.totalItems === 1 ? 'item' : 'items'}
-                      {authMode === 'authenticated' && (
+                      {/* {authMode === 'authenticated' && (
                         <span className="ml-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
                           Synced
                         </span>
-                      )}
+                      )} */}
                       {totals.offerSavings > 0 && (
                         <span className="ml-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
                           Save ₹{totals.offerSavings.toFixed(0)}
@@ -362,7 +362,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
             {cartItems.length > 0 && (
               <div className="bg-white border-t border-gray-200 shadow-lg">
                 {/* Summary Section */}
-                <div className="p-4 bg-gradient-to-r from-gray-50 to-blue-50">
+                <div className="px-4 py-2 bg-gradient-to-r from-gray-50 to-blue-50">
                   <div className="space-y-2">
                     {/* Normal Items Subtotal */}
                     {totals.normalSubtotal > 0 && (
@@ -387,7 +387,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                     )}
 
                     {/* Offer Savings */}
-                    {totals.offerSavings > 0 && (
+                    {/* {totals.offerSavings > 0 && (
                       <div className="flex justify-between items-center bg-green-100 -mx-2 px-2 py-2 rounded-lg">
                         <span className="text-green-700 font-semibold flex items-center text-sm">
                           <span className="text-base mr-2">🎉</span>
@@ -395,7 +395,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                         </span>
                         <span className="text-lg font-bold text-green-700">₹{totals.offerSavings.toFixed(2)}</span>
                       </div>
-                    )}
+                    )} */}
 
                     {/* Total */}
                     <div className="flex items-center justify-between pt-3 border-t border-gray-300">
@@ -403,7 +403,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                         <span className="text-lg font-bold text-[var(--color-primary-950)]">Total</span>
                       </div>
                       <div className="text-right">
-                        <div className="text-2xl font-bold text-[var(--color-primary-950)]">
+                        <div className="text-xl font-bold text-[var(--color-primary-950)]">
                           ₹{totals.grandTotal.toFixed(2)}
                         </div>
                         {totals.offerSavings > 0 && (
@@ -433,7 +433,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                 )}
 
                 {/* Action Buttons */}
-                <div className="p-4 space-y-3">
+                <div className="px-4 py-2 space-y-3">
                   <div className="flex gap-3">
                     <button
                       className="flex items-center justify-center px-4 py-3 border-2 border-[var(--color-primary-950)] text-[var(--color-primary-950)] font-semibold rounded-xl hover:bg-[var(--color-primary-950)] hover:text-white transition-all duration-300 transform hover:scale-105"

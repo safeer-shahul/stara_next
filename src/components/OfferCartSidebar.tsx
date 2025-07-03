@@ -5,8 +5,6 @@ import { ShoppingBag, X } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { useCart, CartOfferItem, ProductItemDetails, ProductVariant } from '@/context/cartContext';
 
-// interface ProductItem extends ProductItemDetails {}
-
 interface OfferData {
     id: string;
     offer_name: string;
@@ -40,8 +38,7 @@ export default function OfferCartSidebar({
     onOpenCartDrawer,
     isAuthenticated = false
 }: OfferCartSidebarProps) {
-    const { dispatchCart } = useCart();
-    // const [loading, setLoading] = useState(false);
+    const { dispatchCart, authMode } = useCart();
 
     const calculateTotals = useCallback(() => {
         const filledSlots = slots.filter(slot => slot.product);
@@ -52,13 +49,12 @@ export default function OfferCartSidebar({
         const allIndividualProductsInSlots: (ProductItemDetails & { uniqueSlotId: string; selectedVariant?: ProductVariant })[] = filledSlots.map(slot => {
             const product = slot.product!;
             return {
-                ...product, // Spread existing product data (includes product_variant, have_variants etc.)
-                quantity: 1, // Quantity within this specific slot
-                ...(slot.selectedVariant && { selectedVariant: slot.selectedVariant }), // Ensure selected variant is part of the product object for this specific slot
-                uniqueSlotId: slot.id, // Keep unique ID for offer logic
+                ...product,
+                quantity: 1,
+                ...(slot.selectedVariant && { selectedVariant: slot.selectedVariant }),
+                uniqueSlotId: slot.id,
             };
         });
-
 
         const sortedProductsDesc = [...allIndividualProductsInSlots]
             .sort((a, b) => parseFloat(b.product_price) - parseFloat(a.product_price));
@@ -85,7 +81,7 @@ export default function OfferCartSidebar({
     const handleBuyNow = useCallback(async () => {
         if (!isOfferComplete()) return;
 
-        // setLoading(true);
+        console.log('🎁 OfferCartSidebar: Adding offer to cart, authMode:', authMode, 'isAuthenticated:', isAuthenticated);
 
         const filledSlots = slots.filter(slot => slot.product);
 
@@ -98,8 +94,8 @@ export default function OfferCartSidebar({
                 const productKey = `${slot.product.id}-${slot.selectedVariant?.id || ''}`;
 
                 const productDetailsForCartOfferItem: ProductItemDetails & { quantity: number; selectedVariant?: ProductVariant } = {
-                    ...slot.product, // Spread existing product data
-                    quantity: 1, // Each slot counts as 1 unit in the offer
+                    ...slot.product,
+                    quantity: 1,
                     ...(slot.selectedVariant && { selectedVariant: slot.selectedVariant }),
                 };
 
@@ -117,9 +113,10 @@ export default function OfferCartSidebar({
 
         let aggregatedOfferItems: (ProductItemDetails & { quantity: number; selectedVariant?: ProductVariant; isPaid?: boolean })[] = Array.from(aggregatedOfferItemsMap.values());
         
-        // For guest users, assign paid/free status based on price
-        if (!isAuthenticated) {
-            console.log("OfferCartSidebar: Guest user detected - assigning paid/free status based on price");
+        // FIXED: Only assign paid/free status for GUEST users
+        // For authenticated users, let the backend determine paid/free status
+        if (authMode === 'guest' && !isAuthenticated) {
+            console.log("🎁 OfferCartSidebar: Guest user detected - assigning paid/free status based on price");
             
             // Create individual product units for sorting
             const individualProducts: (ProductItemDetails & { quantity: number; selectedVariant?: ProductVariant; originalIndex: number })[] = [];
@@ -141,7 +138,7 @@ export default function OfferCartSidebar({
                 return priceB - priceA; // Descending order
             });
             
-            console.log('OfferCartSidebar: Sorted products by price:', sortedProducts.map(p => ({
+            console.log('🎁 OfferCartSidebar: Sorted products by price:', sortedProducts.map(p => ({
                 name: p.product_name,
                 price: p.product_price
             })));
@@ -181,7 +178,71 @@ export default function OfferCartSidebar({
             });
             
             aggregatedOfferItems = Array.from(finalAggregatedMap.values());
-            console.log("OfferCartSidebar: Guest offer items with paid/free status:", 
+            console.log("🎁 OfferCartSidebar: Guest offer items with paid/free status:", 
+                aggregatedOfferItems.map(item => ({
+                    name: item.product_name,
+                    isPaid: item.isPaid,
+                    quantity: item.quantity
+                }))
+            );
+        } else {
+            console.log("🔑 OfferCartSidebar: Authenticated user - assigning temporary paid/free status for immediate display");
+            // For authenticated users, assign paid/free status temporarily for immediate display
+            // Backend will sync the correct status later
+            const individualProducts: (ProductItemDetails & { quantity: number; selectedVariant?: ProductVariant; originalIndex: number })[] = [];
+            
+            aggregatedOfferItems.forEach((product, originalIndex) => {
+                for (let i = 0; i < product.quantity; i++) {
+                    individualProducts.push({
+                        ...product,
+                        quantity: 1,
+                        originalIndex
+                    });
+                }
+            });
+            
+            const sortedProducts = individualProducts.sort((a, b) => {
+                const priceA = parseFloat(a.product_price || '0');
+                const priceB = parseFloat(b.product_price || '0');
+                return priceB - priceA;
+            });
+            
+            // Apply the same logic as guest users for immediate display
+            const processedProducts: (ProductItemDetails & { quantity: number; selectedVariant?: ProductVariant; isPaid?: boolean })[] = [];
+            
+            sortedProducts.forEach((product, index) => {
+                const isPaid = index < offerData.buy_count;
+                processedProducts.push({
+                    ...product,
+                    isPaid
+                });
+            });
+            
+            // Re-aggregate with isPaid status
+            const finalAggregatedMap = new Map<string, (ProductItemDetails & { quantity: number; selectedVariant?: ProductVariant; isPaid?: boolean })>();
+            
+            processedProducts.forEach(product => {
+                const productId = product.id.replace(/-/g, '');
+                const variantId = product.selectedVariant?.id?.replace(/-/g, '');
+                const isPaidStatus = product.isPaid ? 'paid' : 'free';
+                const key = variantId ? `${productId}-${variantId}-${isPaidStatus}` : `${productId}-${isPaidStatus}`;
+
+                if (finalAggregatedMap.has(key)) {
+                    const existingProduct = finalAggregatedMap.get(key)!;
+                    finalAggregatedMap.set(key, {
+                        ...existingProduct,
+                        quantity: existingProduct.quantity + 1,
+                    });
+                } else {
+                    finalAggregatedMap.set(key, {
+                        ...product,
+                        quantity: 1,
+                    });
+                }
+            });
+            
+            aggregatedOfferItems = Array.from(finalAggregatedMap.values());
+            console.log("🔑 OfferCartSidebar - temporary paid/free assignment for immediate display:", 
                 aggregatedOfferItems.map(item => ({
                     name: item.product_name,
                     isPaid: item.isPaid,
@@ -190,10 +251,9 @@ export default function OfferCartSidebar({
             );
         }
 
-        const temporaryId = uuidv4();
-
+        // FIXED: Let CartContext handle ID management completely
         const offerSetPayload: CartOfferItem = {
-            id: temporaryId,
+            id: uuidv4(), // This will be updated by CartContext if authenticated
             offer: offerData.id,
             offer_name: { id: offerData.id, offer_name: offerData.offer_name },
             buy_count: offerData.buy_count,
@@ -206,17 +266,21 @@ export default function OfferCartSidebar({
         };
 
         try {
+            console.log("🎁 OfferCartSidebar: Dispatching ADD_OFFER_SET with items:", aggregatedOfferItems);
+            
+            // FIXED: Just dispatch - no manual delay needed, CartContext handles everything
             dispatchCart({ type: 'ADD_OFFER_SET', payload: offerSetPayload });
-            console.log("OfferCartSidebar: Dispatched ADD_OFFER_SET with aggregated items:", aggregatedOfferItems);
 
-            onOpenCartDrawer();
+            // Small delay for UI state to update before opening cart
+            setTimeout(() => {
+                onOpenCartDrawer();
+            }, 50);
+            
         } catch (error) {
-            console.error('OfferCartSidebar: Failed to add to cart (local dispatch failed?):', error);
+            console.error('❌ OfferCartSidebar: Failed to add to cart:', error);
             alert('Failed to add offer. Please try again.');
-        } finally {
-            // setLoading(false);
         }
-    }, [dispatchCart, offerData, isOfferComplete, onOpenCartDrawer, slots, isAuthenticated]);
+    }, [dispatchCart, offerData, isOfferComplete, onOpenCartDrawer, slots, isAuthenticated, authMode]);
 
     const filledSlots = slots.filter(slot => slot.product !== null);
     const totalRequiredItems = offerData.buy_count + offerData.get_count;
@@ -304,7 +368,7 @@ export default function OfferCartSidebar({
                         disabled={!isOfferComplete()}
                         onClick={handleBuyNow}
                     >
-                        {isOfferComplete() ? 'Buy Now' : `Select ${totalRequiredItems - filledSlots.length} More Item${totalRequiredItems - filledSlots.length > 1 ? 's' : ''}`}
+                        {isOfferComplete() ? 'Add to Cart' : `Select ${totalRequiredItems - filledSlots.length} More Item${totalRequiredItems - filledSlots.length > 1 ? 's' : ''}`}
                     </button>
                 </div>
             )}
