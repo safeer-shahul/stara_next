@@ -198,19 +198,35 @@ class ApiService {
   // Unified logout method
   public async logout(silent: boolean = false): Promise<void> {
     if (typeof window !== 'undefined') {
+      
+      // 🔄 STEP 1: Save current cart to localStorage before logout
+      try {
+        console.log('💾 Preserving cart state before logout...');
+        
+        // Trigger cart context to save current state
+        window.dispatchEvent(new CustomEvent('beforeLogout'));
+        
+        // Give time for cart context to respond
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        console.log('✅ Cart state preserved for guest mode');
+      } catch (error) {
+        console.error('❌ Error preserving cart state:', error);
+      }
+
+      // 🗑️ STEP 2: Clear authentication tokens
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
-      // Dispatch a custom event for other components (e.g., Header) to react to logout
+      
+      // 📢 STEP 3: Notify components about logout
       window.dispatchEvent(new Event('userLoggedOut'));
 
       const currentPath = window.location.pathname;
 
       if (currentPath.startsWith('/admin') && currentPath !== '/admin/login') {
-        window.location.href = '/admin/login'; // Hard redirect for admin if not already on login page
+        window.location.href = '/admin/login';
       } else {
-        // For regular users, attempt soft navigation or reload
-        // A simple reload is often sufficient and reliable after full logout
-        window.location.href = '/'; // Redirect to home page
+        window.location.href = '/';
       }
     }
 
@@ -218,9 +234,42 @@ class ApiService {
       await Swal.fire({
         icon: 'success',
         title: 'Successfully Logged Out!',
+        text: 'Your cart items have been saved locally.',
         showConfirmButton: false,
-        timer: 1500,
+        timer: 2000,
       });
+    }
+  }
+
+  // Optional: Add method to check if user can logout safely
+  public async canLogoutSafely(): Promise<boolean> {
+    try {
+      // Check if cart has unsaved changes
+      const cartItems = localStorage.getItem('cartItems');
+      const hasUnsavedCart = cartItems && JSON.parse(cartItems).length > 0;
+      
+      if (hasUnsavedCart) {
+        console.log('🛒 Cart has items that will be preserved during logout');
+      }
+      
+      return true; // Always allow logout, but inform user
+    } catch (error) {
+      console.error('❌ Error checking logout safety:', error);
+      return true; // Default to allowing logout
+    }
+  }
+
+  // Optional: Add method to restore cart after login
+  public async restoreCartAfterLogin(): Promise<void> {
+    try {
+      console.log('🔄 Checking for cart restoration after login...');
+      
+      // This is handled automatically by cartContext, but can be called manually
+      window.dispatchEvent(new CustomEvent('afterLogin'));
+      
+      console.log('✅ Cart restoration event dispatched');
+    } catch (error) {
+      console.error('❌ Error dispatching cart restoration event:', error);
     }
   }
 

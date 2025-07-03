@@ -21,7 +21,7 @@ const CartItem = ({ product, onRemove, onQuantityChange, fromProductSummary = fa
     if (product.quantity < currentMaxLimit && !isOutOfStockOverall) {
       onQuantityChange(product.id, 1);
     } else if (product.quantity >= currentMaxLimit) {
-      console.log(`Cannot add more of ${product.product_name}. Max available for your cart: ${currentMaxLimit}`);
+      console.log(`⚠️ Cannot add more of ${product.product_name}. Max available for your cart: ${currentMaxLimit}`);
     }
   };
 
@@ -82,6 +82,22 @@ const CartItem = ({ product, onRemove, onQuantityChange, fromProductSummary = fa
                   </span>
                 )}
               </h3>
+              {/* Sync status indicator */}
+              {!fromProductSummary && (
+                <div className="flex items-center mt-1">
+                  {product.isSynced ? (
+                    <span className="inline-flex items-center text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                      <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1 animate-pulse"></span>
+                      Synced
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                      <span className="w-1.5 h-1.5 bg-amber-500 rounded-full mr-1"></span>
+                      Local
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
             
             {!fromProductSummary && (
@@ -179,16 +195,6 @@ const CartItem = ({ product, onRemove, onQuantityChange, fromProductSummary = fa
               </div>
             </div>
           )}
-
-          {/* Product Summary Total */}
-          {/* {fromProductSummary && (
-            <div className="flex justify-between items-center pt-2 border-t border-gray-200">
-              <span className="text-xs text-gray-600">Item Total:</span>
-              <span className="text-sm font-bold text-[var(--color-primary-950)]">
-                ₹{(parseFloat(product.product_price) * product.quantity).toLocaleString('en-IN')}
-              </span>
-            </div>
-          )} */}
         </div>
       </div>
 

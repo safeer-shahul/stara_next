@@ -16,61 +16,91 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
   const { 
     cartItems, 
     dispatchCart, 
-    loading: contextLoading, 
+    loading: contextLoading,
+    authMode,
     getEffectiveProductStock,
     clearCart,
-    forceRefreshCart // New method for forcing refresh
+    forceRefreshCart,
+    checkBackendCartEmpty
   } = useCart();
   const [showCheckoutModal, setShowCheckoutModal] = useState<boolean>(false);
+  const [hasPerformedInitialSync, setHasPerformedInitialSync] = useState<boolean>(false);
 
-  // Force refresh cart when drawer opens for authenticated users
+  // OPTIMIZED: Only perform sync check on first open, not every open
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
       
-      // Force refresh cart data when drawer opens (for authenticated users)
-      const accessToken = localStorage.getItem('accessToken');
-      if (accessToken) {
-        console.log('CartDrawer: Forcing cart refresh on open');
-        forceRefreshCart();
+      // Only perform sync check if authenticated AND haven't done it in this session
+      if (authMode === 'authenticated' && !hasPerformedInitialSync) {
+        const performLightweightSyncCheck = async () => {
+          try {
+            console.log('🔍 Performing one-time sync check for cart drawer...');
+            
+            // OPTIMIZED: Only check if backend is empty, don't force full refresh
+            const backendIsEmpty = await checkBackendCartEmpty();
+            
+            if (backendIsEmpty && cartItems.length > 0) {
+              console.log('🗑️ Backend cart empty - clearing local cart (purchased on another device)');
+              dispatchCart({ type: 'CLEAR_CART' });
+              
+              setTimeout(() => {
+                alert('Your cart was cleared because it was completed on another device.');
+              }, 500);
+            }
+            // REMOVED: Don't force refresh if backend has items - trust current state
+            
+            setHasPerformedInitialSync(true);
+          } catch (error) {
+            console.error('❌ Error in lightweight sync check:', error);
+            setHasPerformedInitialSync(true); // Still mark as done to prevent retry
+          }
+        };
+
+        performLightweightSyncCheck();
       }
     } else {
       document.body.style.overflow = 'auto';
     }
+    
     return () => {
       document.body.style.overflow = 'auto';
     };
-  }, [isOpen, forceRefreshCart]);
+  }, [isOpen, authMode, hasPerformedInitialSync, cartItems.length, checkBackendCartEmpty, dispatchCart]);
+
+  // Reset sync flag when auth mode changes
+  useEffect(() => {
+    setHasPerformedInitialSync(false);
+  }, [authMode]);
 
   const handleRemoveItem = useCallback(async (id: string): Promise<void> => {
-    console.log(`CartDrawer: Removing item with ID: ${id}`);
+    console.log(`🗑️ CartDrawer: Removing item with ID: ${id}`);
     
-    // Find the item to log details for debugging
     const itemToRemove = cartItems.find(item => item.id === id);
     if (itemToRemove) {
-      // console.log(`CartDrawer: Removing ${itemToRemove.type} item:`, {
-      //   id: itemToRemove.id,
-      //   type: itemToRemove.type,
-      //   name: itemToRemove.type === 'normal' 
-      //     ? (itemToRemove as CartNormalItem).product_name 
-      //     : (itemToRemove as CartOfferItem).offer_name.offer_name
-      // });
+      console.log(`🗑️ CartDrawer: Removing ${itemToRemove.type} item:`, {
+        id: itemToRemove.id,
+        type: itemToRemove.type,
+        name: itemToRemove.type === 'normal' 
+          ? (itemToRemove as CartNormalItem).product_name 
+          : (itemToRemove as CartOfferItem).offer_name.offer_name
+      });
     }
     
     dispatchCart({ type: 'REMOVE_ITEM', payload: id });
   }, [dispatchCart, cartItems]);
 
   const handleQuantityChange = useCallback(async (id: string, change: number): Promise<void> => {
-    console.log('CartDrawer: handleQuantityChange called for item ID:', id, 'change:', change);
+    console.log('📊 CartDrawer: handleQuantityChange called for item ID:', id, 'change:', change);
     const itemToUpdate = cartItems.find(item => item.id === id);
 
     if (!itemToUpdate || itemToUpdate.type !== 'normal') {
-      console.warn(`CartDrawer: Cannot update quantity - item not found or not normal type`);
+      console.warn(`❌ CartDrawer: Cannot update quantity - item not found or not normal type`);
       return;
     }
 
     if (!itemToUpdate.productDetails) {
-      console.error(`CartDrawer: Cannot update quantity - missing productDetails`);
+      console.error(`❌ CartDrawer: Cannot update quantity - missing productDetails`);
       alert('Cannot update quantity: product data incomplete. Please refresh your cart.');
       return;
     }
@@ -86,12 +116,12 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
 
     if (newQuantity > currentEffectiveStock + itemToUpdate.quantity) {
       const maxAllowed = currentEffectiveStock + itemToUpdate.quantity;
-      console.warn(`CartDrawer: Cannot increase quantity beyond stock limit`);
+      console.warn(`⚠️ CartDrawer: Cannot increase quantity beyond stock limit`);
       alert(`Cannot add more: Maximum available stock is ${maxAllowed} units.`);
       return;
     }
 
-    console.log(`CartDrawer: Updating quantity for item ${id} to ${newQuantity}`);
+    console.log(`📊 CartDrawer: Updating quantity for item ${id} to ${newQuantity}`);
     dispatchCart({ type: 'UPDATE_ITEM_QUANTITY', payload: { id, quantity: newQuantity } });
   }, [cartItems, dispatchCart, getEffectiveProductStock, handleRemoveItem]);
 
@@ -104,27 +134,30 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
   }, []);
 
   const handleAddressSelected = useCallback((addressId: string): void => {
-    console.log(`CartDrawer: Proceeding with address ID: ${addressId}`);
+    console.log(`✅ CartDrawer: Proceeding with address ID: ${addressId}`);
     setShowCheckoutModal(false);
   }, []);
 
   const handleClearCart = useCallback(async (): Promise<void> => {
     try {
-      console.log('CartDrawer: Clearing cart');
+      console.log('🧹 CartDrawer: Clearing cart');
       await clearCart();
       
-      // Force refresh after clearing cart to ensure sync
-      const accessToken = localStorage.getItem('accessToken');
-      if (accessToken) {
-        setTimeout(() => {
-          forceRefreshCart();
-        }, 500);
-      }
+      // Reset sync flag so next open will check again
+      setHasPerformedInitialSync(false);
     } catch (error) {
-      console.error('CartDrawer: Error clearing cart:', error);
+      console.error('❌ CartDrawer: Error clearing cart:', error);
       dispatchCart({ type: 'CLEAR_CART' });
     }
-  }, [clearCart, dispatchCart, forceRefreshCart]);
+  }, [clearCart, dispatchCart]);
+
+  // MANUAL refresh function (only called when user clicks refresh button)
+  const handleManualRefresh = useCallback(async (): Promise<void> => {
+    console.log('🔄 Manual cart refresh requested');
+    setHasPerformedInitialSync(false); // Reset flag
+    await forceRefreshCart();
+    setHasPerformedInitialSync(true);
+  }, [forceRefreshCart]);
 
   // Calculate totals using cartUtils
   const calculateTotals = useCallback(() => {
@@ -141,7 +174,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
     try {
       return cartUtils.calculateDetailedTotals(cartItems);
     } catch (error) {
-      console.error('Error calculating totals:', error);
+      console.error('❌ Error calculating totals:', error);
       return {
         normalSubtotal: 0,
         offerSubtotal: 0,
@@ -160,7 +193,6 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
     return cartUtils.getOutOfStockItems(cartItems);
   }, [cartItems]);
 
-  // Group normal items by product and variant for display
   const groupedNormalItems = useCallback(() => {
     const normalItems = cartItems.filter(item => item.type === 'normal') as CartNormalItem[];
     return normalItems;
@@ -172,31 +204,25 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
   const normalItems = groupedNormalItems();
   const offerItems = cartItems.filter(item => item.type === 'offer') as CartOfferItem[];
 
-  console.log('CartDrawer: Rendering with items:', {
+  console.log('🎨 CartDrawer: Rendering with items:', {
     total: cartItems.length,
     normal: normalItems.length,
     offers: offerItems.length,
-    totals
+    totals,
+    authMode,
+    hasPerformedSync: hasPerformedInitialSync
   });
 
   return (
     <>
       <div className="fixed inset-0 z-50 overflow-hidden">
-        {/* Enhanced backdrop with gradient */}
         <div className="absolute inset-0 bg-gradient-to-br from-black/90 via-black/80 to-black/70 backdrop-blur-sm" onClick={onClose}></div>
 
-        {/* Enhanced cart drawer */}
         <div className="absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-2xl transform transition-transform rounded-tl-3xl rounded-bl-3xl">
           <div className="flex flex-col h-full relative overflow-hidden">
             
-            {/* Decorative background elements */}
-            {/* <div className="absolute top-4 right-6 w-20 h-20 rounded-full border-2 border-yellow-200 opacity-30 animate-pulse"></div>
-            <div className="absolute top-12 right-10 w-8 h-8 rounded-full border border-amber-300 opacity-40 animate-bounce" style={{ animationDelay: '0.5s' }}></div>
-            <div className="absolute bottom-32 left-6 w-6 h-6 rounded-full bg-yellow-100 opacity-50 animate-pulse" style={{ animationDelay: '1s' }}></div> */}
-
             {/* Enhanced Header */}
             <div className="relative bg-gradient-to-r from-[var(--color-primary-950)] via-[#1a5f7a] to-[var(--color-primary-950)] text-white shadow-lg">
-              {/* Decorative pattern overlay */}
               <div className="absolute inset-0 opacity-10">
                 <div className="absolute top-2 right-4 w-12 h-12 rounded-full border border-white/30"></div>
                 <div className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-white/10"></div>
@@ -211,6 +237,11 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                     <h3 className="text-lg font-bold">Your Cart</h3>
                     <p className="text-white/80 text-sm">
                       {totals.totalItems} {totals.totalItems === 1 ? 'item' : 'items'}
+                      {authMode === 'authenticated' && (
+                        <span className="ml-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
+                          Synced
+                        </span>
+                      )}
                       {totals.offerSavings > 0 && (
                         <span className="ml-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
                           Save ₹{totals.offerSavings.toFixed(0)}
@@ -228,27 +259,19 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
               </div>
             </div>
 
-            {/* Enhanced Promo Banner */}
-            {/* <div className="bg-gradient-to-r from-green-600 to-emerald-600 py-2 text-center relative overflow-hidden">
-              <div className="absolute inset-0 bg-black/10"></div>
-              <div className="relative flex items-center justify-center">
-                <span className="text-lg mr-2 animate-bounce">🎉</span>
-                <p className="text-white text-sm font-semibold">BUY 1 GET 1 FREE | USE CODE : B1G1</p>
-                <span className="text-lg ml-2 animate-bounce" style={{ animationDelay: '0.5s' }}>🎁</span>
-              </div>
-            </div> */}
-
             {/* Enhanced Cart Items */}
             <div className="flex-1 overflow-y-auto bg-gradient-to-b from-gray-50 to-white">
-              {/* {contextLoading ? (
+              {contextLoading ? (
                 <div className="flex justify-center items-center h-40">
                   <div className="relative">
                     <div className="w-12 h-12 border-4 border-gray-200 border-t-[var(--color-primary-950)] rounded-full animate-spin"></div>
                     <div className="absolute inset-0 w-12 h-12 border-4 border-transparent border-b-yellow-400 rounded-full animate-spin animation-delay-150"></div>
                   </div>
-                  <p className="ml-4 text-gray-600 font-medium">Loading cart items...</p>
+                  <p className="ml-4 text-gray-600 font-medium">
+                    {authMode === 'authenticated' ? 'Syncing cart...' : 'Loading cart items...'}
+                  </p>
                 </div>
-              ) : ( */}
+              ) : (
                 <>
                   {cartItems.length > 0 ? (
                     <div className="p-4 space-y-4">
@@ -320,17 +343,19 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                       <h3 className="text-xl font-semibold text-gray-700 mb-2">Your cart is empty</h3>
                       <p className="text-gray-500 mb-6">Start adding some beautiful jewelry to your cart!</p>
                       
-                      <button
-                        onClick={() => forceRefreshCart()}
-                        className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-[var(--color-primary-950)] to-[#1a5f7a] text-white rounded-lg hover:shadow-lg transition-all duration-300 transform hover:scale-105"
-                      >
-                        <RefreshCw size={16} className="mr-2" />
-                        Refresh Cart
-                      </button>
+                      {authMode === 'authenticated' && (
+                        <button
+                          onClick={handleManualRefresh}
+                          className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-[var(--color-primary-950)] to-[#1a5f7a] text-white rounded-lg hover:shadow-lg transition-all duration-300 transform hover:scale-105"
+                        >
+                          <RefreshCw size={16} className="mr-2" />
+                          Refresh Cart
+                        </button>
+                      )}
                     </div>
                   )}
                 </>
-               {/* )}*/}
+              )}
             </div>
 
             {/* Enhanced Cart Summary & Actions */}
@@ -441,15 +466,6 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                       )}
                     </button>
                   </div>
-
-                  {/* Jewelry themed message */}
-                  {/* <div className="text-center p-3 bg-yellow-50 rounded-xl border border-yellow-200">
-                    <p className="text-yellow-800 text-xs font-medium flex items-center justify-center">
-                      <span className="mr-2">💎</span>
-                      Authentic jewelry with premium craftsmanship
-                      <span className="ml-2">✨</span>
-                    </p>
-                  </div> */}
                 </div>
               </div>
             )}

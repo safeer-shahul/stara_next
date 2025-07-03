@@ -91,7 +91,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   normalItemsForCheckout = [],
   offerSetsForCheckout = [],
 }) => {
-  const { clearCart } = useCart();
+  const { clearCart, authMode, checkBackendCartEmpty } = useCart();
 
   // Memoized normal items for checkout
   const memoizedNormalItems: CartNormalItem[] = useMemo(() => {
@@ -190,7 +190,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         setAddresses([]);
       }
     } catch (error) {
-      console.error('Error fetching addresses:', error);
+      console.error('❌ Error fetching addresses:', error);
       setError('Failed to load addresses');
     } finally {
       setLoading(false);
@@ -202,12 +202,36 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     if (checkoutMode === 'cart') {
       try {
         await clearCart();
-        console.log('Cart cleared successfully');
+        console.log('✅ Cart cleared successfully');
       } catch (error) {
-        console.error('Error clearing cart:', error);
+        console.error('❌ Error clearing cart:', error);
       }
     }
   }, [checkoutMode, clearCart]);
+
+  // Multi-device sync check on checkout modal open
+  useEffect(() => {
+    if (isOpen && authMode === 'authenticated' && checkoutMode === 'cart') {
+      const checkCartBeforeCheckout = async () => {
+        try {
+          console.log('🔍 Checking cart before checkout...');
+          const backendIsEmpty = await checkBackendCartEmpty();
+          
+          if (backendIsEmpty && (normalItemsForCheckout.length > 0 || offerSetsForCheckout.length > 0)) {
+            // Cart was completed on another device
+            console.log('⚠️ Cart was already completed on another device');
+            alert('This cart was already completed on another device. Redirecting...');
+            onClose();
+            return;
+          }
+        } catch (error) {
+          console.error('❌ Error checking cart before checkout:', error);
+        }
+      };
+
+      checkCartBeforeCheckout();
+    }
+  }, [isOpen, authMode, checkoutMode, checkBackendCartEmpty, normalItemsForCheckout.length, offerSetsForCheckout.length, onClose]);
 
   // Initialize on modal open
   useEffect(() => {
@@ -254,7 +278,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     setOrderId(razorpayOrderId);
     setStaraOrderId(staraOrderID);
     setPaymentMethod(method);
-    console.log("Order created:", method, razorpayOrderId);
+    console.log("📦 Order created:", method, razorpayOrderId);
 
     if (method === 'Razorpay') {
       setCurrentStep(CheckoutStep.PAYMENT_PROCESSING);
@@ -272,7 +296,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     setPaymentStatus('success');
     await handleCartClear();
     setCurrentStep(CheckoutStep.ORDER_CONFIRMATION);
-    console.log('Payment success:', orderId, paymentId);
+    console.log('✅ Payment success:', orderId, paymentId);
   };
 
   const handlePaymentError = (errorMessage?: string) => {
@@ -404,6 +428,11 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       {currentStep === CheckoutStep.BILL_SUMMARY && 'Review your order details'}
                       {currentStep === CheckoutStep.PAYMENT_PROCESSING && 'Please wait while we process your payment'}
                     </p>
+                    {authMode === 'authenticated' && (
+                      <span className="inline-block mt-1 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                        🔄 Synced
+                      </span>
+                    )}
                   </div>
                 </div>
                 <button
@@ -436,8 +465,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   {/* Address Selection Step */}
                   {currentStep === CheckoutStep.ADDRESS_SELECTION && (
                     <>
-                      
-
                       {loading ? (
                         <div className="flex justify-center items-center h-40">
                           <div className="relative">

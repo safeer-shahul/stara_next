@@ -56,7 +56,7 @@ const _assignPaidFreeForGuestOffer = (
   buyCount: number,
   getCount: number
 ): (ProductItemDetails & { quantity: number; selectedVariant?: ProductVariant; isPaid?: boolean })[] => {
-  console.log('cartService: Assigning paid/free for guest offer:', { buyCount, getCount, totalProducts: offerProducts.length });
+  console.log('💸 cartService: Assigning paid/free for guest offer:', { buyCount, getCount, totalProducts: offerProducts.length });
   
   // Create individual product units for sorting
   const individualProducts: (ProductItemDetails & { quantity: number; selectedVariant?: ProductVariant; originalIndex: number })[] = [];
@@ -78,13 +78,12 @@ const _assignPaidFreeForGuestOffer = (
     return priceB - priceA; // Descending order
   });
   
-  console.log('cartService: Sorted products by price:', sortedProducts.map(p => ({
+  console.log('📊 cartService: Sorted products by price:', sortedProducts.map(p => ({
     name: p.product_name,
     price: p.product_price
   })));
   
   // Assign paid/free status
-  // const totalItems = buyCount + getCount;
   const processedProducts: (ProductItemDetails & { quantity: number; selectedVariant?: ProductVariant; isPaid?: boolean })[] = [];
   
   sortedProducts.forEach((product, index) => {
@@ -119,7 +118,7 @@ const _assignPaidFreeForGuestOffer = (
   });
   
   const result = Array.from(aggregatedMap.values());
-  console.log('cartService: Guest offer assignment result:', result.map(p => ({
+  console.log('✅ cartService: Guest offer assignment result:', result.map(p => ({
     name: p.product_name,
     quantity: p.quantity,
     isPaid: p.isPaid
@@ -127,6 +126,7 @@ const _assignPaidFreeForGuestOffer = (
   
   return result;
 };
+
 const _aggregateProductsWithinOffer = (productsToAggregate: (ProductItemDetails & { 
   quantity: number; 
   selectedVariant?: ProductVariant;
@@ -167,26 +167,26 @@ const _aggregateProductsWithinOffer = (productsToAggregate: (ProductItemDetails 
 
 export const cartService = {
   fetchCartFromBackend: async (): Promise<CartItemType[]> => {
-    console.log("cartService: Entering fetchCartFromBackend");
+    console.log("🔄 cartService: Entering fetchCartFromBackend");
     
     try {
       const accessToken = localStorage.getItem('accessToken');
       let rawCartDataFromSource: BackendCombinedRawItem[] = [];
 
       if (accessToken) {
-        console.log("cartService: Fetching cart from backend for authenticated user");
+        console.log("🔑 cartService: Fetching cart from backend for authenticated user");
         const backendCartResponse = await apiService.getUserCart();
-        console.log("cartService: Backend getUserCart response:", backendCartResponse);
+        console.log("📦 cartService: Backend getUserCart response:", backendCartResponse);
 
         // Safely extract cart items
         const normalItems = backendCartResponse?.shopping_cart?.items || [];
         const offerItems = backendCartResponse?.offer_cart?.items || [];
 
         rawCartDataFromSource = [...normalItems, ...offerItems];
-        console.log("cartService: Raw cart data combined:", rawCartDataFromSource.length, "items");
-        console.log("cartService: Normal items:", normalItems.length, "Offer items:", offerItems.length);
+        console.log("📋 cartService: Raw cart data combined:", rawCartDataFromSource.length, "items");
+        console.log("🛍️ cartService: Normal items:", normalItems.length, "🎁 Offer items:", offerItems.length);
       } else {
-        console.log("cartService: Loading cart from localStorage for guest user");
+        console.log("👤 cartService: Loading cart from localStorage for guest user");
         const storedItems = localStorage.getItem('cartItems');
         if (storedItems) {
           try {
@@ -199,7 +199,7 @@ export const cartService = {
               (item.type === 'normal' || item.type === 'offer')
             ).map(async (item: any) => {
               if (item.type === 'offer' && (!item.isSynced || item.isSynced === false)) {
-                console.log('cartService: Processing guest offer item for paid/free assignment:', item.offer_name?.offer_name);
+                console.log('🎁 cartService: Processing guest offer item for paid/free assignment:', item.offer_name?.offer_name);
                 
                 try {
                   // Fetch valid offers to get buy/get counts
@@ -209,7 +209,7 @@ export const cartService = {
                   );
                   
                   if (validOffer) {
-                    console.log('cartService: Found valid offer:', {
+                    console.log('✅ cartService: Found valid offer:', {
                       offerName: validOffer.offer_name,
                       buyCount: validOffer.buy_count,
                       getCount: validOffer.get_count
@@ -222,7 +222,7 @@ export const cartService = {
                       return cleanProduct;
                     });
                     
-                    console.log('cartService: Products before paid/free assignment:', 
+                    console.log('📊 cartService: Products before paid/free assignment:', 
                       offerProductsWithoutPaidStatus.map((p: any) => ({
                         name: p.product_name,
                         price: p.product_price,
@@ -236,7 +236,7 @@ export const cartService = {
                       validOffer.get_count
                     );
                     
-                    console.log('cartService: Products after paid/free assignment:', 
+                    console.log('✅ cartService: Products after paid/free assignment:', 
                       updatedOfferItems.map((p: any) => ({
                         name: p.product_name,
                         price: p.product_price,
@@ -253,10 +253,10 @@ export const cartService = {
                       isSynced: false // Mark as not synced since this is guest processing
                     };
                   } else {
-                    console.warn('cartService: Valid offer not found for guest offer:', item.offer);
+                    console.warn('⚠️ cartService: Valid offer not found for guest offer:', item.offer);
                   }
                 } catch (error) {
-                  console.error('cartService: Error processing guest offer:', error);
+                  console.error('❌ cartService: Error processing guest offer:', error);
                 }
               }
               return item;
@@ -264,7 +264,7 @@ export const cartService = {
             
             return processedItems;
           } catch (parseError) {
-            console.error('cartService: Error parsing localStorage items:', parseError);
+            console.error('❌ cartService: Error parsing localStorage items:', parseError);
             localStorage.removeItem('cartItems');
             return [];
           }
@@ -307,7 +307,7 @@ export const cartService = {
         }
       });
 
-      console.log("cartService: Collecting product details for", allProductUUIDs.size, "products");
+      console.log("🔍 cartService: Collecting product details for", allProductUUIDs.size, "products");
 
       // Fetch product details
       const productIdsArray = Array.from(allProductUUIDs);
@@ -336,7 +336,7 @@ export const cartService = {
             product_variant: p.product_variant || [],
           });
         });
-        console.log("cartService: Product details fetched for", productsMap.size, "products");
+        console.log("✅ cartService: Product details fetched for", productsMap.size, "products");
       }
 
       // Fetch valid offers
@@ -344,7 +344,7 @@ export const cartService = {
       const validOffersMap = new Map<string, OfferDetailsFromBackend>(
         offersResponse.data.map((o: OfferDetailsFromBackend) => [o.id.replace(/-/g, ''), o])
       );
-      console.log("cartService: Valid offers fetched:", validOffersMap.size);
+      console.log("🎁 cartService: Valid offers fetched:", validOffersMap.size);
 
       // --- Map Raw Data to Frontend CartItemType ---
       const enrichedCartItems: CartItemType[] = rawCartDataFromSource
@@ -364,11 +364,11 @@ export const cartService = {
           if ('buy_products' in item && item.buy_products !== undefined) {
             // Process offer item - EACH OFFER ITEM IS SEPARATE
             const offerItem = item as BackendRawOfferCartItem;
-            console.log("cartService: Processing offer item:", offerItem.id, "with offer:", offerItem.offer);
+            console.log("🎁 cartService: Processing offer item:", offerItem.id, "with offer:", offerItem.offer);
             
             const offerDetails = validOffersMap.get(offerItem.offer.replace(/-/g, ''));
             if (!offerDetails) {
-              console.warn(`cartService: Offer details not found for offer ID: ${offerItem.offer}`);
+              console.warn(`⚠️ cartService: Offer details not found for offer ID: ${offerItem.offer}`);
               return null;
             }
 
@@ -424,11 +424,11 @@ export const cartService = {
             const aggregatedOfferItems = _aggregateProductsWithinOffer(productsInOfferBundle);
             
             if (aggregatedOfferItems.length === 0) {
-              console.warn(`cartService: No valid products found for offer item after aggregation`);
+              console.warn(`⚠️ cartService: No valid products found for offer item after aggregation`);
               return null;
             }
 
-            console.log(`cartService: Created offer item with ${aggregatedOfferItems.length} aggregated products`);
+            console.log(`✅ cartService: Created offer item with ${aggregatedOfferItems.length} aggregated products`);
 
             return {
               id: offerItem.id,
@@ -446,7 +446,7 @@ export const cartService = {
           } else {
             // Process normal item
             const normalItem = item as BackendRawNormalCartItem;
-            console.log("cartService: Processing normal item:", normalItem.id);
+            console.log("🛍️ cartService: Processing normal item:", normalItem.id);
             
             const productDetail = productsMap.get(normalItem.product?.replace(/-/g, ''));
 
@@ -485,20 +485,20 @@ export const cartService = {
                 updated_at: normalItem.updated_at,
               } as CartNormalItem;
             }
-            console.warn(`cartService: Product details missing for normal item ${normalItem.product}`);
+            console.warn(`⚠️ cartService: Product details missing for normal item ${normalItem.product}`);
             return null;
           }
         })
         .filter((item): item is CartItemType => item !== null) as CartItemType[];
 
-      console.log("cartService: Final enriched cart items:", enrichedCartItems.length);
-      console.log("cartService: Normal items:", enrichedCartItems.filter(i => i.type === 'normal').length);
-      console.log("cartService: Offer items:", enrichedCartItems.filter(i => i.type === 'offer').length);
+      console.log("✅ cartService: Final enriched cart items:", enrichedCartItems.length);
+      console.log("🛍️ cartService: Normal items:", enrichedCartItems.filter(i => i.type === 'normal').length);
+      console.log("🎁 cartService: Offer items:", enrichedCartItems.filter(i => i.type === 'offer').length);
       
       return enrichedCartItems;
 
     } catch (error) {
-      console.error('cartService: Critical error in fetchCartFromBackend:', error);
+      console.error('❌ cartService: Critical error in fetchCartFromBackend:', error);
       
       // Fallback to localStorage
       const storedItems = localStorage.getItem('cartItems');
@@ -509,33 +509,33 @@ export const cartService = {
             typeof item === 'object' && item !== null &&
             ('type' in item && ((item as any).type === 'normal' || (item as any).type === 'offer'))
           ) as CartItemType[];
-          console.log("cartService: Fallback to localStorage successful. Items:", validFallbackItems.length);
+          console.log("📦 cartService: Fallback to localStorage successful. Items:", validFallbackItems.length);
           return validFallbackItems;
         } catch (parseError) {
-          console.error('cartService: Error parsing stored cart items during fallback:', parseError);
+          console.error('❌ cartService: Error parsing stored cart items during fallback:', parseError);
           localStorage.removeItem('cartItems');
         }
       }
       
-      console.log("cartService: Returning empty cart due to errors");
+      console.log("🏁 cartService: Returning empty cart due to errors");
       return [];
     }
   },
 
   // Force refresh cart from backend (call this after add/remove operations)
   refreshCartFromBackend: async (): Promise<CartItemType[]> => {
-    console.log("cartService: Force refreshing cart from backend");
+    console.log("🔄 cartService: Force refreshing cart from backend");
     return await cartService.fetchCartFromBackend();
   },
 
   pushLocalCartToBackend: async (localUnsyncedItems: CartItemType[]): Promise<void> => {
-    console.log("cartService: Pushing", localUnsyncedItems.length, "unsynced items to backend");
+    console.log("📤 cartService: Pushing", localUnsyncedItems.length, "unsynced items to backend");
     
     for (const item of localUnsyncedItems) {
       try {
         if (item.type === 'normal') {
           const normalItem = item as CartNormalItem;
-          console.log(`cartService: Pushing normal item: ${normalItem.product_name} x${normalItem.quantity}`);
+          console.log(`➕ cartService: Pushing normal item: ${normalItem.product_name} x${normalItem.quantity}`);
           
           // Add item quantity times to backend
           for (let q = 0; q < normalItem.quantity; q++) {
@@ -547,11 +547,11 @@ export const cartService = {
               })
             });
           }
-          console.log(`cartService: Successfully pushed normal item ${normalItem.product_name}`);
+          console.log(`✅ cartService: Successfully pushed normal item ${normalItem.product_name}`);
           
         } else if (item.type === 'offer') {
           const offerItem = item as CartOfferItem;
-          console.log(`cartService: Pushing offer item: ${offerItem.offer_name.offer_name}`);
+          console.log(`🎁 cartService: Pushing offer item: ${offerItem.offer_name.offer_name}`);
 
           const productsPayloadForBackend: { product_id: string; variant_id?: string }[] = [];
 
@@ -571,22 +571,22 @@ export const cartService = {
             offer_id: offerItem.offer.replace(/-/g, ''),
             products: productsPayloadForBackend,
           });
-          console.log(`cartService: Successfully pushed offer item ${offerItem.offer_name.offer_name}`);
+          console.log(`✅ cartService: Successfully pushed offer item ${offerItem.offer_name.offer_name}`);
         }
       } catch (error) {
-        console.error(`cartService: Error pushing item to backend (ID: ${item.id}, Type: ${item.type}):`, error);
+        console.error(`❌ cartService: Error pushing item to backend (ID: ${item.id}, Type: ${item.type}):`, error);
       }
     }
-    console.log("cartService: Finished pushing local items to backend");
+    console.log("🏁 cartService: Finished pushing local items to backend");
   },
 
   // Method specifically for processing guest offers
   processGuestOffers: async (cartItems: CartItemType[]): Promise<CartItemType[]> => {
-    console.log("cartService: Processing guest offers for paid/free assignment");
+    console.log("🎁 cartService: Processing guest offers for paid/free assignment");
     
     const accessToken = localStorage.getItem('accessToken');
     if (accessToken) {
-      console.log("cartService: User is authenticated, skipping guest offer processing");
+      console.log("🔑 cartService: User is authenticated, skipping guest offer processing");
       return cartItems;
     }
     
@@ -596,14 +596,14 @@ export const cartService = {
       
       const processedItems = await Promise.all(cartItems.map(async (item) => {
         if (item.type === 'offer' && !item.isSynced) {
-          console.log('cartService: Processing guest offer for paid/free:', item.offer_name?.offer_name);
+          console.log('🎁 cartService: Processing guest offer for paid/free:', item.offer_name?.offer_name);
           
           const validOffer = offersResponse.data.find((o: any) => 
             o.id.replace(/-/g, '') === item.offer.replace(/-/g, '')
           );
           
           if (validOffer) {
-            console.log('cartService: Found valid offer with counts:', {
+            console.log('✅ cartService: Found valid offer with counts:', {
               buyCount: validOffer.buy_count,
               getCount: validOffer.get_count
             });
@@ -615,7 +615,7 @@ export const cartService = {
               return cleanProduct;
             });
             
-            console.log('cartService: Products before assignment:', 
+            console.log('📊 cartService: Products before assignment:', 
               offerProductsWithoutPaidStatus.map((p: any) => ({
                 name: p.product_name,
                 price: p.product_price,
@@ -629,7 +629,7 @@ export const cartService = {
               validOffer.get_count
             );
             
-            console.log('cartService: Products after assignment:', 
+            console.log('✅ cartService: Products after assignment:', 
               updatedOfferItems.map((p: any) => ({
                 name: p.product_name,
                 isPaid: p.isPaid,
@@ -650,42 +650,42 @@ export const cartService = {
       
       return processedItems;
     } catch (error) {
-      console.error('cartService: Error processing guest offers:', error);
+      console.error('❌ cartService: Error processing guest offers:', error);
       return cartItems;
     }
   },
 
   addToCart: async (payload: { product_id?: string; mode: string; item_id?: string; variant_id?: string; is_cart?: string }) => {
-    console.log("cartService: Calling apiService.addToCart with payload:", payload);
+    console.log("📤 cartService: Calling apiService.addToCart with payload:", payload);
     const response = await apiService.addToCart(payload);
-    console.log("cartService: apiService.addToCart response:", response);
+    console.log("📥 cartService: apiService.addToCart response:", response);
     return response;
   },
 
-  // New method specifically for removing offer items
+  // Method specifically for removing offer items
   removeOfferItem: async (offerItemId: string): Promise<any> => {
-    console.log("cartService: Removing offer item with ID:", offerItemId);
+    console.log("🗑️ cartService: Removing offer item with ID:", offerItemId);
     const payload = {
       mode: 'delete',
       item_id: offerItemId.replace(/-/g, ''),
       is_offer: 'yes'
     };
-    console.log("cartService: Remove offer payload:", payload);
+    console.log("📤 cartService: Remove offer payload:", payload);
     const response = await apiService.addToCart(payload);
-    console.log("cartService: Remove offer response:", response);
+    console.log("📥 cartService: Remove offer response:", response);
     return response;
   },
 
   // Method for removing normal items (existing logic)
   removeNormalItem: async (normalItemId: string): Promise<any> => {
-    console.log("cartService: Removing normal item with ID:", normalItemId);
+    console.log("🗑️ cartService: Removing normal item with ID:", normalItemId);
     const payload = {
       mode: 'delete',
       item_id: normalItemId.replace(/-/g, '')
     };
-    console.log("cartService: Remove normal payload:", payload);
+    console.log("📤 cartService: Remove normal payload:", payload);
     const response = await apiService.addToCart(payload);
-    console.log("cartService: Remove normal response:", response);
+    console.log("📥 cartService: Remove normal response:", response);
     return response;
   },
 };

@@ -4,7 +4,7 @@ import apiService from '@/utils/api/apiService';
 import { cartService } from '@/utils/api/cartService';
 import { v4 as uuidv4 } from 'uuid';
 
-// ... [Keep all existing type definitions from original cartContext.tsx] ...
+// Keep all existing type definitions
 export interface ProductImage {
   id: string;
   product_image: string;
@@ -77,7 +77,7 @@ export interface CartOfferItem {
 
 export type CartItemType = CartNormalItem | CartOfferItem;
 
-// --- Reducer Action Types ---
+// Reducer Action Types
 export type CartAction =
   | { type: 'SET_CART_ITEMS'; payload: CartItemType[] }
   | { type: 'ADD_OFFER_SET'; payload: CartOfferItem }
@@ -86,22 +86,22 @@ export type CartAction =
   | { type: 'UPDATE_ITEM_QUANTITY'; payload: { id: string; quantity: number } }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'CLEAR_CART' }
-  | { type: 'TRIGGER_SYNC' }
-  | { type: 'FORCE_REFRESH' }; // New action for forced refresh
+  | { type: 'FORCE_REFRESH' };
 
-// --- Cart State and Context ---
+// Cart State and Context
 interface CartState {
   cartItems: CartItemType[];
   loading: boolean;
 }
 
 interface CartContextType extends CartState {
+  authMode: 'guest' | 'authenticated';
   dispatchCart: React.Dispatch<CartAction>;
   getTotalProductQuantitiesInCart: () => Map<string, number>;
   getEffectiveProductStock: (productDetails: ProductItemDetails, variantId?: string) => number;
-  syncCart: () => Promise<void>;
-  forceRefreshCart: () => Promise<void>; // New method for forced refresh
+  forceRefreshCart: () => Promise<void>;
   clearCart: () => Promise<void>;
+  checkBackendCartEmpty: () => Promise<boolean>;
   calculateTotals: () => {
     normalSubtotal: number;
     offerSubtotal: number;
@@ -118,16 +118,16 @@ const initialState: CartState = {
   loading: false,
 };
 
-// --- Local Storage Management ---
+// Local Storage Management
 const CART_STORAGE_KEY = 'cartItems';
 
 const saveToLocalStorage = (items: CartItemType[]) => {
   if (typeof window !== 'undefined') {
     try {
       localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
-      console.log('Cart saved to localStorage:', items.length, 'items');
+      console.log('💾 Cart saved to localStorage:', items.length, 'items');
     } catch (error) {
-      console.error('Error saving to localStorage:', error);
+      console.error('❌ Error saving to localStorage:', error);
     }
   }
 };
@@ -139,7 +139,7 @@ const loadFromLocalStorage = (): CartItemType[] => {
     const stored = localStorage.getItem(CART_STORAGE_KEY);
     if (stored) {
       const parsed = JSON.parse(stored);
-      console.log('Cart loaded from localStorage:', parsed.length, 'items');
+      console.log('📂 Cart loaded from localStorage:', parsed.length, 'items');
       return parsed.map((item: any) => ({
         ...item,
         id: item.id || uuidv4(),
@@ -147,7 +147,7 @@ const loadFromLocalStorage = (): CartItemType[] => {
       }));
     }
   } catch (error) {
-    console.error('Error loading from localStorage:', error);
+    console.error('❌ Error loading from localStorage:', error);
     localStorage.removeItem(CART_STORAGE_KEY);
   }
   return [];
@@ -156,22 +156,21 @@ const loadFromLocalStorage = (): CartItemType[] => {
 const clearLocalStorage = () => {
   if (typeof window !== 'undefined') {
     localStorage.removeItem(CART_STORAGE_KEY);
-    console.log('Cart localStorage cleared');
+    console.log('🗑️ Cart localStorage cleared');
   }
 };
 
-// --- Cart Reducer ---
+// Cart Reducer
 const cartReducer = (state: CartState, action: CartAction): CartState => {
   let newItems: CartItemType[];
 
   switch (action.type) {
     case 'SET_CART_ITEMS':
-      console.log('Reducer: SET_CART_ITEMS', action.payload.length, 'items');
-      saveToLocalStorage(action.payload);
+      console.log('🔄 Reducer: SET_CART_ITEMS', action.payload.length, 'items');
       return { ...state, cartItems: action.payload };
 
     case 'ADD_NORMAL_ITEM':
-      console.log('Reducer: ADD_NORMAL_ITEM', action.payload.product_name);
+      console.log('➕ Reducer: ADD_NORMAL_ITEM', action.payload.product_name);
 
       const incomingHasVariant = !!action.payload.selectedVariant;
       const incomingVariantId = action.payload.selectedVariant?.id;
@@ -205,11 +204,10 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
         newItems = [...state.cartItems, newNormalItem];
       }
 
-      saveToLocalStorage(newItems);
       return { ...state, cartItems: newItems };
 
     case 'ADD_OFFER_SET':
-      console.log('Reducer: ADD_OFFER_SET', action.payload.offer_name.offer_name);
+      console.log('🎁 Reducer: ADD_OFFER_SET', action.payload.offer_name.offer_name);
 
       const newOfferSet: CartOfferItem = {
         ...action.payload,
@@ -219,17 +217,15 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
         updated_at: new Date().toISOString(),
       };
       newItems = [...state.cartItems, newOfferSet];
-      saveToLocalStorage(newItems);
       return { ...state, cartItems: newItems };
 
     case 'REMOVE_ITEM':
-      console.log('Reducer: REMOVE_ITEM', action.payload);
+      console.log('🗑️ Reducer: REMOVE_ITEM', action.payload);
       newItems = state.cartItems.filter((item) => item.id !== action.payload);
-      saveToLocalStorage(newItems);
       return { ...state, cartItems: newItems };
 
     case 'UPDATE_ITEM_QUANTITY':
-      console.log('Reducer: UPDATE_ITEM_QUANTITY', action.payload);
+      console.log('📊 Reducer: UPDATE_ITEM_QUANTITY', action.payload);
       newItems = state.cartItems.map((item) => {
         if (item.type === 'normal' && item.id === action.payload.id) {
           return {
@@ -241,70 +237,48 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
         }
         return item;
       });
-      saveToLocalStorage(newItems);
       return { ...state, cartItems: newItems };
 
     case 'CLEAR_CART':
-      console.log('Reducer: CLEAR_CART');
-      clearLocalStorage();
+      console.log('🧹 Reducer: CLEAR_CART');
       return { ...state, cartItems: [] };
 
     case 'SET_LOADING':
       return { ...state, loading: action.payload };
 
-    case 'TRIGGER_SYNC':
-      console.log('Reducer: TRIGGER_SYNC - will trigger sync in useEffect');
-      return state;
-
-    case 'FORCE_REFRESH':
-      console.log('Reducer: FORCE_REFRESH - will trigger force refresh in useEffect');
-      return state;
-
     default:
-      console.warn(`Unhandled action type: ${(action as { type: string }).type}`);
+      console.warn(`❓ Unhandled action type: ${(action as { type: string }).type}`);
       return state;
   }
 };
 
-// --- Debounce utility ---
-const useDebounce = (callback: Function, delay: number) => {
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  return useCallback(
-    (...args: any[]) => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-
-      timeoutRef.current = setTimeout(() => {
-        callback(...args);
-      }, delay);
-    },
-    [callback, delay]
-  );
-};
-
-// --- Cart Provider Component ---
+// Cart Provider Component
 export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   const [state, dispatch] = useReducer(cartReducer, initialState);
-  const [syncRequested, setSyncRequested] = useState(false);
-  const [forceRefreshRequested, setForceRefreshRequested] = useState(false);
+  const [authMode, setAuthMode] = useState<'guest' | 'authenticated'>('guest');
   const isInitialized = useRef(false);
   const isSyncing = useRef(false);
-  const isMounted = useRef(true);
   const prevAccessTokenRef = useRef<string | null>(null);
-
-  // Track pending operations to prevent duplicates
   const pendingOperations = useRef(new Set<string>());
-  const lastRemovalTime = useRef<number>(0);
 
   // Track component mount status
   useEffect(() => {
-    isMounted.current = true;
     return () => {
-      isMounted.current = false;
+      // Cleanup pending operations on unmount
+      pendingOperations.current.clear();
     };
   }, []);
+
+  // Listen for beforeLogout event to save cart
+  useEffect(() => {
+    const handleBeforeLogout = () => {
+      console.log('💾 Saving cart before logout...');
+      saveToLocalStorage(state.cartItems);
+    };
+
+    window.addEventListener('beforeLogout', handleBeforeLogout);
+    return () => window.removeEventListener('beforeLogout', handleBeforeLogout);
+  }, [state.cartItems]);
 
   // Track authentication state changes
   useEffect(() => {
@@ -312,654 +286,262 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       const currentAccessToken = localStorage.getItem('accessToken');
       const previousToken = prevAccessTokenRef.current;
 
-      // Detect login (no token -> has token)
-      if (!previousToken && currentAccessToken && isInitialized.current) {
-        console.log('Login detected - triggering sync');
-        setSyncRequested(true);
+      // LOGIN DETECTED: Clear localStorage and switch to API mode
+      if (!previousToken && currentAccessToken) {
+        console.log('🔑 Login detected - switching to API-first mode');
+        setAuthMode('authenticated');
+        handleLoginTransition();
+      }
+      
+      // LOGOUT DETECTED: Switch back to localStorage mode
+      else if (previousToken && !currentAccessToken) {
+        console.log('🚪 Logout detected - switching to localStorage mode');
+        setAuthMode('guest');
+        handleLogoutTransition();
       }
 
       prevAccessTokenRef.current = currentAccessToken;
     };
 
-    // Check immediately
     checkAuthChange();
-
-    // Set up a small interval to catch auth changes
     const interval = setInterval(checkAuthChange, 500);
-
     return () => clearInterval(interval);
   }, []);
 
-  // Initialize cart from localStorage on mount
-  useEffect(() => {
-    if (typeof window !== 'undefined' && !isInitialized.current) {
-      const currentAccessToken = localStorage.getItem('accessToken');
+  // Handle login transition: localStorage → API
+  const handleLoginTransition = useCallback(async () => {
+    try {
+      console.log('📤 Transferring localStorage cart to backend...');
+      
+      // Get current localStorage items
+      const localItems = loadFromLocalStorage();
+      
+      // Push all local items to backend first
+      if (localItems.length > 0) {
+        await cartService.pushLocalCartToBackend(localItems);
+        console.log('✅ Local cart transferred to backend');
+      }
+      
+      // Clear localStorage completely
+      clearLocalStorage();
+      console.log('🗑️ localStorage cleared');
+      
+      // Fetch fresh cart from backend (now authoritative)
+      await loadCartFromAPI();
+      
+    } catch (error) {
+      console.error('❌ Error during login transition:', error);
+      // Fallback: load from localStorage if backend fails
+      const fallbackItems = loadFromLocalStorage();
+      dispatch({ type: 'SET_CART_ITEMS', payload: fallbackItems });
+    }
+  }, []);
+
+  // Handle logout transition: API → localStorage
+  const handleLogoutTransition = useCallback(async () => {
+    try {
+      console.log('💾 Cart preserved for guest mode');
+      // Cart is already saved by beforeLogout event listener
+      
+      // Load from localStorage for guest mode
       const storedItems = loadFromLocalStorage();
+      const processedItems = await cartService.processGuestOffers(storedItems);
+      dispatch({ type: 'SET_CART_ITEMS', payload: processedItems });
+      
+    } catch (error) {
+      console.error('❌ Error during logout transition:', error);
+      const fallbackItems = loadFromLocalStorage();
+      dispatch({ type: 'SET_CART_ITEMS', payload: fallbackItems });
+    }
+  }, []);
 
-      prevAccessTokenRef.current = currentAccessToken;
-      isInitialized.current = true;
+  // Load cart from API (for authenticated users)
+  const loadCartFromAPI = useCallback(async () => {
+    if (authMode !== 'authenticated') return;
+    
+    try {
+      dispatch({ type: 'SET_LOADING', payload: true });
+      console.log('🔄 Loading cart from API...');
+      
+      const cartItems = await cartService.fetchCartFromBackend();
+      dispatch({ type: 'SET_CART_ITEMS', payload: cartItems });
+      
+      console.log(`✅ Cart loaded from API: ${cartItems.length} items`);
+    } catch (error) {
+      console.error('❌ Error loading cart from API:', error);
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
+    }
+  }, [authMode]);
 
+  // Check if backend cart is empty (for multi-device sync)
+  const checkBackendCartEmpty = useCallback(async (): Promise<boolean> => {
+  if (authMode !== 'authenticated') return false;
+  
+  try {
+    console.log('🔍 Performing lightweight backend cart check...');
+    
+    // OPTION 1: Use a lightweight cart summary API (if available)
+    // const cartSummary = await apiService.getCartSummary();
+    // return cartSummary.total_items === 0;
+    
+    // OPTION 2: Use existing getUserCart but just check length
+    const backendCartResponse = await apiService.getUserCart();
+    const normalItems = backendCartResponse?.shopping_cart?.items || [];
+    const offerItems = backendCartResponse?.offer_cart?.items || [];
+    const isEmpty = normalItems.length === 0 && offerItems.length === 0;
+    
+    console.log(`📊 Backend cart check: ${isEmpty ? 'empty' : 'has items'} (${normalItems.length + offerItems.length} total)`);
+    return isEmpty;
+    
+  } catch (error) {
+    console.error('❌ Error checking backend cart:', error);
+    return false;
+  }
+}, [authMode]);
+
+  // Initialize cart based on auth mode
+  useEffect(() => {
+    if (!isInitialized.current) {
+      const currentAccessToken = localStorage.getItem('accessToken');
+      
       if (currentAccessToken) {
-        // For authenticated users, load local items first, then sync
+        console.log('🔑 Authenticated user detected - API mode');
+        setAuthMode('authenticated');
+        loadCartFromAPI();
+      } else {
+        console.log('👤 Guest user detected - localStorage mode');
+        setAuthMode('guest');
+        const storedItems = loadFromLocalStorage();
+        
+        // Process guest offers if any
         if (storedItems.length > 0) {
-          console.log('Setting local items before sync (including offers):', storedItems.length);
+          cartService.processGuestOffers(storedItems).then(processedItems => {
+            dispatch({ type: 'SET_CART_ITEMS', payload: processedItems });
+          }).catch(error => {
+            console.error('❌ Error processing guest offers:', error);
+            dispatch({ type: 'SET_CART_ITEMS', payload: storedItems });
+          });
+        } else {
           dispatch({ type: 'SET_CART_ITEMS', payload: storedItems });
         }
-        
-        // Always sync to merge local items with backend
-        console.log('Authenticated user detected - syncing with backend (preserving local offers)');
-        setSyncRequested(true);
-      } else {
-        // For guest users, load from localStorage and process offers immediately
-        if (storedItems.length > 0) {
-          console.log('Guest user - processing cart items including offers');
-          
-          // Check if there are unsynced offers that need processing
-          const hasUnsyncedOffers = storedItems.some(item => 
-            item.type === 'offer' && !item.isSynced
-          );
-          
-          if (hasUnsyncedOffers) {
-            console.log('Found unsynced guest offers - processing for paid/free assignment');
-            // Process guest offers immediately
-            cartService.processGuestOffers(storedItems).then(processedItems => {
-              console.log('Guest offers processed on initialization');
-              dispatch({ type: 'SET_CART_ITEMS', payload: processedItems });
-            }).catch(error => {
-              console.error('Error processing guest offers on init:', error);
-              dispatch({ type: 'SET_CART_ITEMS', payload: storedItems });
-            });
-          } else {
-            dispatch({ type: 'SET_CART_ITEMS', payload: storedItems });
-          }
-        }
-        console.log('Guest user - cart loaded from localStorage');
-      }
-    }
-  }, []);
-
-  // Force refresh cart from backend
-  const forceRefreshCart = useCallback(async () => {
-    if (isSyncing.current) {
-      console.log('Sync already in progress, skipping force refresh');
-      return;
-    }
-
-    // Prevent rapid successive refreshes after removal operations
-    const now = Date.now();
-    if (now - lastRemovalTime.current < 2000) {
-      console.log('Recent removal operation, skipping rapid refresh');
-      return;
-    }
-
-    isSyncing.current = true;
-    dispatch({ type: 'SET_LOADING', payload: true });
-
-    try {
-      console.log('Force refreshing cart from backend...');
-      const freshCartItems = await cartService.refreshCartFromBackend();
-      
-      // For guest users, also process offers for paid/free assignment
-      const accessToken = localStorage.getItem('accessToken');
-      if (!accessToken) {
-        console.log('Guest user detected - processing offers for paid/free assignment');
-        const processedCartItems = await cartService.processGuestOffers(freshCartItems);
-        console.log('Force refresh completed with guest offer processing. Items:', processedCartItems.length);
-        dispatch({ type: 'SET_CART_ITEMS', payload: processedCartItems });
-      } else {
-        console.log('Force refresh completed. Items:', freshCartItems.length);
-        dispatch({ type: 'SET_CART_ITEMS', payload: freshCartItems });
-      }
-    } catch (error) {
-      console.error('Force refresh failed:', error);
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
-      isSyncing.current = false;
-      setForceRefreshRequested(false);
-    }
-  }, []);
-
-  // Sync with backend - INTELLIGENT SYNC WITH STOCK VALIDATION
-  const syncCart = useCallback(async () => {
-    if (isSyncing.current) {
-      console.log('Sync already in progress, skipping');
-      return;
-    }
-
-    const accessToken = localStorage.getItem('accessToken');
-    if (!accessToken) {
-      console.log('No access token, skipping sync');
-      return;
-    }
-
-    isSyncing.current = true;
-    dispatch({ type: 'SET_LOADING', payload: true });
-
-    try {
-      console.log('Starting intelligent cart sync with stock validation...');
-
-      // Get both local and backend carts
-      const localCart = state.cartItems;
-      const backendCart = await cartService.fetchCartFromBackend();
-      
-      console.log('Local cart items:', localCart.length);
-      console.log('Backend cart items:', backendCart.length);
-
-      // For offers, we need a different strategy since they're complex
-      // 1. Always trust backend for synced offers
-      // 2. Only push local offers that don't exist on backend
-      // 3. Don't do intelligent merge for offers - too complex
-
-      const finalCart: CartItemType[] = [];
-      
-      // Get all offer items from backend (always trust backend for synced offers)
-      const backendOfferItems = backendCart.filter(item => item.type === 'offer') as CartOfferItem[];
-      console.log('Backend offer items:', backendOfferItems.length);
-      
-      // Get local offer items that might need to be pushed to backend
-      const localOfferItems = localCart.filter(item => item.type === 'offer' && !item.isSynced) as CartOfferItem[];
-      console.log('Local unsynced offer items:', localOfferItems.length);
-      
-      // Add all backend offers to final cart first
-      finalCart.push(...backendOfferItems);
-      
-      // Check which local offers actually need to be pushed (don't exist on backend)
-      const offersToActuallyPush: CartOfferItem[] = [];
-      
-      for (const localOffer of localOfferItems) {
-        // Check if this offer already exists on backend by comparing offer ID and products
-        const existsOnBackend = backendOfferItems.some(backendOffer => {
-          // Same offer ID
-          if (backendOffer.offer.replace(/-/g, '') !== localOffer.offer.replace(/-/g, '')) {
-            return false;
-          }
-          
-          // Check if products match (simple comparison by product IDs and quantities)
-          const backendProductSignature = backendOffer.offer_items
-            .map(item => `${item.id.replace(/-/g, '')}-${item.selectedVariant?.id?.replace(/-/g, '') || 'novariant'}-${item.quantity}`)
-            .sort()
-            .join('|');
-            
-          const localProductSignature = localOffer.offer_items
-            .map(item => `${item.id.replace(/-/g, '')}-${item.selectedVariant?.id?.replace(/-/g, '') || 'novariant'}-${item.quantity}`)
-            .sort()
-            .join('|');
-            
-          return backendProductSignature === localProductSignature;
-        });
-        
-        if (!existsOnBackend) {
-          console.log('Local offer not found on backend, will push:', localOffer.offer_name.offer_name);
-          offersToActuallyPush.push(localOffer);
-        } else {
-          console.log('Local offer already exists on backend, skipping push:', localOffer.offer_name.offer_name);
-        }
       }
       
-      console.log('Offers that actually need to be pushed:', offersToActuallyPush.length);
-      
-      // Push only the offers that don't exist on backend
-      for (const localOffer of offersToActuallyPush) {
-        try {
-          console.log('Pushing unique local offer to backend:', localOffer.offer_name.offer_name);
-          
-          const productsPayloadForBackend: { product_id: string; variant_id?: string }[] = [];
-          localOffer.offer_items.forEach((p) => {
-            const productIdClean = p.id.replace(/-/g, '');
-            const variantIdClean = p.selectedVariant?.id?.replace(/-/g, '');
-
-            for (let q = 0; q < p.quantity; q++) {
-              productsPayloadForBackend.push({
-                product_id: productIdClean,
-                ...(variantIdClean && { variant_id: variantIdClean }),
-              });
-            }
-          });
-
-          await apiService.addToCartOffer({
-            offer_id: localOffer.offer.replace(/-/g, ''),
-            products: productsPayloadForBackend,
-          });
-          
-          console.log('Successfully pushed unique local offer to backend');
-        } catch (error) {
-          console.error('Error pushing unique local offer to backend:', error);
-          // If push fails, keep the local offer in cart
-          finalCart.push(localOffer);
-        }
-      }
-      
-      // After pushing unique offers, fetch fresh backend data to get the complete state
-      if (offersToActuallyPush.length > 0) {
-        try {
-          console.log('Fetching fresh cart after pushing unique local offers...');
-          const freshBackendCart = await cartService.fetchCartFromBackend();
-          const freshBackendOffers = freshBackendCart.filter(item => item.type === 'offer') as CartOfferItem[];
-          
-          // Replace backend offers with fresh data
-          const cartWithoutOffers = finalCart.filter(item => item.type !== 'offer');
-          finalCart.length = 0; // Clear array
-          finalCart.push(...cartWithoutOffers, ...freshBackendOffers);
-          
-          console.log('Updated cart with fresh backend offers after unique push:', freshBackendOffers.length);
-        } catch (error) {
-          console.error('Error fetching fresh backend data after unique push:', error);
-        }
-      }
-
-      // For normal items, do intelligent merge
-      const localNormalItems = localCart.filter(item => item.type === 'normal') as CartNormalItem[];
-      const backendNormalItems = backendCart.filter(item => item.type === 'normal') as CartNormalItem[];
-
-      // Collect all unique product IDs to fetch fresh stock data
-      const allProductIds = new Set<string>();
-      [...localNormalItems, ...backendNormalItems].forEach(item => {
-        allProductIds.add(item.product_id.replace(/-/g, ''));
-      });
-
-      // Fetch fresh product data with current stock
-      let stockMap = new Map<string, ProductItemDetails>();
-      if (allProductIds.size > 0) {
-        try {
-          const productsResponse = await apiService.getPaginatedProducts(1, 100, undefined, Array.from(allProductIds));
-          productsResponse.products.forEach((p: any) => {
-            stockMap.set(p.id.replace(/-/g, ''), {
-              id: p.id,
-              images: p.images || [],
-              product_code: p.product_code,
-              product_name: p.product_name,
-              product_description: p.product_description,
-              product_price: p.product_price,
-              strike_price: p.strike_price,
-              quantity: p.quantity,
-              product_weight: p.product_weight,
-              product_box_weight: p.product_box_weight,
-              product_status: p.product_status,
-              created_at: p.created_at,
-              updated_at: p.updated_at,
-              sub_category: p.sub_category,
-              isInStock: p.product_status && p.quantity > 0,
-              have_variants: p.have_variants || false,
-              product_variant: p.product_variant || [],
-            });
-          });
-          console.log('Fresh stock data fetched for', stockMap.size, 'products');
-        } catch (error) {
-          console.error('Failed to fetch fresh stock data:', error);
-        }
-      }
-
-      // Helper function to get available stock for an item
-      const getAvailableStock = (item: CartNormalItem): number => {
-        const productData = stockMap.get(item.product_id.replace(/-/g, ''));
-        if (!productData) return 0;
-
-        if (item.selectedVariant && productData.have_variants) {
-          const variant = productData.product_variant.find(v => 
-            v.id.replace(/-/g, '') === item.selectedVariant!.id.replace(/-/g, '')
-          );
-          return variant?.quantity || 0;
-        }
-        return productData.quantity || 0;
-      };
-
-      // Create maps for easier comparison (product_id + variant_id as key)
-      const createItemKey = (item: CartNormalItem) => {
-        const variantId = item.selectedVariant?.id || 'no-variant';
-        return `${item.product_id}-${variantId}`;
-      };
-
-      const localMap = new Map<string, CartNormalItem>();
-      const backendMap = new Map<string, CartNormalItem>();
-
-      localNormalItems.forEach(item => {
-        const key = createItemKey(item);
-        localMap.set(key, item);
-      });
-
-      backendNormalItems.forEach(item => {
-        const key = createItemKey(item);
-        backendMap.set(key, item);
-      });
-
-      const itemsToAddToBackend: CartNormalItem[] = [];
-      const itemsToUpdateInBackend: { item: CartNormalItem; newQuantity: number }[] = [];
-      const stockWarnings: string[] = [];
-
-      // Process all unique keys (from both local and backend)
-      const allKeys = new Set([...localMap.keys(), ...backendMap.keys()]);
-
-      for (const key of allKeys) {
-        const localItem = localMap.get(key);
-        const backendItem = backendMap.get(key);
-
-        if (localItem && backendItem) {
-          // Item exists in both - compare quantities with stock validation
-          const localQty = localItem.quantity;
-          const backendQty = backendItem.quantity;
-          const availableStock = getAvailableStock(localItem);
-
-          // Determine the desired quantity (higher of the two)
-          const desiredQty = Math.max(localQty, backendQty);
-          
-          // Apply stock limit
-          const finalQty = Math.min(desiredQty, availableStock);
-
-          if (finalQty < desiredQty) {
-            const productName = localItem.product_name;
-            const variantInfo = localItem.selectedVariant ? ` (${localItem.selectedVariant.variant_name})` : '';
-            stockWarnings.push(`${productName}${variantInfo}: Reduced quantity from ${desiredQty} to ${finalQty} due to stock limit`);
-            console.log(`Stock limit applied for ${key}: desired ${desiredQty}, available ${availableStock}, final ${finalQty}`);
-          }
-
-          if (finalQty === 0) {
-            // Remove item completely if no stock
-            const productName = localItem.product_name;
-            const variantInfo = localItem.selectedVariant ? ` (${localItem.selectedVariant.variant_name})` : '';
-            stockWarnings.push(`${productName}${variantInfo}: Removed from cart - out of stock`);
-            console.log(`Removing item ${key} - no stock available`);
-            continue; // Skip adding to final cart
-          }
-
-          // Create the final item with validated quantity
-          const finalItem = { ...localItem, quantity: finalQty };
-
-          if (localQty > backendQty && finalQty !== backendQty) {
-            // Need to update backend
-            console.log(`Updating backend quantity for ${key}: ${backendQty} -> ${finalQty}`);
-            itemsToUpdateInBackend.push({ item: finalItem, newQuantity: finalQty });
-          }
-
-          finalCart.push(finalItem);
-        } else if (localItem && !backendItem) {
-          // Item exists only in local - validate stock before adding to backend
-          const availableStock = getAvailableStock(localItem);
-          const finalQty = Math.min(localItem.quantity, availableStock);
-
-          if (finalQty < localItem.quantity) {
-            const productName = localItem.product_name;
-            const variantInfo = localItem.selectedVariant ? ` (${localItem.selectedVariant.variant_name})` : '';
-            stockWarnings.push(`${productName}${variantInfo}: Reduced quantity from ${localItem.quantity} to ${finalQty} due to stock limit`);
-          }
-
-          if (finalQty > 0) {
-            const finalItem = { ...localItem, quantity: finalQty };
-            console.log(`Adding local item to backend with stock validation: ${key} (qty: ${finalQty})`);
-            itemsToAddToBackend.push(finalItem);
-            finalCart.push(finalItem);
-          } else {
-            const productName = localItem.product_name;
-            const variantInfo = localItem.selectedVariant ? ` (${localItem.selectedVariant.variant_name})` : '';
-            stockWarnings.push(`${productName}${variantInfo}: Removed from cart - out of stock`);
-          }
-        } else if (!localItem && backendItem) {
-          // Item exists only in backend - validate stock before adding to local
-          const availableStock = getAvailableStock(backendItem);
-          const finalQty = Math.min(backendItem.quantity, availableStock);
-
-          if (finalQty < backendItem.quantity) {
-            const productName = backendItem.product_name;
-            const variantInfo = backendItem.selectedVariant ? ` (${backendItem.selectedVariant.variant_name})` : '';
-            stockWarnings.push(`${productName}${variantInfo}: Reduced quantity from ${backendItem.quantity} to ${finalQty} due to stock limit`);
-          }
-
-          if (finalQty > 0) {
-            const finalItem = { ...backendItem, quantity: finalQty };
-            console.log(`Adding backend item to local with stock validation: ${key} (qty: ${finalQty})`);
-            finalCart.push(finalItem);
-          } else {
-            const productName = backendItem.product_name;
-            const variantInfo = backendItem.selectedVariant ? ` (${backendItem.selectedVariant.variant_name})` : '';
-            stockWarnings.push(`${productName}${variantInfo}: Removed from cart - out of stock`);
-          }
-        }
-      }
-
-      // Execute backend updates
-      for (const { item, newQuantity } of itemsToUpdateInBackend) {
-        try {
-          const backendItem = backendMap.get(createItemKey(item));
-          const currentQty = backendItem ? backendItem.quantity : 0;
-          const difference = newQuantity - currentQty;
-          
-          if (difference > 0) {
-            // Need to add more
-            for (let i = 0; i < difference; i++) {
-              await cartService.addToCart({
-                product_id: item.product_id.replace(/-/g, ''),
-                mode: '+',
-                ...(item.selectedVariant && {
-                  variant_id: item.selectedVariant.id.replace(/-/g, ''),
-                }),
-              });
-            }
-          }
-        } catch (error) {
-          console.error('Error updating backend quantity:', error);
-          // Continue with other items
-        }
-      }
-
-      // Execute backend additions
-      for (const item of itemsToAddToBackend) {
-        try {
-          for (let i = 0; i < item.quantity; i++) {
-            await cartService.addToCart({
-              product_id: item.product_id.replace(/-/g, ''),
-              mode: '+',
-              ...(item.selectedVariant && {
-                variant_id: item.selectedVariant.id.replace(/-/g, ''),
-              }),
-            });
-          }
-        } catch (error) {
-          console.error('Error adding item to backend:', error);
-          // Continue with other items
-        }
-      }
-
-      // Update local storage with final cart
-      console.log('Final synced cart items:', finalCart.length);
-      dispatch({ type: 'SET_CART_ITEMS', payload: finalCart });
-
-      // Show stock warnings to user if any
-      if (stockWarnings.length > 0) {
-        console.warn('Stock validation warnings:', stockWarnings);
-        const warningMessage = `Cart updated due to stock limitations:\n${stockWarnings.join('\n')}`;
-        if (typeof window !== 'undefined') {
-          setTimeout(() => alert(warningMessage), 100);
-        }
-      }
-
-    } catch (error) {
-      console.error('Cart sync failed:', error);
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
-      isSyncing.current = false;
-      setSyncRequested(false);
+      isInitialized.current = true;
+      prevAccessTokenRef.current = currentAccessToken;
     }
-  }, [state.cartItems]);
+  }, [loadCartFromAPI]);
 
-  // Debounced sync function
-  const debouncedSync = useDebounce(() => {
-    setSyncRequested(true);
-  }, 1000);
-
-  // Auto-sync when requested
-  useEffect(() => {
-    const accessToken = localStorage.getItem('accessToken');
-
-    if (accessToken && syncRequested && isInitialized.current) {
-      console.log('Sync requested for authenticated user');
-      syncCart();
-    } else if (syncRequested && !accessToken) {
-      // Reset sync request for guest users
-      setSyncRequested(false);
-      console.log('Sync requested but no access token - skipping');
-    }
-  }, [syncRequested, syncCart]);
-
-  // Auto force refresh when requested
-  useEffect(() => {
-    if (forceRefreshRequested && isInitialized.current) {
-      console.log('Force refresh requested');
-      forceRefreshCart();
-    }
-  }, [forceRefreshRequested, forceRefreshCart]);
-
-  // Clear cart function
-  const clearCart = useCallback(async () => {
-    const accessToken = localStorage.getItem('accessToken');
-
-    if (accessToken) {
-      try {
-        await apiService.addToCart({ mode: 'delete_cart' });
-        console.log('Cart cleared on backend');
-      } catch (error) {
-        console.error('Error clearing cart on backend:', error);
-      }
-    }
-
-    dispatch({ type: 'CLEAR_CART' });
-  }, []);
-
-  // Enhanced dispatch function with better backend sync
+  // OPTIMIZED dispatch function - minimal API calls
   const customDispatch: React.Dispatch<CartAction> = useCallback(
     async (action: CartAction) => {
-      const accessToken = localStorage.getItem('accessToken');
-
-      if (action.type === 'TRIGGER_SYNC') {
-        setSyncRequested(true);
+      // For guest users, use localStorage
+      if (authMode === 'guest') {
+        dispatch(action);
+        // Save to localStorage for guest users
+        if (action.type !== 'SET_LOADING') {
+          setTimeout(() => {
+            saveToLocalStorage(state.cartItems);
+          }, 0);
+        }
         return;
       }
 
-      if (action.type === 'FORCE_REFRESH') {
-        setForceRefreshRequested(true);
-        return;
-      }
-
-      // Handle backend operations for authenticated users
-      if (accessToken && isInitialized.current) {
-        console.log('Processing backend operation for:', action.type, 'accessToken:', !!accessToken, 'initialized:', isInitialized.current);
+      // For authenticated users, use API-first approach
+      if (authMode === 'authenticated') {
         try {
           if (action.type === 'REMOVE_ITEM') {
             const operationKey = `remove-${action.payload}`;
             if (pendingOperations.current.has(operationKey)) {
-              console.log('Remove operation already pending for:', action.payload);
+              console.log('⏳ Remove operation already pending for:', action.payload);
               return;
             }
-
+            
             pendingOperations.current.add(operationKey);
 
             try {
-              console.log('Removing item from backend:', action.payload);
-              
-              // Find the item to determine if it's an offer or normal item
               const itemToRemove = state.cartItems.find(item => item.id === action.payload);
               
-              if (itemToRemove) {
-                if (itemToRemove.type === 'offer') {
-                  console.log('Removing offer item using removeOfferItem method');
-                  
-                  // Track removal time to prevent rapid refreshes
-                  lastRemovalTime.current = Date.now();
-                  
-                  await cartService.removeOfferItem(action.payload);
-                  
-                  // For offer removal, wait a bit longer before refresh to ensure backend processing
-                  console.log('Offer removed, waiting before refresh to ensure backend sync...');
-                  setTimeout(() => {
-                    if (isMounted.current && !pendingOperations.current.has(operationKey)) {
-                      setForceRefreshRequested(true);
-                    }
-                  }, 1500); // Longer delay for offers
-                } else {
-                  console.log('Removing normal item using removeNormalItem method');
-                  await cartService.removeNormalItem(action.payload);
-                  
-                  // Normal refresh timing for normal items
-                  setTimeout(() => {
-                    if (isMounted.current && !pendingOperations.current.has(operationKey)) {
-                      setForceRefreshRequested(true);
-                    }
-                  }, 500);
-                }
+              console.log('🗑️ Removing item from backend:', action.payload);
+              
+              // OPTIMIZED: Single API call for removal
+              if (itemToRemove?.type === 'offer') {
+                await cartService.removeOfferItem(action.payload);
               } else {
-                console.warn('Item not found in cart, using fallback removal method');
-                await cartService.addToCart({
-                  item_id: action.payload.replace(/-/g, ''),
-                  mode: 'delete',
-                });
-                
-                setTimeout(() => {
-                  if (isMounted.current) {
-                    setForceRefreshRequested(true);
-                  }
-                }, 500);
+                await cartService.removeNormalItem(action.payload);
               }
               
-              console.log('Item removed from backend successfully');
+              // OPTIMIZED: Update local state immediately
+              dispatch(action);
+              
+              console.log('✅ Item removed from backend and local state');
             } finally {
               pendingOperations.current.delete(operationKey);
             }
-          } else if (action.type === 'UPDATE_ITEM_QUANTITY') {
-            const itemToUpdate = state.cartItems.find((item) => item.id === action.payload.id);
-            if (!itemToUpdate || itemToUpdate.type !== 'normal') {
-              console.warn('Item not found or not normal type for quantity update');
-              dispatch(action);
-              return;
-            }
-
+          }
+          
+          else if (action.type === 'UPDATE_ITEM_QUANTITY') {
             const operationKey = `update-${action.payload.id}`;
             if (pendingOperations.current.has(operationKey)) {
-              console.log('Update operation already pending for:', action.payload.id);
+              console.log('⏳ Update operation already pending for:', action.payload.id);
               return;
             }
-
+            
             pendingOperations.current.add(operationKey);
 
             try {
-              const currentQuantity = itemToUpdate.quantity;
-              const newQuantity = action.payload.quantity;
-              const quantityDifference = newQuantity - currentQuantity;
+              const itemToUpdate = state.cartItems.find(item => item.id === action.payload.id);
+              if (!itemToUpdate || itemToUpdate.type !== 'normal') {
+                dispatch(action);
+                return;
+              }
 
-              if (quantityDifference !== 0) {
-                console.log(`Updating quantity: ${currentQuantity} -> ${newQuantity} (diff: ${quantityDifference})`);
+              const normalItem = itemToUpdate as CartNormalItem;
+              const currentQty = normalItem.quantity;
+              const newQty = action.payload.quantity;
+              const difference = newQty - currentQty;
 
-                const normalItem = itemToUpdate as CartNormalItem;
-                const mode = quantityDifference > 0 ? '+' : '-';
-
-                // Make single API call with proper product_id and variant_id matching
-                await cartService.addToCart({
-                  product_id: normalItem.product_id.replace(/-/g, ''),
-                  mode: mode,
-                  ...(normalItem.selectedVariant && {
-                    variant_id: normalItem.selectedVariant.id.replace(/-/g, ''),
-                  }),
-                });
-                console.log('Quantity updated on backend successfully with variant matching');
+              if (difference !== 0) {
+                console.log(`📊 Updating quantity: ${currentQty} → ${newQty} (diff: ${difference})`);
                 
-                // Force refresh to get updated cart state
-                setTimeout(() => {
-                  setForceRefreshRequested(true);
-                }, 500);
+                // OPTIMIZED: Single API call for quantity change
+                const mode = difference > 0 ? '+' : '-';
+                const absoluteDiff = Math.abs(difference);
+                
+                // Make multiple calls only if needed (for your backend's design)
+                for (let i = 0; i < absoluteDiff; i++) {
+                  await cartService.addToCart({
+                    product_id: normalItem.product_id.replace(/-/g, ''),
+                    mode: mode,
+                    ...(normalItem.selectedVariant && {
+                      variant_id: normalItem.selectedVariant.id.replace(/-/g, ''),
+                    }),
+                  });
+                }
+                
+                // OPTIMIZED: Update local state immediately
+                dispatch(action);
+                
+                console.log(`✅ Quantity updated: ${currentQty} → ${newQty}`);
               }
             } finally {
               pendingOperations.current.delete(operationKey);
             }
-          } else if (action.type === 'ADD_NORMAL_ITEM') {
+          }
+          
+          else if (action.type === 'ADD_NORMAL_ITEM') {
             const operationKey = `add-${action.payload.product_id}-${action.payload.selectedVariant?.id || 'no-variant'}`;
             if (pendingOperations.current.has(operationKey)) {
-              console.log('Add operation already pending for:', action.payload.product_id);
+              console.log('⏳ Add operation already pending for:', action.payload.product_id);
               return;
             }
-
+            
             pendingOperations.current.add(operationKey);
 
             try {
-              console.log('Adding item to backend:', action.payload.product_id, 'quantity:', action.payload.quantity);
+              console.log('➕ Adding item to backend:', action.payload.product_id, 'quantity:', action.payload.quantity);
               
-              // For new items, add each unit individually (this is correct for your backend)
+              // OPTIMIZED: Add to backend first
               for (let i = 0; i < action.payload.quantity; i++) {
                 await cartService.addToCart({
                   product_id: action.payload.product_id.replace(/-/g, ''),
@@ -969,69 +551,111 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
                   }),
                 });
               }
-              console.log('Item added to backend successfully');
               
-              // Force refresh to get updated cart state
-              setTimeout(() => {
-                setForceRefreshRequested(true);
-              }, 500);
+              // OPTIMIZED: Update local state immediately
+              dispatch(action);
+              
+              console.log('✅ Item added to backend and local state');
             } finally {
               pendingOperations.current.delete(operationKey);
             }
-          } else if (action.type === 'ADD_OFFER_SET') {
+          }
+          
+          else if (action.type === 'ADD_OFFER_SET') {
             const operationKey = `add-offer-${action.payload.offer}`;
             if (pendingOperations.current.has(operationKey)) {
-              console.log('Add offer operation already pending for:', action.payload.offer);
+              console.log('⏳ Add offer operation already pending for:', action.payload.offer);
               return;
             }
-
+            
             pendingOperations.current.add(operationKey);
 
             try {
               const offerItem = action.payload as CartOfferItem;
-              console.log('Adding offer to backend:', offerItem.offer);
-
-              const productsPayloadForBackend: { product_id: string; variant_id?: string }[] = [];
+              console.log('🎁 Adding offer to backend:', offerItem.offer);
+              
+              const productsPayload: { product_id: string; variant_id?: string }[] = [];
               offerItem.offer_items.forEach((p) => {
-                const productIdClean = p.id.replace(/-/g, '');
-                const variantIdClean = p.selectedVariant?.id?.replace(/-/g, '');
-
                 for (let q = 0; q < p.quantity; q++) {
-                  productsPayloadForBackend.push({
-                    product_id: productIdClean,
-                    ...(variantIdClean && { variant_id: variantIdClean }),
+                  productsPayload.push({
+                    product_id: p.id.replace(/-/g, ''),
+                    ...(p.selectedVariant?.id && {
+                      variant_id: p.selectedVariant.id.replace(/-/g, ''),
+                    }),
                   });
                 }
               });
 
               await apiService.addToCartOffer({
                 offer_id: offerItem.offer.replace(/-/g, ''),
-                products: productsPayloadForBackend,
+                products: productsPayload,
               });
-              console.log('Offer added to backend successfully');
               
-              // Force refresh to get updated cart state
-              setTimeout(() => {
-                setForceRefreshRequested(true);
-              }, 1000);
+              // OPTIMIZED: Update local state immediately
+              dispatch(action);
+              
+              console.log('✅ Offer added to backend and local state');
             } finally {
               pendingOperations.current.delete(operationKey);
             }
           }
+          
+          else if (action.type === 'CLEAR_CART') {
+            console.log('🧹 Clearing cart on backend and local state...');
+            await apiService.addToCart({ mode: 'delete_cart' });
+            dispatch(action);
+            console.log('✅ Cart cleared on backend and local state');
+          }
+          
+          else if (action.type === 'FORCE_REFRESH') {
+            await loadCartFromAPI();
+            return;
+          }
+          
+          else {
+            // For other actions, just update local state
+            dispatch(action);
+          }
+          
         } catch (error) {
-          console.error(`Error in backend operation for ${action.type}:`, error);
+          console.error(`❌ Error in ${action.type}:`, error);
+          // Always update local state even if backend fails
+          dispatch(action);
         }
-      } else {
-        console.log('Skipping backend operation for:', action.type, 'accessToken:', !!accessToken, 'initialized:', isInitialized.current);
       }
-
-      // Always dispatch to local state first
-      dispatch(action);
     },
-    [state.cartItems, debouncedSync]
+    [authMode, state.cartItems, loadCartFromAPI]
   );
 
-  // Helper functions
+  // Force refresh from API (for multi-device sync)
+  const forceRefreshCart = useCallback(async () => {
+    if (authMode === 'authenticated') {
+      await loadCartFromAPI();
+    } else {
+      // For guests, process localStorage items
+      const storedItems = loadFromLocalStorage();
+      const processedItems = await cartService.processGuestOffers(storedItems);
+      dispatch({ type: 'SET_CART_ITEMS', payload: processedItems });
+    }
+  }, [authMode, loadCartFromAPI]);
+
+  // Clear cart with proper handling
+  const clearCart = useCallback(async () => {
+    if (authMode === 'authenticated') {
+      try {
+        await apiService.addToCart({ mode: 'delete_cart' });
+        dispatch({ type: 'CLEAR_CART' });
+      } catch (error) {
+        console.error('❌ Error clearing cart on backend:', error);
+        dispatch({ type: 'CLEAR_CART' });
+      }
+    } else {
+      dispatch({ type: 'CLEAR_CART' });
+      clearLocalStorage();
+    }
+  }, [authMode]);
+
+  // Helper functions (keep existing implementations)
   const getTotalProductQuantitiesInCart = useCallback(() => {
     const quantities = new Map<string, number>();
 
@@ -1157,19 +781,32 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, [state.cartItems]);
 
+  // Context value
   const contextValue = useMemo(
     () => ({
       cartItems: state.cartItems,
       loading: state.loading,
+      authMode,
       dispatchCart: customDispatch,
-      getTotalProductQuantitiesInCart,
-      getEffectiveProductStock,
-      syncCart,
       forceRefreshCart,
       clearCart,
+      checkBackendCartEmpty,
+      getTotalProductQuantitiesInCart,
+      getEffectiveProductStock,
       calculateTotals,
     }),
-    [state.cartItems, state.loading, customDispatch, getTotalProductQuantitiesInCart, getEffectiveProductStock, syncCart, forceRefreshCart, clearCart, calculateTotals]
+    [
+      state.cartItems, 
+      state.loading, 
+      authMode,
+      customDispatch, 
+      forceRefreshCart, 
+      clearCart, 
+      checkBackendCartEmpty,
+      getTotalProductQuantitiesInCart, 
+      getEffectiveProductStock, 
+      calculateTotals
+    ]
   );
 
   return <CartContext.Provider value={contextValue}>{children}</CartContext.Provider>;
