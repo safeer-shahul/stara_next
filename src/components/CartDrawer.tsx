@@ -25,39 +25,52 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
   } = useCart();
   const [showCheckoutModal, setShowCheckoutModal] = useState<boolean>(false);
   const [hasPerformedInitialSync, setHasPerformedInitialSync] = useState<boolean>(false);
+  const [isLocalLoading, setIsLocalLoading] = useState<boolean>(false);
 
-  // OPTIMIZED: Only perform sync check on first open, not every open
+  // FIXED: Better sync logic - only sync if authenticated and drawer opens with items showing 0
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
       
-      // Only perform sync check if authenticated AND haven't done it in this session
+      // CRITICAL FIX: Check if cart appears empty but user is authenticated
       if (authMode === 'authenticated' && !hasPerformedInitialSync) {
-        const performLightweightSyncCheck = async () => {
+        const performSyncCheck = async () => {
           try {
-            console.log('🔍 Performing one-time sync check for cart drawer...');
+            setIsLocalLoading(true);
+            console.log('🔍 Cart drawer opened - checking cart sync status...');
             
-            // OPTIMIZED: Only check if backend is empty, don't force full refresh
-            const backendIsEmpty = await checkBackendCartEmpty();
-            
-            if (backendIsEmpty && cartItems.length > 0) {
-              console.log('🗑️ Backend cart empty - clearing local cart (purchased on another device)');
-              dispatchCart({ type: 'CLEAR_CART' });
+            // Check if local cart is empty but backend might have items
+            if (cartItems.length === 0) {
+              console.log('📭 Local cart empty - checking backend...');
               
-              setTimeout(() => {
-                alert('Your cart was cleared because it was completed on another device.');
-              }, 500);
+              // Force refresh from backend to ensure we have latest data
+              await forceRefreshCart();
+              console.log('✅ Cart refreshed from backend');
+            } else {
+              // If local cart has items, just do a light check
+              console.log('📦 Local cart has items - doing light backend check...');
+              const backendIsEmpty = await checkBackendCartEmpty();
+              
+              if (backendIsEmpty && cartItems.length > 0) {
+                console.log('🗑️ Backend cart empty but local has items - clearing local cart');
+                dispatchCart({ type: 'CLEAR_CART' });
+                
+                setTimeout(() => {
+                  alert('Your cart was cleared because it was completed on another device.');
+                }, 500);
+              }
             }
-            // REMOVED: Don't force refresh if backend has items - trust current state
             
             setHasPerformedInitialSync(true);
           } catch (error) {
-            console.error('❌ Error in lightweight sync check:', error);
-            setHasPerformedInitialSync(true); // Still mark as done to prevent retry
+            console.error('❌ Error in cart sync check:', error);
+            setHasPerformedInitialSync(true);
+          } finally {
+            setIsLocalLoading(false);
           }
         };
 
-        performLightweightSyncCheck();
+        performSyncCheck();
       }
     } else {
       document.body.style.overflow = 'auto';
@@ -66,7 +79,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
     return () => {
       document.body.style.overflow = 'auto';
     };
-  }, [isOpen, authMode, hasPerformedInitialSync, cartItems.length, checkBackendCartEmpty, dispatchCart]);
+  }, [isOpen, authMode, hasPerformedInitialSync, cartItems.length, checkBackendCartEmpty, dispatchCart, forceRefreshCart]);
 
   // Reset sync flag when auth mode changes
   useEffect(() => {
@@ -142,8 +155,6 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
     try {
       console.log('🧹 CartDrawer: Clearing cart');
       await clearCart();
-      
-      // Reset sync flag so next open will check again
       setHasPerformedInitialSync(false);
     } catch (error) {
       console.error('❌ CartDrawer: Error clearing cart:', error);
@@ -154,9 +165,17 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
   // MANUAL refresh function (only called when user clicks refresh button)
   const handleManualRefresh = useCallback(async (): Promise<void> => {
     console.log('🔄 Manual cart refresh requested');
-    setHasPerformedInitialSync(false); // Reset flag
-    await forceRefreshCart();
-    setHasPerformedInitialSync(true);
+    setIsLocalLoading(true);
+    setHasPerformedInitialSync(false);
+    
+    try {
+      await forceRefreshCart();
+      setHasPerformedInitialSync(true);
+    } catch (error) {
+      console.error('❌ Error in manual refresh:', error);
+    } finally {
+      setIsLocalLoading(false);
+    }
   }, [forceRefreshCart]);
 
   // Calculate totals using cartUtils
@@ -203,6 +222,9 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
   const totals = calculateTotals();
   const normalItems = groupedNormalItems();
   const offerItems = cartItems.filter(item => item.type === 'offer') as CartOfferItem[];
+  
+  // FIXED: Show loading if either context is loading OR local sync is happening
+  const isLoading = contextLoading || isLocalLoading;
 
   console.log('🎨 CartDrawer: Rendering with items:', {
     total: cartItems.length,
@@ -210,6 +232,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
     offers: offerItems.length,
     totals,
     authMode,
+    isLoading,
     hasPerformedSync: hasPerformedInitialSync
   });
 
@@ -237,14 +260,15 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                     <h3 className="text-lg font-bold">Your Cart</h3>
                     <p className="text-white/80 text-sm">
                       {totals.totalItems} {totals.totalItems === 1 ? 'item' : 'items'}
-                      {/* {authMode === 'authenticated' && (
-                        <span className="ml-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
-                          Synced
-                        </span>
-                      )} */}
                       {totals.offerSavings > 0 && (
                         <span className="ml-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
                           Save ₹{totals.offerSavings.toFixed(0)}
+                        </span>
+                      )}
+                      {/* FIXED: Show loading indicator in header */}
+                      {isLoading && (
+                        <span className="ml-2 bg-yellow-500 text-white text-xs px-2 py-0.5 rounded-full font-bold animate-pulse">
+                          Syncing...
                         </span>
                       )}
                     </p>
@@ -261,7 +285,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
 
             {/* Enhanced Cart Items */}
             <div className="flex-1 overflow-y-auto bg-gradient-to-b from-gray-50 to-white">
-              {contextLoading ? (
+              {isLoading ? (
                 <div className="flex justify-center items-center h-40">
                   <div className="relative">
                     <div className="w-12 h-12 border-4 border-gray-200 border-t-[var(--color-primary-950)] rounded-full animate-spin"></div>
@@ -346,10 +370,13 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                       {authMode === 'authenticated' && (
                         <button
                           onClick={handleManualRefresh}
-                          className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-[var(--color-primary-950)] to-[#1a5f7a] text-white rounded-lg hover:shadow-lg transition-all duration-300 transform hover:scale-105"
+                          disabled={isLoading}
+                          className={`inline-flex items-center px-4 py-2 bg-gradient-to-r from-[var(--color-primary-950)] to-[#1a5f7a] text-white rounded-lg hover:shadow-lg transition-all duration-300 transform hover:scale-105 ${
+                            isLoading ? 'opacity-50 cursor-not-allowed' : ''
+                          }`}
                         >
-                          <RefreshCw size={16} className="mr-2" />
-                          Refresh Cart
+                          <RefreshCw size={16} className={`mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+                          {isLoading ? 'Refreshing...' : 'Refresh Cart'}
                         </button>
                       )}
                     </div>
@@ -359,7 +386,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
             </div>
 
             {/* Enhanced Cart Summary & Actions */}
-            {cartItems.length > 0 && (
+            {cartItems.length > 0 && !isLoading && (
               <div className="bg-white border-t border-gray-200 shadow-lg">
                 {/* Summary Section */}
                 <div className="px-4 py-2 bg-gradient-to-r from-gray-50 to-blue-50">
@@ -385,17 +412,6 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                         <span className="font-semibold text-gray-800">₹{totals.offerSubtotal.toFixed(2)}</span>
                       </div>
                     )}
-
-                    {/* Offer Savings */}
-                    {/* {totals.offerSavings > 0 && (
-                      <div className="flex justify-between items-center bg-green-100 -mx-2 px-2 py-2 rounded-lg">
-                        <span className="text-green-700 font-semibold flex items-center text-sm">
-                          <span className="text-base mr-2">🎉</span>
-                          You Save (Free Items)
-                        </span>
-                        <span className="text-lg font-bold text-green-700">₹{totals.offerSavings.toFixed(2)}</span>
-                      </div>
-                    )} */}
 
                     {/* Total */}
                     <div className="flex items-center justify-between pt-3 border-t border-gray-300">
@@ -438,6 +454,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                     <button
                       className="flex items-center justify-center px-4 py-3 border-2 border-[var(--color-primary-950)] text-[var(--color-primary-950)] font-semibold rounded-xl hover:bg-[var(--color-primary-950)] hover:text-white transition-all duration-300 transform hover:scale-105"
                       onClick={handleClearCart}
+                      disabled={isLoading}
                     >
                       <Trash2 size={16} className="mr-2" />
                       Clear
@@ -445,17 +462,22 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                     
                     <button
                       className={`flex-1 font-bold py-4 rounded-xl transition-all duration-300 transform hover:scale-105 flex items-center justify-center shadow-lg ${
-                        hasOutOfStockItems() 
+                        hasOutOfStockItems() || isLoading
                           ? 'bg-gray-400 cursor-not-allowed text-white' 
                           : 'bg-gradient-to-r from-[var(--color-primary-950)] via-[#1a5f7a] to-[var(--color-primary-950)] hover:shadow-xl text-white'
                       }`}
-                      onClick={hasOutOfStockItems() ? undefined : handleProceedToCheckout}
-                      disabled={hasOutOfStockItems()}
+                      onClick={hasOutOfStockItems() || isLoading ? undefined : handleProceedToCheckout}
+                      disabled={hasOutOfStockItems() || isLoading}
                     >
                       {hasOutOfStockItems() ? (
                         <>
                           <span className="mr-2">⚠️</span>
                           Remove Out of Stock Items
+                        </>
+                      ) : isLoading ? (
+                        <>
+                          <span className="mr-2">⏳</span>
+                          Please wait...
                         </>
                       ) : (
                         <>

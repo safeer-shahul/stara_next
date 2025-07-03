@@ -84,7 +84,7 @@ export type CartAction =
   | { type: 'ADD_NORMAL_ITEM'; payload: CartNormalItem }
   | { type: 'REMOVE_ITEM'; payload: string }
   | { type: 'UPDATE_ITEM_QUANTITY'; payload: { id: string; quantity: number } }
-  | { type: 'UPDATE_OFFER_ID'; payload: { tempId: string; actualId: string } } // NEW ACTION
+  | { type: 'UPDATE_OFFER_ID'; payload: { tempId: string; actualId: string } }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'CLEAR_CART' }
   | { type: 'FORCE_REFRESH' };
@@ -227,7 +227,7 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
           return {
             ...item,
             id: action.payload.actualId,
-            isSynced: true, // Mark as synced since it now has backend ID
+            isSynced: true,
             updated_at: new Date().toISOString(),
           };
         }
@@ -273,14 +273,12 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   const [state, dispatch] = useReducer(cartReducer, initialState);
   const [authMode, setAuthMode] = useState<'guest' | 'authenticated'>('guest');
   const isInitialized = useRef(false);
-  const isSyncing = useRef(false);
   const prevAccessTokenRef = useRef<string | null>(null);
   const pendingOperations = useRef(new Set<string>());
 
   // Track component mount status
   useEffect(() => {
     return () => {
-      // Cleanup pending operations on unmount
       pendingOperations.current.clear();
     };
   }, []);
@@ -296,8 +294,74 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     return () => window.removeEventListener('beforeLogout', handleBeforeLogout);
   }, [state.cartItems]);
 
-  // Track authentication state changes
+  // Load cart from API (for authenticated users)
+  const loadCartFromAPI = useCallback(async () => {
+    try {
+      dispatch({ type: 'SET_LOADING', payload: true });
+      console.log('🔄 Loading cart from API...');
+      
+      const cartItems = await cartService.fetchCartFromBackend();
+      dispatch({ type: 'SET_CART_ITEMS', payload: cartItems });
+      
+      console.log(`✅ Cart loaded from API: ${cartItems.length} items`);
+    } catch (error) {
+      console.error('❌ Error loading cart from API:', error);
+      // Fallback to localStorage if API fails
+      const fallbackItems = loadFromLocalStorage();
+      dispatch({ type: 'SET_CART_ITEMS', payload: fallbackItems });
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
+    }
+  }, []);
+
+  // FIXED: More reliable authentication detection and cart initialization
   useEffect(() => {
+    if (!isInitialized.current) {
+      const initializeCart = async () => {
+        console.log('🚀 Initializing cart...');
+        
+        const currentAccessToken = localStorage.getItem('accessToken');
+        console.log('🔍 AccessToken check:', currentAccessToken ? 'Found' : 'Not found');
+        
+        if (currentAccessToken) {
+          console.log('🔑 Authenticated user detected - switching to API mode');
+          setAuthMode('authenticated');
+          
+          // CRITICAL FIX: Always load from API for authenticated users on initialization
+          await loadCartFromAPI();
+          
+        } else {
+          console.log('👤 Guest user detected - switching to localStorage mode');
+          setAuthMode('guest');
+          
+          const storedItems = loadFromLocalStorage();
+          
+          if (storedItems.length > 0) {
+            try {
+              const processedItems = await cartService.processGuestOffers(storedItems);
+              dispatch({ type: 'SET_CART_ITEMS', payload: processedItems });
+            } catch (error) {
+              console.error('❌ Error processing guest offers:', error);
+              dispatch({ type: 'SET_CART_ITEMS', payload: storedItems });
+            }
+          } else {
+            dispatch({ type: 'SET_CART_ITEMS', payload: [] });
+          }
+        }
+        
+        isInitialized.current = true;
+        prevAccessTokenRef.current = currentAccessToken;
+      };
+      
+      // Add a small delay to ensure DOM is ready
+      setTimeout(initializeCart, 100);
+    }
+  }, [loadCartFromAPI]);
+
+  // Track authentication state changes (login/logout)
+  useEffect(() => {
+    if (!isInitialized.current) return; // Skip if not initialized yet
+    
     const checkAuthChange = () => {
       const currentAccessToken = localStorage.getItem('accessToken');
       const previousToken = prevAccessTokenRef.current;
@@ -320,7 +384,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     checkAuthChange();
-    const interval = setInterval(checkAuthChange, 500);
+    const interval = setInterval(checkAuthChange, 1000); // Check every second
     return () => clearInterval(interval);
   }, []);
 
@@ -329,37 +393,30 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       console.log('📤 Transferring localStorage cart to backend...');
       
-      // Get current localStorage items
       const localItems = loadFromLocalStorage();
       
-      // Push all local items to backend first
       if (localItems.length > 0) {
         await cartService.pushLocalCartToBackend(localItems);
         console.log('✅ Local cart transferred to backend');
       }
       
-      // Clear localStorage completely
       clearLocalStorage();
       console.log('🗑️ localStorage cleared');
       
-      // Fetch fresh cart from backend (now authoritative)
       await loadCartFromAPI();
       
     } catch (error) {
       console.error('❌ Error during login transition:', error);
-      // Fallback: load from localStorage if backend fails
       const fallbackItems = loadFromLocalStorage();
       dispatch({ type: 'SET_CART_ITEMS', payload: fallbackItems });
     }
-  }, []);
+  }, [loadCartFromAPI]);
 
   // Handle logout transition: API → localStorage
   const handleLogoutTransition = useCallback(async () => {
     try {
       console.log('💾 Cart preserved for guest mode');
-      // Cart is already saved by beforeLogout event listener
       
-      // Load from localStorage for guest mode
       const storedItems = loadFromLocalStorage();
       const processedItems = await cartService.processGuestOffers(storedItems);
       dispatch({ type: 'SET_CART_ITEMS', payload: processedItems });
@@ -371,82 +428,26 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, []);
 
-  // Load cart from API (for authenticated users)
-  const loadCartFromAPI = useCallback(async () => {
-    if (authMode !== 'authenticated') return;
-    
-    try {
-      dispatch({ type: 'SET_LOADING', payload: true });
-      console.log('🔄 Loading cart from API...');
-      
-      const cartItems = await cartService.fetchCartFromBackend();
-      dispatch({ type: 'SET_CART_ITEMS', payload: cartItems });
-      
-      console.log(`✅ Cart loaded from API: ${cartItems.length} items`);
-    } catch (error) {
-      console.error('❌ Error loading cart from API:', error);
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
-    }
-  }, [authMode]);
-
   // Check if backend cart is empty (for multi-device sync)
   const checkBackendCartEmpty = useCallback(async (): Promise<boolean> => {
-  if (authMode !== 'authenticated') return false;
-  
-  try {
-    console.log('🔍 Performing lightweight backend cart check...');
+    if (authMode !== 'authenticated') return false;
     
-    // OPTION 1: Use a lightweight cart summary API (if available)
-    // const cartSummary = await apiService.getCartSummary();
-    // return cartSummary.total_items === 0;
-    
-    // OPTION 2: Use existing getUserCart but just check length
-    const backendCartResponse = await apiService.getUserCart();
-    const normalItems = backendCartResponse?.shopping_cart?.items || [];
-    const offerItems = backendCartResponse?.offer_cart?.items || [];
-    const isEmpty = normalItems.length === 0 && offerItems.length === 0;
-    
-    console.log(`📊 Backend cart check: ${isEmpty ? 'empty' : 'has items'} (${normalItems.length + offerItems.length} total)`);
-    return isEmpty;
-    
-  } catch (error) {
-    console.error('❌ Error checking backend cart:', error);
-    return false;
-  }
-}, [authMode]);
-
-  // Initialize cart based on auth mode
-  useEffect(() => {
-    if (!isInitialized.current) {
-      const currentAccessToken = localStorage.getItem('accessToken');
+    try {
+      console.log('🔍 Performing lightweight backend cart check...');
       
-      if (currentAccessToken) {
-        console.log('🔑 Authenticated user detected - API mode');
-        setAuthMode('authenticated');
-        loadCartFromAPI();
-      } else {
-        console.log('👤 Guest user detected - localStorage mode');
-        setAuthMode('guest');
-        const storedItems = loadFromLocalStorage();
-        
-        // Process guest offers if any
-        if (storedItems.length > 0) {
-          cartService.processGuestOffers(storedItems).then(processedItems => {
-            dispatch({ type: 'SET_CART_ITEMS', payload: processedItems });
-          }).catch(error => {
-            console.error('❌ Error processing guest offers:', error);
-            dispatch({ type: 'SET_CART_ITEMS', payload: storedItems });
-          });
-        } else {
-          dispatch({ type: 'SET_CART_ITEMS', payload: storedItems });
-        }
-      }
+      const backendCartResponse = await apiService.getUserCart();
+      const normalItems = backendCartResponse?.shopping_cart?.items || [];
+      const offerItems = backendCartResponse?.offer_cart?.items || [];
+      const isEmpty = normalItems.length === 0 && offerItems.length === 0;
       
-      isInitialized.current = true;
-      prevAccessTokenRef.current = currentAccessToken;
+      console.log(`📊 Backend cart check: ${isEmpty ? 'empty' : 'has items'} (${normalItems.length + offerItems.length} total)`);
+      return isEmpty;
+      
+    } catch (error) {
+      console.error('❌ Error checking backend cart:', error);
+      return false;
     }
-  }, [loadCartFromAPI]);
+  }, [authMode]);
 
   // OPTIMIZED dispatch function - minimal API calls
   const customDispatch: React.Dispatch<CartAction> = useCallback(
@@ -454,7 +455,6 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       // For guest users, use localStorage
       if (authMode === 'guest') {
         dispatch(action);
-        // Save to localStorage for guest users
         if (action.type !== 'SET_LOADING') {
           setTimeout(() => {
             saveToLocalStorage(state.cartItems);
@@ -480,14 +480,12 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
               
               console.log('🗑️ Removing item from backend:', action.payload);
               
-              // OPTIMIZED: Single API call for removal
               if (itemToRemove?.type === 'offer') {
                 await cartService.removeOfferItem(action.payload);
               } else {
                 await cartService.removeNormalItem(action.payload);
               }
               
-              // OPTIMIZED: Update local state immediately
               dispatch(action);
               
               console.log('✅ Item removed from backend and local state');
@@ -520,11 +518,9 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
               if (difference !== 0) {
                 console.log(`📊 Updating quantity: ${currentQty} → ${newQty} (diff: ${difference})`);
                 
-                // OPTIMIZED: Single API call for quantity change
                 const mode = difference > 0 ? '+' : '-';
                 const absoluteDiff = Math.abs(difference);
                 
-                // Make multiple calls only if needed (for your backend's design)
                 for (let i = 0; i < absoluteDiff; i++) {
                   await cartService.addToCart({
                     product_id: normalItem.product_id.replace(/-/g, ''),
@@ -535,7 +531,6 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
                   });
                 }
                 
-                // OPTIMIZED: Update local state immediately
                 dispatch(action);
                 
                 console.log(`✅ Quantity updated: ${currentQty} → ${newQty}`);
@@ -557,7 +552,6 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
             try {
               console.log('➕ Adding item to backend:', action.payload.product_id, 'quantity:', action.payload.quantity);
               
-              // OPTIMIZED: Add to backend first
               for (let i = 0; i < action.payload.quantity; i++) {
                 await cartService.addToCart({
                   product_id: action.payload.product_id.replace(/-/g, ''),
@@ -568,7 +562,6 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
                 });
               }
               
-              // OPTIMIZED: Update local state immediately
               dispatch(action);
               
               console.log('✅ Item added to backend and local state');
@@ -590,7 +583,6 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
               const offerItem = action.payload as CartOfferItem;
               console.log('🎁 Adding offer to backend:', offerItem.offer);
               
-              // Store temporary ID for updating later
               const tempId = offerItem.id;
               
               const productsPayload: { product_id: string; variant_id?: string }[] = [];
@@ -605,16 +597,13 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
                 }
               });
 
-              // FIXED: Call backend API and get the actual ID
               const backendResponse = await apiService.addToCartOffer({
                 offer_id: offerItem.offer.replace(/-/g, ''),
                 products: productsPayload,
               });
               
-              // Add offer to local state with temporary ID first
               dispatch(action);
               
-              // CRITICAL FIX: Update the temporary ID with actual backend ID
               if (backendResponse && backendResponse.id) {
                 console.log('🔄 Updating offer ID from temp to backend:', tempId, '→', backendResponse.id);
                 dispatch({ 
@@ -645,13 +634,11 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
           }
           
           else {
-            // For other actions, just update local state
             dispatch(action);
           }
           
         } catch (error) {
           console.error(`❌ Error in ${action.type}:`, error);
-          // Always update local state even if backend fails
           dispatch(action);
         }
       }
@@ -664,7 +651,6 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     if (authMode === 'authenticated') {
       await loadCartFromAPI();
     } else {
-      // For guests, process localStorage items
       const storedItems = loadFromLocalStorage();
       const processedItems = await cartService.processGuestOffers(storedItems);
       dispatch({ type: 'SET_CART_ITEMS', payload: processedItems });
