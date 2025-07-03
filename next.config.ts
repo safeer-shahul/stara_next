@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   images: {
-    domains: ['127.0.0.1', 'localhost'],
+    domains: ['127.0.0.1', 'localhost','apitest.starajewels.com'],
   },
   eslint: {
     // Warning: This allows production builds to successfully complete even if ESLint errors are present
