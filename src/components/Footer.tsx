@@ -7,7 +7,7 @@ export default function Footer() {
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
           <div>
-            <h3 className="font-normal text-xl mb-4">Subscribe to receive exciting gifts!</h3>
+            {/* <h3 className="font-normal text-xl mb-4">Subscribe to receive exciting gifts!</h3>
             <div className="flex mb-6">
               <input
                 type="email"
@@ -17,7 +17,7 @@ export default function Footer() {
               <button className="text-black px-3 py-2 -ml-15">
                 <Mail size={30}/>
               </button>
-            </div>
+            </div> */}
 
             <div className="text-gray-400 space-y-3">
               <p className="flex items-center text-[14px]">
@@ -41,19 +41,19 @@ export default function Footer() {
             <ul className="space-y-2">
               <li><a href="/stara-faq/shipping-handling" className="text-gray-400 hover:text-black text-[14px]">Shipping & Handling</a></li>
               <li><a href="/stara-faq/return-replacement-policy" className="text-gray-400 hover:text-black text-[14px]">Return & Replacement Policy</a></li>
-              <li><a href="/stara-faq/refund-policy" className="text-gray-400 hover:text-black text-[14px]">Refund Policy</a></li>
+              {/* <li><a href="/stara-faq/refund-policy" className="text-gray-400 hover:text-black text-[14px]">Refund Policy</a></li> */}
               <li><a href="/stara-faq/terms-of-services" className="text-gray-400 hover:text-black text-[14px]">Terms of Service</a></li>
               <li><a href="/stara-faq/privacy-policy" className="text-gray-400 hover:text-black text-[14px]">Privacy Policy</a></li>
             </ul>
           </div>
 
-          <div>
+          {/* <div>
             <h3 className="font-normal text-xl mb-4">About Us</h3>
             <ul className="space-y-2">
               <li><a href="#" className="text-gray-400 hover:text-black text-[14px]">About Us</a></li>
               <li><a href="#" className="text-gray-400 hover:text-black text-[14px]">Contact Us</a></li>
             </ul>
-          </div>
+          </div> */}
         </div>
 
         <div className="border-t border-gray-200 pt-8">

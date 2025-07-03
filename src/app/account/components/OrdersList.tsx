@@ -1,12 +1,53 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { MapPin, PackageOpen, Gift } from 'lucide-react';
 import Image from 'next/image';
 import apiService from '@/utils/api/apiService';
 import CancelOrderModal from './CancelOrderModal';
 import ReplacementOrderModal from './ReplacementOrderModal';
 import ComplaintModal from './ComplaintModal';
+
+// --- Constants ---
+const INDIAN_STATES: { [key: string]: string } = {
+  "AN": "Andaman and Nicobar Islands",
+  "AP": "Andhra Pradesh",
+  "AR": "Arunachal Pradesh",
+  "AS": "Assam",
+  "BR": "Bihar",
+  "CG": "Chandigarh",
+  "CH": "Chhattisgarh",
+  "DN": "Dadra and Nagar Haveli",
+  "DD": "Daman and Diu",
+  "DL": "Delhi",
+  "GA": "Goa",
+  "GJ": "Gujarat",
+  "HR": "Haryana",
+  "HP": "Himachal Pradesh",
+  "JK": "Jammu and Kashmir",
+  "JH": "Jharkhand",
+  "KA": "Karnataka",
+  "KL": "Kerala",
+  "LA": "Ladakh",
+  "LD": "Lakshadweep",
+  "MP": "Madhya Pradesh",
+  "MH": "Maharashtra",
+  "MN": "Manipur",
+  "ML": "Meghalaya",
+  "MZ": "Mizoram",
+  "NL": "Nagaland",
+  "OR": "Odisha",
+  "PY": "Puducherry",
+  "PB": "Punjab",
+  "RJ": "Rajasthan",
+  "SK": "Sikkim",
+  "TN": "Tamil Nadu",
+  "TS": "Telangana",
+  "TR": "Tripura",
+  "UP": "Uttar Pradesh",
+  "UK": "Uttarakhand",
+  "WB": "West Bengal"
+};
 
 export default function OrdersList() {
   const [orders, setOrders] = useState<any>([]);
@@ -43,6 +84,11 @@ export default function OrdersList() {
     };
 
     fetchData();
+  }, []);
+
+  // Get full state name from state code
+  const getStateName = useCallback((stateCode: string) => {
+    return INDIAN_STATES[stateCode] || stateCode;
   }, []);
 
   // Helper function to format dates
@@ -236,10 +282,10 @@ export default function OrdersList() {
                       <MapPin className="w-4 h-4 text-gray-500 mr-2" />
                       <h4 className="text-sm font-bold text-gray-700">Delivering to:</h4>
                     </div>
-                    <p className="text-sm ml-6">{order.address_details.address}, {order.address_details.town}, {order.address_details.state} - {order.address_details.pincode}</p>
+                    <p className="text-sm ml-6">{order.address_details.address}, {order.address_details.town}, {getStateName(order.address_details.state)} - {order.address_details.pincode}</p>
                     <p className="text-sm ml-6">
                       <span className="font-medium">Phone:</span> {order.address_details.phone_number_1}
-                      {order.address_details.phone_number_2 && (
+                      {order.address_details.phone_number_2 && order.address_details.phone_number_2.trim() !== "" && (
                         <>, {order.address_details.phone_number_2}</>
                       )}
                     </p>
@@ -374,14 +420,14 @@ export default function OrdersList() {
                       </button>
                     )}
                     
-                    {canComplaint && (
+                    {/* {canComplaint && (
                       <button 
                         onClick={() => handleOpenComplaintModal(order.order_id)}
                         className="px-3 py-1 cursor-pointer text-[12px] border border-black text-black rounded hover:bg-gray-50 transition-colors"
                       >
                         Register Complaint
                       </button>
-                    )}
+                    )} */}
                     
                     {canReplace && (
                       <button 

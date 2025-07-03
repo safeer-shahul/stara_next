@@ -8,48 +8,44 @@ import {
   Box, UserRound, CheckCircle, Clock, CalendarDays, Edit, Copy, RotateCcw
 } from 'lucide-react';
 import apiService from '@/utils/api/apiService';
-import { useAdminUser } from '../../context/AdminUserContext'; // Import the custom hook
-import DatePicker from 'react-datepicker'; // You'll need to install react-datepicker
-import 'react-datepicker/dist/react-datepicker.css'; // And its styles
+import { useAdminUser } from '../../context/AdminUserContext';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 
-// Define more specific types for Order for better type safety
 interface Order {
   order_id: string;
   created_at: string;
   updated_at: string;
-  payable_price: string; // Changed from total_price
-  actual_price: string; // New field
-  discounted_price: string; // New field
-  shipping_price: string; // New field
-  status: string; // e.g., 'Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'
-  payment_mode: string; // e.g., 'COD', 'Razorpay'
-  payment_status: string; // e.g., 'Success', 'Pending', 'Failed'
+  payable_price: string;
+  actual_price: string;
+  discounted_price: string;
+  shipping_price: string;
+  status: string;
+  payment_mode: string;
+  payment_status: string;
   razorpay_order_id: string;
   user: number;
-  assigned_to?: number | null; // ID of the assigned user
-  is_packed: boolean; // From backend
-  packed_date: string | null; // From backend
-  is_shipped: boolean; // New from backend
-  is_delivered: boolean; // New from backend
-  is_cancelled: boolean; // New from backend
-  is_returned: boolean; // New from backend
-  is_refunded: boolean; // New from backend
-  is_paid: boolean; // New from backend
-  phone_number: string; // Assuming phone number is part of the order details
+  assigned_to?: number | null;
+  is_packed: boolean;
+  packed_date: string | null;
+  is_shipped: boolean;
+  is_delivered: boolean;
+  is_cancelled: boolean;
+  is_returned: boolean;
+  is_refunded: boolean;
+  is_paid: boolean;
+  phone_number: string;
 }
 
-// Define the order modes for the UI cards
 type OrderMode =
   'all' | 'assigned_order_to_me' | 'un_assigned_order' |
   'packed_order_by_me' | 'all_packed_order' | 'all_delivered_order';
 
-// Define delivery statuses for dropdown
 const DeliveryStatuses = ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'] as const;
 type DeliveryStatus = typeof DeliveryStatuses[number];
 
-
 export default function OrderListPage() {
-  const adminUser = useAdminUser(); // Get the admin user from context
+  const adminUser = useAdminUser();
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,30 +53,26 @@ export default function OrderListPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
-  const [pageSize] = useState(10); // Page size remains constant
+  const [pageSize] = useState(10);
 
-  // State variables for filters and selections
   const [selectedOrderMode, setSelectedOrderMode] = useState<OrderMode>('all');
-  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc'); // Default to descending
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
-  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]); // For checkboxes
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
 
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const [newDeliveryStatus, setNewDeliveryStatus] = useState<DeliveryStatus>('Pending');
 
-  // State for search inputs
-  const [searchOrderId, setSearchOrderId] = useState('');
-  const [searchPhoneNumber, setSearchPhoneNumber] = useState('');
+  // CHANGED: Separate state for input values and actual search values
+  const [searchOrderIdInput, setSearchOrderIdInput] = useState(''); // For input field
+  const [searchPhoneNumberInput, setSearchPhoneNumberInput] = useState(''); // For input field
+  const [searchOrderId, setSearchOrderId] = useState(''); // For actual search
+  const [searchPhoneNumber, setSearchPhoneNumber] = useState(''); // For actual search
 
-  // State for copy dropdown
   const [showCopyDropdown, setShowCopyDropdown] = useState<string | null>(null);
-
-  // Use a state to explicitly trigger fetches when reset/search is clicked
   const [triggerFetch, setTriggerFetch] = useState(0);
 
-
-  // Determine available order modes based on user type
   const availableOrderModes = useMemo(() => {
     const modes: { label: string; value: OrderMode; icon: any }[] = [
       { label: 'All Orders', value: 'all', icon: ShoppingCart },
@@ -102,13 +94,11 @@ export default function OrderListPage() {
     return modes;
   }, [adminUser]);
 
-  // Effect to fetch orders whenever relevant filters/pagination/triggerFetch change
- 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     setError(null);
-    setSelectedOrderIds([]); // Clear selections on new fetch
-    setEditingOrderId(null); // Clear editing state
+    setSelectedOrderIds([]);
+    setEditingOrderId(null);
 
     try {
       const options: {
@@ -116,21 +106,21 @@ export default function OrderListPage() {
         sort_order?: 'asc' | 'desc';
         start_date?: string;
         end_date?: string;
-        order_id?: string; // New: for search
-        phone_number?: string; // New: for search
+        order_id?: string;
+        phone_number?: string;
       } = { sort_order: sortOrder };
 
-      if (selectedOrderMode !== 'all') { // Only send order_mode if it's not 'all'
+      if (selectedOrderMode !== 'all') {
         options.order_mode = selectedOrderMode;
       }
       if (startDate) {
-        options.start_date = startDate.toISOString().split('T')[0]; // Format to YYYY-MM-DD
+        options.start_date = startDate.toISOString().split('T')[0];
       }
       if (endDate) {
-        options.end_date = endDate.toISOString().split('T')[0]; // Format to YYYY-MM-DD
+        options.end_date = endDate.toISOString().split('T')[0];
       }
 
-      // Always include search parameters if they are present in state
+      // CHANGED: Use actual search values, not input values
       if (searchOrderId) {
         options.order_id = searchOrderId;
       }
@@ -140,7 +130,6 @@ export default function OrderListPage() {
 
       const response = await apiService.getPaginatedOrders(currentPage, pageSize, options);
 
-      // Ensure that payable_price is always treated as a string for display consistency
       const formattedOrders = response.orders.map((order: any) => ({
         ...order,
         payable_price: order.payable_price ? parseFloat(order.payable_price).toFixed(2) : '0.00',
@@ -159,16 +148,15 @@ export default function OrderListPage() {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, pageSize, selectedOrderMode, sortOrder, startDate, endDate, adminUser, searchOrderId, searchPhoneNumber]); // Keep all dependencies for useCallback to be correct
+  }, [currentPage, pageSize, selectedOrderMode, sortOrder, startDate, endDate, adminUser, searchOrderId, searchPhoneNumber]);
 
-
-   useEffect(() => {
+  // CHANGED: Remove search input dependencies from useEffect
+  useEffect(() => {
     if (adminUser) {
       fetchOrders();
     }
-  }, [currentPage, selectedOrderMode, sortOrder, startDate, endDate, adminUser, triggerFetch, fetchOrders]); // Add fetchOrders
+  }, [currentPage, selectedOrderMode, sortOrder, startDate, endDate, adminUser, triggerFetch, fetchOrders]);
 
-  
   const handleNextPage = useCallback(() => {
     if (currentPage < totalPages) {
       setCurrentPage(prev => prev + 1);
@@ -183,52 +171,65 @@ export default function OrderListPage() {
 
   const handleOrderModeChange = useCallback((mode: OrderMode) => {
     setSelectedOrderMode(mode);
-    setCurrentPage(1); // Reset to first page on mode change
-    setSelectedOrderIds([]); // Clear selections
-    setSearchOrderId(''); // Clear search fields
+    setCurrentPage(1);
+    setSelectedOrderIds([]);
+    // CHANGED: Clear input fields and actual search values
+    setSearchOrderIdInput('');
+    setSearchPhoneNumberInput('');
+    setSearchOrderId('');
     setSearchPhoneNumber('');
-    setTriggerFetch(prev => prev + 1); // Trigger a fetch
+    setTriggerFetch(prev => prev + 1);
   }, []);
 
   const handleSortOrderChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
     setSortOrder(event.target.value as 'asc' | 'desc');
-    setCurrentPage(1); // Reset to first page on sort change
-    setTriggerFetch(prev => prev + 1); // Trigger a fetch
+    setCurrentPage(1);
+    setTriggerFetch(prev => prev + 1);
   }, []);
 
   const handleStartDateChange = useCallback((date: Date | null) => {
     setStartDate(date);
-    setCurrentPage(1); // Reset to first page on date change
-    setTriggerFetch(prev => prev + 1); // Trigger a fetch
+    setCurrentPage(1);
+    setTriggerFetch(prev => prev + 1);
   }, []);
 
   const handleEndDateChange = useCallback((date: Date | null) => {
     setEndDate(date);
-    setCurrentPage(1); // Reset to first page on date change
-    setTriggerFetch(prev => prev + 1); // Trigger a fetch
+    setCurrentPage(1);
+    setTriggerFetch(prev => prev + 1);
   }, []);
 
-  // Modified handleSearch to explicitly trigger fetch
+  // CHANGED: Modified search handler to update actual search values
   const handleSearch = useCallback(() => {
-    setCurrentPage(1); // Reset to first page on search
-    setTriggerFetch(prev => prev + 1); // Trigger a fetch
-  }, []);
+    // Update actual search values from input values
+    setSearchOrderId(searchOrderIdInput);
+    setSearchPhoneNumber(searchPhoneNumberInput);
+    setCurrentPage(1);
+    setTriggerFetch(prev => prev + 1);
+  }, [searchOrderIdInput, searchPhoneNumberInput]);
 
   const handleResetFilters = useCallback(() => {
-    // Reset all filter states
     setSelectedOrderMode('all');
     setSortOrder('desc');
     setStartDate(null);
     setEndDate(null);
+    // CHANGED: Clear both input and actual search values
+    setSearchOrderIdInput('');
+    setSearchPhoneNumberInput('');
     setSearchOrderId('');
     setSearchPhoneNumber('');
     setSelectedOrderIds([]);
     setEditingOrderId(null);
-    setCurrentPage(1); // Reset current page to 1
-
-    // Increment triggerFetch to force useEffect to re-run
+    setCurrentPage(1);
     setTriggerFetch(prev => prev + 1);
   }, []);
+
+  // CHANGED: Added handler for Enter key press in search inputs
+  const handleSearchKeyPress = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      handleSearch();
+    }
+  }, [handleSearch]);
 
   const handleSelectAllOrders = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.checked) {
@@ -257,7 +258,7 @@ export default function OrderListPage() {
     try {
       await apiService.assignOrdersToMe(selectedOrderIds);
       alert('Selected orders assigned successfully!');
-      setTriggerFetch(prev => prev + 1); // Trigger a fetch after assignment
+      setTriggerFetch(prev => prev + 1);
     } catch (err) {
       console.error('Failed to assign orders:', err);
       setError('Failed to assign orders. Please try again.');
@@ -270,11 +271,10 @@ export default function OrderListPage() {
     setLoading(true);
     setError(null);
     try {
-      // The API now expects a boolean `packing_status`
       console.log('currentPackingStatus', orderId)
       await apiService.markOrderAsPacked(orderId, !currentPackingStatus);
       alert(`Order ${orderId.substring(0, 8)}... packing status updated!`);
-      setTriggerFetch(prev => prev + 1); // Trigger a fetch after status update
+      setTriggerFetch(prev => prev + 1);
     } catch (err) {
       console.error(`Failed to update packing status for order ${orderId}:`, err);
       setError('Failed to update packing status. Please try again.');
@@ -285,7 +285,7 @@ export default function OrderListPage() {
 
   const handleEditDeliveryStatus = useCallback((orderId: string, currentStatus: string) => {
     setEditingOrderId(orderId);
-    setNewDeliveryStatus(currentStatus as DeliveryStatus); // Cast to DeliveryStatus
+    setNewDeliveryStatus(currentStatus as DeliveryStatus);
   }, []);
 
   const handleUpdateDeliveryStatus = useCallback(async (orderId: string) => {
@@ -294,8 +294,8 @@ export default function OrderListPage() {
     try {
       await apiService.updateOrderStatus(orderId, { status: newDeliveryStatus });
       alert(`Delivery status for order ${orderId.substring(0, 8)}... updated to ${newDeliveryStatus}!`);
-      setEditingOrderId(null); // Exit editing mode
-      setTriggerFetch(prev => prev + 1); // Trigger a fetch after status update
+      setEditingOrderId(null);
+      setTriggerFetch(prev => prev + 1);
     } catch (err) {
       console.error(`Failed to update delivery status for order ${orderId}:`, err);
       setError('Failed to update delivery status. Please try again.');
@@ -304,7 +304,6 @@ export default function OrderListPage() {
     }
   }, [newDeliveryStatus]);
 
-  // Function to format date string
   const formatDate = (dateString: string) => {
     if (!dateString) return 'N/A';
     try {
@@ -322,7 +321,6 @@ export default function OrderListPage() {
     }
   };
 
-  // Helper to get status badge colors
   const getStatusBadgeClasses = (status: string) => {
     switch (status) {
       case 'Delivered':
@@ -340,7 +338,6 @@ export default function OrderListPage() {
     }
   };
 
-  // Helper to get payment status badge colors
   const getPaymentStatusBadgeClasses = (paymentStatus: string) => {
     switch (paymentStatus) {
       case 'Success':
@@ -354,17 +351,15 @@ export default function OrderListPage() {
     }
   };
 
-  // Determine if "Select All" checkbox should be checked
   const isAllUnassignedSelected = useMemo(() => {
     const unassignedOrders = orders.filter(order => order.assigned_to === null);
     return unassignedOrders.length > 0 && unassignedOrders.every(order => selectedOrderIds.includes(order.order_id));
   }, [orders, selectedOrderIds]);
 
-  // Handle copying to clipboard
   const copyToClipboard = useCallback((text: string) => {
     navigator.clipboard.writeText(text).then(() => {
       alert('Copied to clipboard!');
-      setShowCopyDropdown(null); // Hide dropdown after copying
+      setShowCopyDropdown(null);
     }).catch(err => {
       console.error('Failed to copy: ', err);
       alert('Failed to copy to clipboard.');
@@ -373,7 +368,6 @@ export default function OrderListPage() {
 
   return (
     <div className="space-y-8">
-      {/* Page Header */}
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-3xl font-extrabold text-gray-800 flex items-center">
           <ShoppingCart className="w-8 h-8 mr-3 text-[var(--color-primary-950)]" />
@@ -381,7 +375,6 @@ export default function OrderListPage() {
         </h2>
       </div>
 
-      {/* Order Mode Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 mb-8">
         {availableOrderModes.map((mode) => {
           const ModeIcon = mode.icon;
@@ -402,19 +395,14 @@ export default function OrderListPage() {
         })}
       </div>
 
-      {/* Main Content Area: Orders Table */}
       <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
-
-        {/* Table Header/Toolbar - Filters and Actions */}
-        <div className="p-5 border-b border-gray-200 flex flex-col gap-4"> {/* Changed to flex-col */}
-          {/* Top Row: Title and Assign Button */}
+        <div className="p-5 border-b border-gray-200 flex flex-col gap-4">
           <div className="flex justify-between items-center flex-wrap gap-4">
             <h3 className="font-semibold text-lg text-gray-800 flex items-center">
               <Package className="w-6 h-6 text-[var(--color-primary-950)] mr-3" />
               {availableOrderModes.find(m => m.value === selectedOrderMode)?.label || 'All Customer Orders'}
             </h3>
 
-            {/* Conditional "Assign to Me" button - MOVED HERE */}
             {selectedOrderMode === 'un_assigned_order' && selectedOrderIds.length > 0 && (
               <button
                 onClick={handleAssignSelectedOrders}
@@ -426,11 +414,8 @@ export default function OrderListPage() {
             )}
           </div>
 
-          {/* Second Row: Filter Controls */}
           <div className="flex flex-col sm:flex-row flex-wrap items-center justify-between gap-4">
-            {/* Left side filters: Sort Dropdown, Date Pickers */}
             <div className="flex items-center flex-wrap gap-2">
-              {/* Sort Dropdown */}
               <div className="relative">
                 <select
                   value={sortOrder}
@@ -445,7 +430,6 @@ export default function OrderListPage() {
                 </div>
               </div>
 
-              {/* Date Pickers */}
               <div className="flex flex-col sm:flex-row items-center gap-2">
                 <div className="relative">
                   <DatePicker
@@ -477,27 +461,29 @@ export default function OrderListPage() {
               </div>
             </div>
 
-            {/* Right side filters: Search Inputs and Buttons */}
-            <div className="flex items-center flex-wrap gap-2"> {/* Added flex-wrap for responsiveness */}
+            <div className="flex items-center flex-wrap gap-2">
+              {/* CHANGED: Use input state variables and add onKeyPress handler */}
               <input
                 type="text"
                 placeholder="Search by Order ID"
-                value={searchOrderId}
-                onChange={(e) => setSearchOrderId(e.target.value)}
+                value={searchOrderIdInput}
+                onChange={(e) => setSearchOrderIdInput(e.target.value)}
+                onKeyPress={handleSearchKeyPress}
                 className="w-full sm:w-48 border border-gray-300 rounded-md py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)]"
               />
               <input
                 type="text"
                 placeholder="Search by Phone No."
-                value={searchPhoneNumber}
-                onChange={(e) => setSearchPhoneNumber(e.target.value)}
+                value={searchPhoneNumberInput}
+                onChange={(e) => setSearchPhoneNumberInput(e.target.value)}
+                onKeyPress={handleSearchKeyPress}
                 className="w-full sm:w-48 border border-gray-300 rounded-md py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)]"
               />
               <button
                 onClick={handleSearch}
                 className={`px-4 py-2 rounded-md transition-colors duration-200 flex items-center justify-center
-                  ${(searchOrderId || searchPhoneNumber) ? 'bg-[var(--color-primary-950)] text-white hover:bg-[var(--color-primary-800)]' : 'bg-gray-300 text-gray-600 cursor-not-allowed'}`}
-                disabled={!(searchOrderId || searchPhoneNumber) || loading}
+                  ${(searchOrderIdInput || searchPhoneNumberInput) ? 'bg-[var(--color-primary-950)] text-white hover:bg-[var(--color-primary-800)]' : 'bg-gray-300 text-gray-600 cursor-not-allowed'}`}
+                disabled={!(searchOrderIdInput || searchPhoneNumberInput) || loading}
                 title="Search Orders"
               >
                 <Search className="w-5 h-5" />
@@ -513,14 +499,12 @@ export default function OrderListPage() {
           </div>
         </div>
 
-        {/* Error Message */}
         {error && (
           <div className="p-6 text-red-700 bg-red-50 border-l-4 border-red-500">
             <p className="font-medium">{error}</p>
           </div>
         )}
 
-        {/* Loading State */}
         {loading ? (
           <div className="p-10 text-center">
             <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[var(--color-primary-950)] mx-auto"></div>
@@ -528,7 +512,6 @@ export default function OrderListPage() {
           </div>
         ) : (
           <>
-            {/* Table */}
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
@@ -576,7 +559,7 @@ export default function OrderListPage() {
                               type="checkbox"
                               checked={selectedOrderIds.includes(order.order_id)}
                               onChange={(e) => handleSelectOrder(order.order_id, e)}
-                              disabled={order.assigned_to !== null} // Disable if already assigned
+                              disabled={order.assigned_to !== null}
                               className="form-checkbox h-4 w-4 text-[var(--color-primary-950)] rounded"
                             />
                           </td>
@@ -593,7 +576,7 @@ export default function OrderListPage() {
                                 <Copy className="w-4 h-4" />
                               </button>
                               {showCopyDropdown === order.order_id && (
-                                <div className="absolute z-60 bg-white shadow-md rounded-md mt-2 w-42 left-0 -ml-16"> {/* Adjust positioning */}
+                                <div className="absolute z-60 bg-white shadow-md rounded-md mt-2 w-42 left-0 -ml-16">
                                   <button
                                     onClick={() => copyToClipboard(order.order_id)}
                                     className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
@@ -626,7 +609,7 @@ export default function OrderListPage() {
                           ₹{order.actual_price}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          {editingOrderId === order.order_id && (adminUser?.is_superuser || selectedOrderMode === 'packed_order_by_me') && !['Delivered', 'Cancelled'].includes(order.status) ? ( // Hide edit if delivered/cancelled
+                          {editingOrderId === order.order_id && (adminUser?.is_superuser || selectedOrderMode === 'packed_order_by_me') && !['Delivered', 'Cancelled'].includes(order.status) ? (
                             <div className="flex items-center space-x-2">
                               <select
                                 value={newDeliveryStatus}
@@ -645,7 +628,7 @@ export default function OrderListPage() {
                                 Update
                               </button>
                               <button
-                                onClick={() => setEditingOrderId(null)} // Cancel editing
+                                onClick={() => setEditingOrderId(null)}
                                 className="px-3 py-1 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 text-sm"
                               >
                                 Cancel
@@ -656,7 +639,6 @@ export default function OrderListPage() {
                               <span className={`px-3 py-1 inline-flex text-sm leading-5 font-semibold rounded-full ${getStatusBadgeClasses(order.status)}`}>
                                 {order.status}
                               </span>
-                              {/* The key conditional logic for showing/hiding the Edit button */}
                               {((adminUser?.is_superuser || selectedOrderMode === 'packed_order_by_me') && !['Delivered', 'Cancelled'].includes(order.status)) ? (
                                 <button
                                   onClick={() => handleEditDeliveryStatus(order.order_id, order.status)}
@@ -688,7 +670,6 @@ export default function OrderListPage() {
                               <Eye className="w-5 h-5" />
                             </Link>
 
-                            {/* Toggle Packed Status button */}
                             {selectedOrderMode === 'assigned_order_to_me' && (
                               <button
                                 onClick={() => handleTogglePackedStatus(order.order_id, order.is_packed)}
@@ -716,7 +697,6 @@ export default function OrderListPage() {
               </table>
             </div>
 
-            {/* Pagination */}
             <div className="px-6 py-5 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4">
               <p className="text-sm text-gray-600">
                 Showing {orders.length} of {totalItems} orders
