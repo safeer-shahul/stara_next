@@ -5,6 +5,8 @@ import { useState } from 'react';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { auth } from './firebase/config';
 import apiService from '@/utils/api/apiService';
+import { showToast } from '@/utils/toast';
+import { Eye, EyeOff } from 'lucide-react';
 
 interface LoginProps {
   switchToRegister: () => void;
@@ -19,6 +21,7 @@ const Login = ({ switchToRegister, onLoginSuccess, switchToForgotPassword }: Log
     username: '',
     password: '',
   });
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -33,9 +36,11 @@ const Login = ({ switchToRegister, onLoginSuccess, switchToForgotPassword }: Log
   const handleSuccessfulLogin = async () => {
     try {
       console.log('Login successful - cart will sync automatically');
+      showToast.success('Successfully logged in!');
       onLoginSuccess();
     } catch (error) {
       console.error('Error after login:', error);
+      showToast.success('Successfully logged in!');
       onLoginSuccess();
     }
   };
@@ -59,7 +64,9 @@ const Login = ({ switchToRegister, onLoginSuccess, switchToForgotPassword }: Log
 
     } catch (err: any) {
       console.error('Login failed:', err);
-      setError(err.detail || err.message || 'Login failed. Please check your username and password.');
+      const errorMessage = err.detail || err.message || 'Login failed. Please check your username and password.';
+      setError(errorMessage);
+      showToast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -105,6 +112,7 @@ const Login = ({ switchToRegister, onLoginSuccess, switchToForgotPassword }: Log
         }
       }
       setError(errorMessage);
+      showToast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -164,16 +172,30 @@ const Login = ({ switchToRegister, onLoginSuccess, switchToForgotPassword }: Log
           <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
             Password
           </label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            value={formData.password}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200"
-            required
-            disabled={isLoading}
-          />
+          <div className="relative">
+            <input
+              id="password"
+              name="password"
+              type={showPassword ? "text" : "password"}
+              value={formData.password}
+              onChange={handleChange}
+              className="w-full px-3 py-2 pr-12 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200"
+              required
+              disabled={isLoading}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+              disabled={isLoading}
+            >
+              {showPassword ? (
+                <EyeOff className="w-5 h-5" />
+              ) : (
+                <Eye className="w-5 h-5" />
+              )}
+            </button>
+          </div>
           <button
             type="button"
             onClick={switchToForgotPassword}

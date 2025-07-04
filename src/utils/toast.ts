@@ -6,7 +6,7 @@ export const showToast = {
   success: (message: string) => {
     Swal.fire({
       toast: true,
-      position: 'top-end',
+      position: 'top-start',
       showConfirmButton: false,
       timer: 3000,
       timerProgressBar: true,
@@ -16,11 +16,11 @@ export const showToast = {
       color: '#0c4a6e',
     });
   },
-  
+   
   error: (message: string) => {
     Swal.fire({
       toast: true,
-      position: 'top-end',
+      position: 'top-start',
       showConfirmButton: false,
       timer: 4000,
       timerProgressBar: true,
@@ -30,11 +30,11 @@ export const showToast = {
       color: '#991b1b',
     });
   },
-  
+   
   warning: (message: string) => {
     Swal.fire({
       toast: true,
-      position: 'top-end',
+      position: 'top-start',
       showConfirmButton: false,
       timer: 3500,
       timerProgressBar: true,
@@ -44,11 +44,11 @@ export const showToast = {
       color: '#92400e',
     });
   },
-  
+   
   info: (message: string) => {
     Swal.fire({
       toast: true,
-      position: 'top-end',
+      position: 'top-start',
       showConfirmButton: false,
       timer: 3000,
       timerProgressBar: true,

@@ -1,5 +1,6 @@
 import axios, { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig, AxiosError } from 'axios';
 import Swal from 'sweetalert2';
+import { showToast } from '../toast';
 
 // Configuration
 const API_CONFIG = {
@@ -196,50 +197,52 @@ class ApiService {
   }
 
   // Unified logout method
-  public async logout(silent: boolean = false): Promise<void> {
-    if (typeof window !== 'undefined') {
-      
-      // 🔄 STEP 1: Save current cart to localStorage before logout
-      try {
-        console.log('💾 Preserving cart state before logout...');
-        
-        // Trigger cart context to save current state
-        window.dispatchEvent(new CustomEvent('beforeLogout'));
-        
-        // Give time for cart context to respond
-        await new Promise(resolve => setTimeout(resolve, 200));
-        
-        console.log('✅ Cart state preserved for guest mode');
-      } catch (error) {
-        console.error('❌ Error preserving cart state:', error);
-      }
+ // Don't forget to import your toast utility and router at the top of your file
+// import { showToast } from '@/utils/toast';
+// import { useRouter } from 'next/router'; // or 'next/navigation' for App Router
 
-      // 🗑️ STEP 2: Clear authentication tokens
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      
-      // 📢 STEP 3: Notify components about logout
-      window.dispatchEvent(new Event('userLoggedOut'));
-
-      const currentPath = window.location.pathname;
-
-      if (currentPath.startsWith('/admin') && currentPath !== '/admin/login') {
-        window.location.href = '/admin/login';
-      } else {
-        window.location.href = '/';
-      }
+public async logout(silent: boolean = false, router?: any): Promise<void> {
+  if (typeof window !== 'undefined') {
+           
+    // 🔄 STEP 1: Save current cart to localStorage before logout
+    try {
+      console.log('💾 Preserving cart state before logout...');
+               
+      // Trigger cart context to save current state
+      window.dispatchEvent(new CustomEvent('beforeLogout'));
+               
+      // Give time for cart context to respond
+      await new Promise(resolve => setTimeout(resolve, 200));
+               
+      console.log('✅ Cart state preserved for guest mode');
+    } catch (error) {
+      console.error('❌ Error preserving cart state:', error);
     }
 
+    // 🗑️ STEP 2: Clear authentication tokens
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+           
+    // 📢 STEP 3: Notify components about logout
+    window.dispatchEvent(new Event('userLoggedOut'));
+
+    // 🎉 STEP 4: Show success toast (only if not silent)
     if (!silent) {
-      await Swal.fire({
-        icon: 'success',
-        title: 'Successfully Logged Out!',
-        text: 'Your cart items have been saved locally.',
-        showConfirmButton: false,
-        timer: 2000,
-      });
+      showToast.success('Successfully logged out!');
     }
+
+    const currentPath = window.location.pathname;
+
+    // Small delay to let the toast show before redirect
+    setTimeout(() => {
+      if (currentPath.startsWith('/admin') && currentPath !== '/admin/login') {
+        router?.push('/admin/login') || (window.location.href = '/admin/login');
+      } else {
+        router?.push('/') || (window.location.href = '/');
+      }
+    }, 500);
   }
+}
 
   // Optional: Add method to check if user can logout safely
   public async canLogoutSafely(): Promise<boolean> {

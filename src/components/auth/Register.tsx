@@ -5,6 +5,8 @@ import { useState } from 'react';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { auth } from './firebase/config';
 import apiService from '@/utils/api/apiService';
+import { showToast } from '@/utils/toast';
+import { Eye, EyeOff } from 'lucide-react';
 
 interface RegisterProps {
   switchToLogin: () => void;
@@ -21,6 +23,8 @@ const Register = ({ switchToLogin, onRegisterSuccess }: RegisterProps) => {
     password: '',
     confirmPassword: '',
   });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [passwordsMatchError, setPasswordsMatchError] = useState('');
@@ -48,9 +52,11 @@ const Register = ({ switchToLogin, onRegisterSuccess }: RegisterProps) => {
   const handleSuccessfulRegistration = async () => {
     try {
       console.log('Registration successful - cart will sync automatically');
+      showToast.success('Account created successfully! Welcome aboard!');
       onRegisterSuccess();
     } catch (error) {
       console.error('Error after registration:', error);
+      showToast.success('Account created successfully! Welcome aboard!');
       onRegisterSuccess();
     }
   };
@@ -61,7 +67,9 @@ const Register = ({ switchToLogin, onRegisterSuccess }: RegisterProps) => {
 
     // Final check for password match before submitting
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match. Please correct them.');
+      const errorMsg = 'Passwords do not match. Please correct them.';
+      setError(errorMsg);
+      showToast.error(errorMsg);
       return;
     }
 
@@ -97,7 +105,9 @@ const Register = ({ switchToLogin, onRegisterSuccess }: RegisterProps) => {
 
     } catch (err: any) {
       console.error('Registration failed:', err);
-      setError(err.detail || err.message || 'An unexpected error occurred during registration.');
+      const errorMessage = err.detail || err.message || 'An unexpected error occurred during registration.';
+      setError(errorMessage);
+      showToast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -144,6 +154,7 @@ const Register = ({ switchToLogin, onRegisterSuccess }: RegisterProps) => {
         }
       }
       setError(errorMessage);
+      showToast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -238,32 +249,60 @@ const Register = ({ switchToLogin, onRegisterSuccess }: RegisterProps) => {
           <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
             Password
           </label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            value={formData.password}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200"
-            required
-            disabled={isLoading}
-          />
+          <div className="relative">
+            <input
+              id="password"
+              name="password"
+              type={showPassword ? "text" : "password"}
+              value={formData.password}
+              onChange={handleChange}
+              className="w-full px-3 py-2 pr-12 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200"
+              required
+              disabled={isLoading}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+              disabled={isLoading}
+            >
+              {showPassword ? (
+                <EyeOff className="w-5 h-5" />
+              ) : (
+                <Eye className="w-5 h-5" />
+              )}
+            </button>
+          </div>
         </div>
 
         <div className="mb-6">
           <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
             Confirm Password
           </label>
-          <input
-            id="confirmPassword"
-            name="confirmPassword"
-            type="password"
-            value={formData.confirmPassword}
-            onChange={handleChange}
-            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200 ${passwordsMatchError ? 'border-red-500' : 'border-gray-300'}`}
-            required
-            disabled={isLoading}
-          />
+          <div className="relative">
+            <input
+              id="confirmPassword"
+              name="confirmPassword"
+              type={showConfirmPassword ? "text" : "password"}
+              value={formData.confirmPassword}
+              onChange={handleChange}
+              className={`w-full px-3 py-2 pr-12 border rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200 ${passwordsMatchError ? 'border-red-500' : 'border-gray-300'}`}
+              required
+              disabled={isLoading}
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+              disabled={isLoading}
+            >
+              {showConfirmPassword ? (
+                <EyeOff className="w-5 h-5" />
+              ) : (
+                <Eye className="w-5 h-5" />
+              )}
+            </button>
+          </div>
           {passwordsMatchError && (
             <p className="text-red-500 text-xs mt-1">{passwordsMatchError}</p>
           )}

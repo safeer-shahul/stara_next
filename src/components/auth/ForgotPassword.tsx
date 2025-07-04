@@ -3,7 +3,9 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import apiService from '@/utils/api/apiService'; // Ensure this path is correct
+import apiService from '@/utils/api/apiService';
+import { showToast } from '@/utils/toast';
+import { Eye, EyeOff } from 'lucide-react';
 
 interface ForgotPasswordProps {
   onClose?: () => void; // Optional if used as a modal
@@ -18,6 +20,8 @@ const ForgotPassword = ({ onClose, switchToLogin }: ForgotPasswordProps) => {
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -33,10 +37,14 @@ const ForgotPassword = ({ onClose, switchToLogin }: ForgotPasswordProps) => {
       // API call to request OTP for password reset
       // Your backend should send an OTP to the provided email/username
       const response = await apiService.requestPasswordResetOtp({ email_or_username: emailOrUsername });
-      setSuccessMessage(response.message || 'OTP sent successfully. Please check your email/phone.');
+      const message = response.message || 'OTP sent successfully. Please check your email/phone.';
+      setSuccessMessage(message);
+      showToast.success(message);
       setStep(2); // Move to OTP verification step
     } catch (err: any) {
-      setError(err.detail || err.message || 'Failed to send OTP. Please check the provided email/username.');
+      const errorMessage = err.detail || err.message || 'Failed to send OTP. Please check the provided email/username.';
+      setError(errorMessage);
+      showToast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -51,10 +59,14 @@ const ForgotPassword = ({ onClose, switchToLogin }: ForgotPasswordProps) => {
     try {
       // API call to verify the OTP
       const response = await apiService.verifyPasswordResetOtp({ email_or_username: emailOrUsername, otp: otp });
-      setSuccessMessage(response.message || 'OTP verified. You can now set your new password.');
+      const message = response.message || 'OTP verified. You can now set your new password.';
+      setSuccessMessage(message);
+      showToast.success(message);
       setStep(3); // Move to set new password step
     } catch (err: any) {
-      setError(err.detail || err.message || 'OTP verification failed. Invalid OTP or request expired.');
+      const errorMessage = err.detail || err.message || 'OTP verification failed. Invalid OTP or request expired.';
+      setError(errorMessage);
+      showToast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -67,7 +79,9 @@ const ForgotPassword = ({ onClose, switchToLogin }: ForgotPasswordProps) => {
     setIsLoading(true);
 
     if (newPassword !== confirmNewPassword) {
-      setError('Passwords do not match.');
+      const errorMessage = 'Passwords do not match.';
+      setError(errorMessage);
+      showToast.error(errorMessage);
       setIsLoading(false);
       return;
     }
@@ -79,18 +93,26 @@ const ForgotPassword = ({ onClose, switchToLogin }: ForgotPasswordProps) => {
         otp: otp, // Pass OTP again to ensure the reset context is maintained
         new_password: newPassword,
       });
-      setSuccessMessage(response.message || 'Your password has been successfully reset. You can now log in.');
+      const message = response.message || 'Your password has been successfully reset. You can now log in.';
+      setSuccessMessage(message);
+      showToast.success(message);
       
       // Optionally, automatically switch to login view and close modal if applicable
       if (switchToLogin) {
-        switchToLogin();
-        if (onClose) onClose();
+        setTimeout(() => {
+          switchToLogin();
+          if (onClose) onClose();
+        }, 1500); // Give time for user to see the success message
       } else {
         // If not in a modal, redirect to login page
-        router.push('/login'); // Assuming you have a dedicated login page
+        setTimeout(() => {
+          router.push('/login'); // Assuming you have a dedicated login page
+        }, 1500);
       }
     } catch (err: any) {
-      setError(err.detail || err.message || 'Failed to reset password. Please try again.');
+      const errorMessage = err.detail || err.message || 'Failed to reset password. Please try again.';
+      setError(errorMessage);
+      showToast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -202,30 +224,58 @@ const ForgotPassword = ({ onClose, switchToLogin }: ForgotPasswordProps) => {
             <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 mb-1">
               New Password
             </label>
-            <input
-              id="newPassword"
-              name="newPassword"
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200"
-              required
-            />
+            <div className="relative">
+              <input
+                id="newPassword"
+                name="newPassword"
+                type={showNewPassword ? "text" : "password"}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="w-full px-3 py-2 pr-12 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowNewPassword(!showNewPassword)}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                disabled={isLoading}
+              >
+                {showNewPassword ? (
+                  <EyeOff className="w-5 h-5" />
+                ) : (
+                  <Eye className="w-5 h-5" />
+                )}
+              </button>
+            </div>
           </div>
 
           <div className="mb-6">
             <label htmlFor="confirmNewPassword" className="block text-sm font-medium text-gray-700 mb-1">
               Confirm New Password
             </label>
-            <input
-              id="confirmNewPassword"
-              name="confirmNewPassword"
-              type="password"
-              value={confirmNewPassword}
-              onChange={(e) => setConfirmNewPassword(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200"
-              required
-            />
+            <div className="relative">
+              <input
+                id="confirmNewPassword"
+                name="confirmNewPassword"
+                type={showConfirmPassword ? "text" : "password"}
+                value={confirmNewPassword}
+                onChange={(e) => setConfirmNewPassword(e.target.value)}
+                className="w-full px-3 py-2 pr-12 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                disabled={isLoading}
+              >
+                {showConfirmPassword ? (
+                  <EyeOff className="w-5 h-5" />
+                ) : (
+                  <Eye className="w-5 h-5" />
+                )}
+              </button>
+            </div>
           </div>
 
           <button
