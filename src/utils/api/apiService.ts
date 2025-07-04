@@ -895,6 +895,14 @@ public async logout(silent: boolean = false, router?: any): Promise<void> {
       throw error;
     }
   }
+
+  public async requestReplacement(data: any): Promise<any> {
+    try {
+      return await this.post<any>('/order/create_replacement_request', data,true);
+    } catch (error) {
+      throw error;
+    }
+  }
 }
 
 const apiService = ApiService.getInstance();

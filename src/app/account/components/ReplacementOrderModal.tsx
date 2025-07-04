@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, ChevronDown, ChevronUp, AlertTriangle, Gift } from 'lucide-react';
+import { X, ChevronDown, ChevronUp, AlertTriangle, Gift, Trash2, Eye, FileImage } from 'lucide-react';
 import Image from 'next/image';
 import apiService from '@/utils/api/apiService';
 
@@ -16,10 +16,18 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
   const [loading, setLoading] = useState(true);
   const [orderData, setOrderData] = useState<any>(null);
   const [offers, setOffers] = useState<any>([]);
-  const [selectedItems, setSelectedItems] = useState<Record<string, boolean>>({});
-  const [replacementReason, setReplacementReason] = useState('');
+  const [replacementItems, setReplacementItems] = useState<Record<string, {
+    selected: boolean;
+    reason: 'Damaged' | 'Change Size' | '';
+    newVariant?: string;
+    replacementImages?: File[];
+  }>>({});
+  const [requestDetails, setRequestDetails] = useState('');
   const [error, setError] = useState('');
   const [showPolicy, setShowPolicy] = useState(false);
+  const [fullScreenImage, setFullScreenImage] = useState<{ url: string; name: string } | null>(null);
+
+  const mainReasons = ['Damaged', 'Change Size'];
 
   // Fetch order and offers data when component mounts
   useEffect(() => {
@@ -38,6 +46,20 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
         
         setOrderData(orderResponse);
         setOffers(offersResponse?.data || []);
+
+        // Initialize replacement items state
+        const allItems = getAllOrderItems(orderResponse);
+        const initialItems: Record<string, any> = {};
+        allItems.forEach(item => {
+          initialItems[item.id] = {
+            selected: false,
+            reason: '',
+            newVariant: item.product_variant || '',
+            replacementImages: []
+          };
+        });
+        setReplacementItems(initialItems);
+        
         setLoading(false);
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -92,69 +114,162 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
     }));
   };
 
-  const handleItemSelection = (itemId: string, selected: boolean) => {
-    setSelectedItems({
-      ...selectedItems,
-      [itemId]: selected
+  const handleItemChange = (itemId: string, field: string, value: any) => {
+    const allItems = getAllOrderItems(orderData);
+    const orderItem = allItems.find(item => item.id === itemId);
+    if (!orderItem) return;
+
+    setReplacementItems(prev => {
+      const updated = { ...prev };
+      
+      if (!updated[itemId]) {
+        updated[itemId] = { selected: false, reason: '', newVariant: orderItem.product_variant || '', replacementImages: [] };
+      }
+      
+      if (field === 'selected') {
+        updated[itemId] = { 
+          ...updated[itemId], 
+          selected: value
+        };
+      } else if (field === 'reason') {
+        updated[itemId] = { 
+          ...updated[itemId], 
+          reason: value,
+          // Reset variant to current if switching to Damaged
+          newVariant: value === 'Damaged' ? orderItem.product_variant : updated[itemId].newVariant
+        };
+      } else if (field === 'newVariant') {
+        updated[itemId] = { ...updated[itemId], newVariant: value };
+      } else if (field === 'replacementImages') {
+        // Handle multiple file selection
+        const files = value ? Array.from(value as FileList) : [];
+        updated[itemId] = { 
+          ...updated[itemId], 
+          replacementImages: files
+        };
+      }
+      
+      return updated;
     });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Check if any items are selected for replacement
-    const hasSelectedItems = Object.values(selectedItems).some(selected => selected);
-    if (!hasSelectedItems) {
-      setError('Please select at least one item to replace');
-      return;
-    }
-    
-    // Check if a reason is provided
-    if (!replacementReason.trim()) {
-      setError('Please provide a reason for replacement');
-      return;
-    }
-
-    setSubmitting(true);
-    setError('');
-
-    try {
-      // Get all items and filter selected ones
-      const allItems = getAllOrderItems(orderData);
-      const selectedItemIds = Object.keys(selectedItems).filter(itemId => selectedItems[itemId]);
-      
-      // Build products array with product_id and variant_id
-      const products = selectedItemIds.map(itemId => {
-        const item = allItems.find(item => item.id === itemId);
-        return {
-          product_id: item?.product_id || item?.product_details?.id,
-          variant_id: item?.variant_id || item?.product_details?.variant_id || null
+  // Delete specific image from the array
+  const handleDeleteImage = (itemId: string, indexToDelete: number) => {
+    setReplacementItems(prev => {
+      const updated = { ...prev };
+      if (updated[itemId] && updated[itemId].replacementImages) {
+        updated[itemId] = {
+          ...updated[itemId],
+          replacementImages: updated[itemId].replacementImages!.filter((_, index) => index !== indexToDelete)
         };
-      }).filter(product => product.product_id); // Remove any items without product_id
-      
-      // Replacement request data in the required format
-      const replacementData = {
-        orderID: orderId,
-        products: products,
-        reason: replacementReason
-      };
-      
-      console.log('Replacement request data:', replacementData);
-      
-      // Call your API to process the replacement
-      // In a real application, uncomment this:
-      // await apiService.createReplacementRequest(replacementData);
-      
-      // For demo purposes, simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      console.log('Replacement request submitted:', replacementData);
-      
-      onSuccess();
-    } catch (error: any) {
-      setError(error.message || 'Failed to submit replacement request. Please try again.');
-      setSubmitting(false);
+      }
+      return updated;
+    });
+  };
+
+  // Open full screen image view
+  const handleViewImage = (file: File) => {
+    const url = URL.createObjectURL(file);
+    setFullScreenImage({ url, name: file.name });
+  };
+
+  // Close full screen image view
+  const closeFullScreenImage = () => {
+    if (fullScreenImage) {
+      URL.revokeObjectURL(fullScreenImage.url);
+      setFullScreenImage(null);
     }
   };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  
+  // Check if any items are selected for replacement
+  const selectedItems = Object.entries(replacementItems).filter(([, item]) => item.selected);
+  if (selectedItems.length === 0) {
+    setError('Please select at least one item to replace');
+    return;
+  }
+  
+  // Validate that all selected items have reasons and required fields
+  for (const [itemId, item] of selectedItems) {
+    if (!item.reason) {
+      setError('Please select a reason for all items you want to replace');
+      return;
+    }
+    
+    if (item.reason === 'Change Size' && !item.newVariant) {
+      setError('Please select a new variant for size change requests');
+      return;
+    }
+  }
+
+  setSubmitting(true);
+  setError('');
+
+  try {
+    const allItems = getAllOrderItems(orderData);
+    
+    // Prepare replacement items data with image keys
+    const items = selectedItems.map(([itemId, item], index) => {
+      const orderItem = allItems.find(oi => oi.id === itemId);
+      const itemData:any = {
+        order_item_id: itemId,
+        item_reason: item.reason,
+        new_requested_product: orderItem?.product_details?.id || orderItem?.product_id || '',
+        new_requested_product_variant: item.newVariant || '',
+      };
+
+      // Add image_key if item has replacement images
+      if (item.replacementImages && item.replacementImages.length > 0) {
+        itemData.image_key = `item_${index + 1}_images`;
+      }
+
+      return itemData;
+    });
+    
+    console.log('Replacement request payload for backend:', {
+      order_id: orderId,
+      ...(requestDetails.trim() && { request_details: requestDetails }),
+      items: items
+    });
+
+    // Create FormData for file upload
+    const formData = new FormData();
+
+    // Add order_id
+    formData.append('order_id', orderId);
+
+    // Add request_details only if provided
+    if (requestDetails.trim()) {
+      formData.append('request_details', requestDetails);
+    }
+
+    // Add entire items array as JSON string
+    formData.append('items', JSON.stringify(items));
+
+    // Add replacement images with their corresponding keys
+    selectedItems.forEach(([itemId, item], index) => {
+      if (item.replacementImages && item.replacementImages.length > 0) {
+        const imageKey = `item_${index + 1}_images`;
+        
+        // Add all images for this item under the same key
+        item.replacementImages.forEach((file) => {
+          formData.append(imageKey, file);
+        });
+      }
+    });
+
+    // Call your API to process the replacement
+    await apiService.requestReplacement(formData);
+
+    console.log('Replacement request submitted successfully');
+    onSuccess();
+  } catch (error: any) {
+    setError(error.message || 'Failed to submit replacement request. Please try again.');
+    setSubmitting(false);
+  }
+};
 
   if (loading) {
     return (
@@ -208,7 +323,7 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
           <div className="absolute inset-0 bg-black opacity-75"></div>
         </div>
 
-        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full">
           <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium text-gray-900">Replace Items</h3>
@@ -250,130 +365,326 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
                   </div>
                 )}
                 
-                <div className="space-y-3 max-h-96 overflow-y-auto">
+                <div className="space-y-4 max-h-96 overflow-y-auto">
                   {/* Regular Items */}
                   {regularItems.length > 0 && (
-                    <div className="space-y-2">
-                      {regularItems.map((item: any) => (
-                        <div key={item.id} className="flex bg-white p-3 rounded-lg border border-gray-200">
-                          <div className="flex items-center mr-3">
-                            <input
-                              type="checkbox"
-                              id={`item-${item.id}`}
-                              checked={selectedItems[item.id] || false}
-                              onChange={(e) => handleItemSelection(item.id, e.target.checked)}
-                              className="h-4 w-4 text-[var(--color-primary-950)] focus:ring-[#175e7a] border-gray-300 rounded"
-                            />
-                          </div>
-                          
-                          <div className="w-16 h-16 rounded-md overflow-hidden mr-3 bg-gray-100 flex-shrink-0 relative">
-                            {item.product_details.images && item.product_details.images.length > 0 ? (
-                              <Image 
-                                src={`${process.env.NEXT_PUBLIC_API_BASE_URL}${item.product_details.images[0].product_image}`} 
-                                alt={item.product_details.product_name}
-                                fill
-                                sizes="64px"
-                                style={{objectFit: 'cover'}}
-                              />
-                            ) : (
-                              <div className="w-full h-full bg-gray-200"></div>
-                            )}
-                          </div>
-                          
-                          <div className="flex-1">
-                            <label htmlFor={`item-${item.id}`} className="cursor-pointer">
-                              <h4 className="text-sm font-medium text-gray-900 mb-1">{item.product_details.product_name}</h4>
-                              <div className="flex justify-between items-center">
-                                <div className="flex items-center gap-2">
-                                  <p className="text-xs text-gray-600">Qty: {item.quantity}</p>
-                                  {item.mode && item.mode !== 'Normal' && (
-                                    <span className="text-xs bg-gray-100 text-gray-700 px-1 py-0.5 rounded">
-                                      {item.mode}
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-sm font-medium">₹{parseFloat(item.price || item.total_price).toFixed(2)}</p>
+                    <div className="space-y-3">
+                      {regularItems.map((item: any) => {
+                        const currentItem = replacementItems[item.id] || { selected: false, reason: '', newVariant: item.product_variant || '', replacementImages: [] };
+                        const isSelected = currentItem.selected;
+                        const canChangeVariant = currentItem.reason === 'Change Size';
+                        
+                        return (
+                          <div key={item.id} className={`border rounded-lg p-4 ${isSelected ? 'border-blue-300 bg-blue-50' : 'border-gray-200'}`}>
+                            <div className="flex items-start space-x-3">
+                              <div className="flex items-center pt-2">
+                                <input
+                                  type="checkbox"
+                                  id={`item-${item.id}`}
+                                  checked={isSelected}
+                                  onChange={(e) => handleItemChange(item.id, 'selected', e.target.checked)}
+                                  className="h-4 w-4 text-[var(--color-primary-950)] focus:ring-[#175e7a] border-gray-300 rounded"
+                                />
                               </div>
-                            </label>
+                              
+                              <div className="w-16 h-16 rounded-md overflow-hidden bg-gray-100 flex-shrink-0 relative">
+                                {item.product_details.images && item.product_details.images.length > 0 ? (
+                                  <Image 
+                                    src={`${process.env.NEXT_PUBLIC_API_BASE_URL}${item.product_details.images[0].product_image}`} 
+                                    alt={item.product_details.product_name}
+                                    fill
+                                    sizes="64px"
+                                    style={{objectFit: 'cover'}}
+                                  />
+                                ) : (
+                                  <div className="w-full h-full bg-gray-200"></div>
+                                )}
+                              </div>
+                              
+                              <div className="flex-1 min-w-0">
+                                <label htmlFor={`item-${item.id}`} className="cursor-pointer">
+                                  <h4 className="text-sm font-medium text-gray-900 mb-1">{item.product_details.product_name}</h4>
+                                  <p className="text-xs text-gray-500 mb-3">₹{parseFloat(item.price || item.total_price).toFixed(2)} x {item.quantity} available</p>
+                                </label>
+
+                                {/* Show controls only if selected */}
+                                {isSelected && (
+                                  <div className="space-y-3">
+                                    {/* Reason Selection */}
+                                    <div className="flex items-center space-x-3">
+                                      <span className="text-sm text-gray-600 w-16">Reason:</span>
+                                      <select
+                                        value={currentItem.reason}
+                                        onChange={(e) => handleItemChange(item.id, 'reason', e.target.value)}
+                                        className="flex-1 border border-gray-300 rounded-md px-3 py-1 text-sm focus:ring-[var(--color-primary-950)] focus:border-[var(--color-primary-950)]"
+                                      >
+                                        <option value="">Select reason</option>
+                                        {mainReasons.map(reason => (
+                                          <option key={reason} value={reason}>{reason}</option>
+                                        ))}
+                                      </select>
+                                    </div>
+
+                                    {/* Variant Selection - only show if reason is "Change Size" and product has variants */}
+                                    {canChangeVariant && item.product_details.product_variant && item.product_details.product_variant.length > 0 && (
+                                      <div className="flex items-center space-x-3">
+                                        <span className="text-sm text-gray-600 w-16">New Size:</span>
+                                        <select
+                                          value={currentItem.newVariant || ''}
+                                          onChange={(e) => handleItemChange(item.id, 'newVariant', e.target.value)}
+                                          className="flex-1 border border-gray-300 rounded-md px-3 py-1 text-sm focus:ring-[var(--color-primary-950)] focus:border-[var(--color-primary-950)]"
+                                        >
+                                          <option value="">Select new variant</option>
+                                          {item.product_details.product_variant.map((variant: any) => (
+                                            <option 
+                                              key={variant.id} 
+                                              value={variant.id}
+                                              disabled={variant.quantity <= 0}
+                                              className={variant.quantity <= 0 ? 'text-gray-400' : ''}
+                                            >
+                                              Size {variant.variant_name} {variant.quantity > 0 ? `(${variant.quantity} available)` : '(Out of stock)'}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                    )}
+
+                                    {/* Multiple Image Upload for damaged items */}
+                                    {currentItem.reason === 'Damaged' && (
+                                      <div className="flex items-start space-x-3">
+                                        <span className="text-sm text-gray-600 w-16 pt-1">Images:</span>
+                                        <div className="flex-1">
+                                          <input
+                                            type="file"
+                                            accept="image/*"
+                                            multiple
+                                            onChange={(e) => handleItemChange(item.id, 'replacementImages', e.target.files)}
+                                            className="w-full border border-gray-300 rounded-md px-3 py-1 text-sm focus:ring-[var(--color-primary-950)] focus:border-[var(--color-primary-950)]"
+                                          />
+                                          <p className="text-xs text-gray-500 mt-1">Upload multiple images showing the damage (optional)</p>
+                                          
+                                          {/* File Tags */}
+                                          {currentItem.replacementImages && currentItem.replacementImages.length > 0 && (
+                                            <div className="mt-3">
+                                              <p className="text-xs text-gray-600 mb-2">Selected images ({currentItem.replacementImages.length}):</p>
+                                              <div className="flex flex-wrap gap-2">
+                                                {currentItem.replacementImages.map((file, index) => (
+                                                  <div key={index} className="flex items-center bg-gray-100 rounded-lg px-3 py-2 border border-gray-200 group hover:bg-gray-50 transition-colors">
+                                                    <FileImage size={16} className="text-gray-500 mr-2 flex-shrink-0" />
+                                                    <span className="text-sm text-gray-700 truncate max-w-[120px]" title={file.name}>
+                                                      {file.name}
+                                                    </span>
+                                                    <div className="flex items-center ml-2 space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                      <button
+                                                        type="button"
+                                                        onClick={() => handleViewImage(file)}
+                                                        className="p-1 hover:bg-gray-200 rounded transition-colors"
+                                                        title="View image"
+                                                      >
+                                                        <Eye size={12} className="text-gray-600" />
+                                                      </button>
+                                                      <button
+                                                        type="button"
+                                                        onClick={() => handleDeleteImage(item.id, index)}
+                                                        className="p-1 hover:bg-red-100 rounded transition-colors"
+                                                        title="Delete image"
+                                                      >
+                                                        <Trash2 size={12} className="text-red-500" />
+                                                      </button>
+                                                    </div>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
 
-                  {/* Bundle/Offer Items - Same styling as regular items */}
+                  {/* Bundle/Offer Items - Same logic as regular items */}
                   {bundleGroups.map((bundleGroup) => (
-                    <div key={bundleGroup.bundleId} className="space-y-2">
+                    <div key={bundleGroup.bundleId} className="space-y-3">
                       <div className="flex items-center gap-2 px-3 py-1">
                         <Gift size={16} className="text-gray-600" />
                         <h5 className="text-sm font-medium text-gray-800">{bundleGroup.offerName}</h5>
                       </div>
                       
-                      {bundleGroup.items.map((item: any) => (
-                        <div key={item.id} className="flex bg-white p-3 rounded-lg border border-gray-200 ml-4">
-                          <div className="flex items-center mr-3">
-                            <input
-                              type="checkbox"
-                              id={`bundle-item-${item.id}`}
-                              checked={selectedItems[item.id] || false}
-                              onChange={(e) => handleItemSelection(item.id, e.target.checked)}
-                              className="h-4 w-4 text-[var(--color-primary-950)] focus:ring-[#175e7a] border-gray-300 rounded"
-                            />
-                          </div>
-                          
-                          <div className="w-14 h-14 rounded-md overflow-hidden mr-3 bg-gray-100 flex-shrink-0 relative">
-                            {item.product_details.images && item.product_details.images.length > 0 ? (
-                              <Image 
-                                src={`${process.env.NEXT_PUBLIC_API_BASE_URL}${item.product_details.images[0].product_image}`} 
-                                alt={item.product_details.product_name}
-                                fill
-                                sizes="56px"
-                                style={{objectFit: 'cover'}}
-                              />
-                            ) : (
-                              <div className="w-full h-full bg-gray-200"></div>
-                            )}
-                          </div>
-                          
-                          <div className="flex-1">
-                            <label htmlFor={`bundle-item-${item.id}`} className="cursor-pointer">
-                              <h4 className="text-sm font-medium text-gray-900 mb-1">{item.product_details.product_name}</h4>
-                              <div className="flex justify-between items-center">
-                                <div className="flex items-center gap-2">
-                                  <p className="text-xs text-gray-600">Qty: {item.quantity}</p>
-                                  <span className="text-xs bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded">
-                                    {item.mode}
-                                  </span>
-                                </div>
-                                <p className="text-sm font-medium">
-                                  {item.mode === 'Get' ? (
-                                    <span className="text-gray-600">FREE</span>
-                                  ) : (
-                                    `₹${parseFloat(item.price || item.total_price).toFixed(2)}`
-                                  )}
-                                </p>
+                      {bundleGroup.items.map((item: any) => {
+                        const currentItem = replacementItems[item.id] || { selected: false, reason: '', newVariant: item.product_variant || '', replacementImages: [] };
+                        const isSelected = currentItem.selected;
+                        const canChangeVariant = currentItem.reason === 'Change Size';
+                        
+                        return (
+                          <div key={item.id} className={`border rounded-lg p-4 ml-4 ${isSelected ? 'border-blue-300 bg-blue-50' : 'border-gray-200'}`}>
+                            <div className="flex items-start space-x-3">
+                              <div className="flex items-center pt-2">
+                                <input
+                                  type="checkbox"
+                                  id={`bundle-item-${item.id}`}
+                                  checked={isSelected}
+                                  onChange={(e) => handleItemChange(item.id, 'selected', e.target.checked)}
+                                  className="h-4 w-4 text-[var(--color-primary-950)] focus:ring-[#175e7a] border-gray-300 rounded"
+                                />
                               </div>
-                            </label>
+                              
+                              <div className="w-14 h-14 rounded-md overflow-hidden bg-gray-100 flex-shrink-0 relative">
+                                {item.product_details.images && item.product_details.images.length > 0 ? (
+                                  <Image 
+                                    src={`${process.env.NEXT_PUBLIC_API_BASE_URL}${item.product_details.images[0].product_image}`} 
+                                    alt={item.product_details.product_name}
+                                    fill
+                                    sizes="56px"
+                                    style={{objectFit: 'cover'}}
+                                  />
+                                ) : (
+                                  <div className="w-full h-full bg-gray-200"></div>
+                                )}
+                              </div>
+                              
+                              <div className="flex-1 min-w-0">
+                                <label htmlFor={`bundle-item-${item.id}`} className="cursor-pointer">
+                                  <h4 className="text-sm font-medium text-gray-900 mb-1">{item.product_details.product_name}</h4>
+                                  <div className="flex items-center gap-2 mb-3">
+                                    <p className="text-xs text-gray-600">Qty: {item.quantity}</p>
+                                    <span className="text-xs bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded">
+                                      {item.mode}
+                                    </span>
+                                    <p className="text-xs">
+                                      {item.mode === 'Get' ? (
+                                        <span className="text-gray-600">FREE</span>
+                                      ) : (
+                                        `₹${parseFloat(item.price || item.total_price).toFixed(2)}`
+                                      )}
+                                    </p>
+                                  </div>
+                                </label>
+
+                                {/* Same controls as regular items */}
+                                {isSelected && (
+                                  <div className="space-y-3">
+                                    {/* Reason Selection */}
+                                    <div className="flex items-center space-x-3">
+                                      <span className="text-sm text-gray-600 w-16">Reason:</span>
+                                      <select
+                                        value={currentItem.reason}
+                                        onChange={(e) => handleItemChange(item.id, 'reason', e.target.value)}
+                                        className="flex-1 border border-gray-300 rounded-md px-3 py-1 text-sm focus:ring-[var(--color-primary-950)] focus:border-[var(--color-primary-950)]"
+                                      >
+                                        <option value="">Select reason</option>
+                                        {mainReasons.map(reason => (
+                                          <option key={reason} value={reason}>{reason}</option>
+                                        ))}
+                                      </select>
+                                    </div>
+
+                                    {/* Variant Selection for bundle items */}
+                                    {canChangeVariant && item.product_details.product_variant && item.product_details.product_variant.length > 0 && (
+                                      <div className="flex items-center space-x-3">
+                                        <span className="text-sm text-gray-600 w-16">New Size:</span>
+                                        <select
+                                          value={currentItem.newVariant || ''}
+                                          onChange={(e) => handleItemChange(item.id, 'newVariant', e.target.value)}
+                                          className="flex-1 border border-gray-300 rounded-md px-3 py-1 text-sm focus:ring-[var(--color-primary-950)] focus:border-[var(--color-primary-950)]"
+                                        >
+                                          <option value="">Select new variant</option>
+                                          {item.product_details.product_variant.map((variant: any) => (
+                                            <option 
+                                              key={variant.id} 
+                                              value={variant.id}
+                                              disabled={variant.quantity <= 0}
+                                              className={variant.quantity <= 0 ? 'text-gray-400' : ''}
+                                            >
+                                              Size {variant.variant_name} {variant.quantity > 0 ? `(${variant.quantity} available)` : '(Out of stock)'}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                    )}
+
+                                    {/* Multiple Image Upload for damaged bundle items */}
+                                    {currentItem.reason === 'Damaged' && (
+                                      <div className="flex items-start space-x-3">
+                                        <span className="text-sm text-gray-600 w-16 pt-1">Images:</span>
+                                        <div className="flex-1">
+                                          <input
+                                            type="file"
+                                            accept="image/*"
+                                            multiple
+                                            onChange={(e) => handleItemChange(item.id, 'replacementImages', e.target.files)}
+                                            className="w-full border border-gray-300 rounded-md px-3 py-1 text-sm focus:ring-[var(--color-primary-950)] focus:border-[var(--color-primary-950)]"
+                                          />
+                                          <p className="text-xs text-gray-500 mt-1">Upload multiple images showing the damage (optional)</p>
+                                          
+                                          {/* File Tags */}
+                                          {currentItem.replacementImages && currentItem.replacementImages.length > 0 && (
+                                            <div className="mt-3">
+                                              <p className="text-xs text-gray-600 mb-2">Selected images ({currentItem.replacementImages.length}):</p>
+                                              <div className="flex flex-wrap gap-2">
+                                                {currentItem.replacementImages.map((file, index) => (
+                                                  <div key={index} className="flex items-center bg-gray-100 rounded-lg px-3 py-2 border border-gray-200 group hover:bg-gray-50 transition-colors">
+                                                    <FileImage size={16} className="text-gray-500 mr-2 flex-shrink-0" />
+                                                    <span className="text-sm text-gray-700 truncate max-w-[120px]" title={file.name}>
+                                                      {file.name}
+                                                    </span>
+                                                    <div className="flex items-center ml-2 space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                      <button
+                                                        type="button"
+                                                        onClick={() => handleViewImage(file)}
+                                                        className="p-1 hover:bg-gray-200 rounded transition-colors"
+                                                        title="View image"
+                                                      >
+                                                        <Eye size={12} className="text-gray-600" />
+                                                      </button>
+                                                      <button
+                                                        type="button"
+                                                        onClick={() => handleDeleteImage(item.id, index)}
+                                                        className="p-1 hover:bg-red-100 rounded transition-colors"
+                                                        title="Delete image"
+                                                      >
+                                                        <Trash2 size={12} className="text-red-500" />
+                                                      </button>
+                                                    </div>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ))}
                 </div>
               </div>
             
               <div className="mb-4">
-                <label htmlFor="replacementReason" className="block text-sm font-medium text-gray-700 mb-2">
-                  Reason for Replacement
+                <label htmlFor="requestDetails" className="block text-sm font-medium text-gray-700 mb-2">
+                  Additional Details
                 </label>
                 <textarea
-                  id="replacementReason"
-                  value={replacementReason}
-                  onChange={(e) => setReplacementReason(e.target.value)}
+                  id="requestDetails"
+                  value={requestDetails}
+                  onChange={(e) => setRequestDetails(e.target.value)}
                   rows={3}
-                  className="shadow-sm focus:ring-[#175e7a] focus:border-[var(--color-primary-950)] block w-full sm:text-sm border-gray-300 rounded-md"
-                  placeholder="Please explain why you want to replace these items..."
                   required
+                  className="shadow-sm focus:ring-[#175e7a] focus:border-[var(--color-primary-950)] block w-full sm:text-sm border-gray-300 rounded-md"
+                  placeholder="Please provide any additional details about your replacement request..."
                 />
               </div>
 
@@ -399,6 +710,39 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
           </div>
         </div>
       </div>
+
+      {/* Full Screen Image Modal */}
+      {fullScreenImage && (
+        <div className="fixed inset-0 z-[60] bg-black bg-opacity-90 flex items-center justify-center p-4">
+          <div className="relative max-w-4xl max-h-full w-full h-full flex items-center justify-center">
+            {/* Close button */}
+            <button
+              onClick={closeFullScreenImage}
+              className="absolute top-4 right-4 z-10 p-2 bg-black bg-opacity-30 hover:bg-opacity-50 rounded-full transition-all border border-white border-opacity-20"
+            >
+              <X size={24} className="text-white" />
+            </button>
+            
+            {/* Image */}
+            <div className="relative w-full h-full flex items-center justify-center">
+              <Image
+                src={fullScreenImage.url}
+                alt={fullScreenImage.name}
+                fill
+                className="object-contain"
+                sizes="(max-width: 1200px) 100vw, 1200px"
+              />
+            </div>
+            
+            {/* Image name */}
+            <div className="absolute bottom-4 left-4 right-4 text-center">
+              <p className="text-white text-sm bg-black bg-opacity-50 rounded px-3 py-1 inline-block">
+                {fullScreenImage.name}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

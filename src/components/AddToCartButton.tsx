@@ -2,6 +2,7 @@
 
 import { ArrowRight, Heart, ShoppingCart } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useWishlist } from '@/app/context/WishlistProvider';
 
 interface AddToCartButtonProps {
   productId: string;
@@ -17,14 +18,14 @@ export default function AddToCartButton({
   disabled = false
 }: AddToCartButtonProps) {
   const [isShaking, setIsShaking] = useState<boolean>(false);
-  const [isFavorite, setIsFavorite] = useState<boolean>(false);
+  const [isWishlistAnimating, setIsWishlistAnimating] = useState<boolean>(false);
+  
+  // Use the wishlist context
+  const { isInWishlist, toggleWishlist } = useWishlist();
+  const isFavorite = isInWishlist(productId);
 
   useEffect(() => {
-    // Check if item is in wishlist (you can implement this based on your wishlist context)
-    // For now, we'll just set it to false
-    setIsFavorite(false);
-
-    // Shaking animation effect
+    // Shaking animation effect for Add to Bag button
     setIsShaking(true);
 
     const intervalId = setInterval(() => {
@@ -41,22 +42,27 @@ export default function AddToCartButton({
   const handleWishlistClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
+    if (disabled || isWishlistAnimating) return;
+
+    setIsWishlistAnimating(true);
+
     try {
-      // Implement wishlist toggle logic here
-      console.log('Toggle wishlist for product:', productId);
-      setIsFavorite(!isFavorite);
+      await toggleWishlist(productId);
     } catch (error) {
       console.error('Error toggling wishlist:', error);
+    } finally {
+      // Reset animation state after a short delay
+      setTimeout(() => setIsWishlistAnimating(false), 300);
     }
   };
 
   const handleAddToBag = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     if (disabled) return;
-    
+
     if (onAddToBag) {
       onAddToBag();
     }
@@ -65,9 +71,9 @@ export default function AddToCartButton({
   const handleBuyNow = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     if (disabled) return;
-    
+
     if (onBuyNow) {
       onBuyNow();
     }
@@ -79,8 +85,8 @@ export default function AddToCartButton({
       <div className="flex gap-1">
         <button
           className={`flex-1 py-3 flex items-center justify-center gap-2 cursor-pointer transition-colors ${
-            disabled 
-              ? 'bg-gray-400 text-gray-600 cursor-not-allowed' 
+            disabled
+              ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
               : `bg-[var(--color-primary-950)] hover:bg-[#0f4c67] text-white ${isShaking ? 'shake-animation' : ''}`
           }`}
           onClick={handleAddToBag}
@@ -93,26 +99,33 @@ export default function AddToCartButton({
             <ArrowRight className="h-4 w-4" />
           </span>
         </button>
-        
+
         <button
-          className={`w-12 h-12 flex items-center justify-center cursor-pointer transition-colors ${
-            disabled 
-              ? 'bg-gray-400 text-gray-600 cursor-not-allowed' 
-              : 'bg-[var(--color-primary-950)] hover:bg-[#0f4c67] text-white'
-          }`}
+          className={`w-12 h-12 flex items-center justify-center cursor-pointer transition-all duration-200 ${
+            disabled
+              ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+              : 'bg-[var(--color-primary-950)] hover:bg-[#0f4c67] text-white hover:scale-105'
+          } ${isWishlistAnimating ? 'scale-110' : ''}`}
           onClick={handleWishlistClick}
-          disabled={disabled}
+          disabled={disabled || isWishlistAnimating}
           type="button"
+          aria-label={isFavorite ? "Remove from wishlist" : "Add to wishlist"}
         >
-          <Heart className={`h-5 w-5 ${isFavorite ? 'fill-current' : ''}`} />
+          <Heart 
+            className={`h-5 w-5 transition-all duration-200 ${
+              isFavorite 
+                ? 'fill-current text-red-500' 
+                : 'text-white'
+            } ${isWishlistAnimating ? 'animate-pulse' : ''}`} 
+          />
         </button>
       </div>
 
       {/* Buy Now Button */}
       <button
         className={`w-full py-3 text-sm cursor-pointer transition-colors ${
-          disabled 
-            ? 'bg-gray-400 text-gray-600 cursor-not-allowed' 
+          disabled
+            ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
             : 'bg-[var(--color-primary-950)] hover:bg-[#0f4c67] text-white'
         }`}
         onClick={handleBuyNow}
