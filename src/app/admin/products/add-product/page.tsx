@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import apiService from '@/utils/api/apiService';
 import Image from 'next/image';
+import { showToast } from '@/utils/toast';
 
 // Define more specific interfaces for clarity and type safety
 interface Category {
@@ -31,8 +32,8 @@ interface ProductImage {
 interface ProductVariant {
   id?: string; // Optional for new variants, present for existing ones (THIS IS THE KEY)
   variant_name: string;
-  quantity: number;
-  weight: number;
+  quantity: number | string; // Allow string for better input handling
+  weight: number | string; // Allow string for better input handling
 }
 
 interface ProductData {
@@ -150,7 +151,9 @@ export default function ProductFormPage() {
       }
     } catch (err) {
       console.error(`Error fetching ${isEditMode ? 'product data' : 'categories'}:`, err);
-      setFormError(`Failed to load ${isEditMode ? 'product data' : 'categories'}. Please try again.`);
+      const errorMessage = `Failed to load ${isEditMode ? 'product data' : 'categories'}. Please try again.`;
+      setFormError(errorMessage);
+      showToast.error(errorMessage);
     } finally {
       setIsFetching(false);
     }
@@ -196,7 +199,9 @@ export default function ProductFormPage() {
     );
 
     if (invalidFiles.length > 0) {
-      setImageErrors('Only JPG, PNG, and WebP formats are allowed.');
+      const errorMessage = 'Only JPG, PNG, and WebP formats are allowed.';
+      setImageErrors(errorMessage);
+      showToast.error(errorMessage);
       if (fileInputRef.current) fileInputRef.current.value = ''; // Clear input
       return;
     }
@@ -231,8 +236,8 @@ export default function ProductFormPage() {
 
   // Variant handling functions
   const handleAddVariant = useCallback(() => {
-    // Add a new empty variant to the state
-    setVariants(prevVariants => [...prevVariants, { variant_name: '', quantity: 0, weight: 0 }]);
+    // Add a new empty variant to the state - using empty strings instead of 0
+    setVariants(prevVariants => [...prevVariants, { variant_name: '', quantity: '', weight: '' }]);
     setFormError(null); // Clear form error when adding a variant
   }, []);
 
@@ -303,72 +308,85 @@ export default function ProductFormPage() {
     setFormError(null); // Clear form error when changing variant setting
   };
 
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  // Client-side validation function
+  const validateForm = (): string | null => {
     // Combined total images for validation
     const totalImagesCount = existingImages.length + newProductImages.length;
 
     // Form validation
     if (!productName.trim() || !productDescription.trim() || !productCode.trim() || !productBoxWeight.trim()) {
-      setFormError('All required fields must be filled.');
-      return;
+      return 'All required fields must be filled.';
     }
     // Price validation moved up to ensure it's checked before variant-specific price/quantity logic
-    if (parseFloat(productPrice) <= 0) {
-      setFormError('Price must be a positive number.');
-      return;
+    if (!productPrice || parseFloat(productPrice) <= 0) {
+      return 'Price must be a positive number.';
     }
     if (strikePrice && parseFloat(strikePrice) <= 0) {
-      setFormError('Strike Price must be a positive number if entered.');
-      return;
+      return 'Strike Price must be a positive number if entered.';
     }
     if (strikePrice && parseFloat(strikePrice) < parseFloat(productPrice)) {
-      setFormError('Strike Price cannot be less than Product Price.');
+      return 'Strike Price cannot be less than Product Price.';
+    }
+
+    if (!haveVariants) { // Validate main quantity and weight only if no variants
+      if (!quantity.trim() || !productWeight.trim()) {
+        return 'Quantity and Product Weight are required if "This product has variants" is not checked.';
+      }
+      if (parseFloat(quantity) <= 0 || parseFloat(productWeight) <= 0) {
+        return 'Quantity and Product Weight must be positive numbers if no variants.';
+      }
+    } else { // Validate variants if haveVariants is true
+      if (variants.length === 0) {
+        return 'Please add at least one variant if "This product has variants" is checked.';
+      }
+      for (const variant of variants) {
+        if (!variant.variant_name.trim() || !variant.quantity || !variant.weight) {
+          return 'All variant fields (name, quantity, weight) must be filled.';
+        }
+        const variantQuantity = typeof variant.quantity === 'string' ? parseFloat(variant.quantity) : variant.quantity;
+        const variantWeight = typeof variant.weight === 'string' ? parseFloat(variant.weight) : variant.weight;
+        if (isNaN(variantQuantity) || isNaN(variantWeight) || variantQuantity <= 0 || variantWeight <= 0) {
+          return 'Variant quantity and weight must be positive numbers.';
+        }
+      }
+    }
+
+    if (!selectedSubCategoryId) {
+      return 'Please select a subcategory.';
+    }
+    if (totalImagesCount < 2) {
+      return 'Please upload at least 2 product images.';
+    }
+
+    return null;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Client-side validation
+    const validationError = validateForm();
+    if (validationError) {
+      setFormError(validationError);
+      showToast.error(validationError);
       return;
     }
 
     let calculatedQuantity = 0;
     let mainProductWeight = 0; // Default to 0 for variant products
 
-    if (!haveVariants) { // Validate main quantity and weight only if no variants
-      if (!quantity.trim() || !productWeight.trim()) {
-        setFormError('Quantity and Product Weight are required if "This product has variants" is not checked.');
-        return;
-      }
-      if (parseFloat(quantity) <= 0 || parseFloat(productWeight) <= 0) {
-        setFormError('Quantity and Product Weight must be positive numbers if no variants.');
-        return;
-      }
+    if (!haveVariants) { // Calculate main quantity and weight if no variants
       calculatedQuantity = parseFloat(quantity);
       mainProductWeight = parseFloat(productWeight);
-    } else { // Validate variants if haveVariants is true
-      if (variants.length === 0) {
-        setFormError('Please add at least one variant if "This product has variants" is checked.');
-        return;
-      }
+    } else { // Calculate total quantity from variants
       for (const variant of variants) {
-        if (!variant.variant_name.trim() || variant.quantity <= 0 || variant.weight <= 0) {
-          setFormError('All variant fields (name, quantity, weight) must be filled and positive numbers.');
-          return;
-        }
-        calculatedQuantity += variant.quantity; // Sum up variant quantities
+        const variantQuantity = typeof variant.quantity === 'string' ? parseFloat(variant.quantity) : variant.quantity;
+        calculatedQuantity += variantQuantity; // Sum up variant quantities
       }
       // For variant products, main product_weight can be 0 or a nominal value, as specific weights are per variant.
       // We'll set it to 0 as per your request.
       mainProductWeight = 0;
     }
-
-    if (!selectedSubCategoryId) {
-      setFormError('Please select a subcategory.');
-      return;
-    }
-    if (totalImagesCount < 2) {
-      setImageErrors('Please upload at least 2 product images.');
-      return;
-    }
-
 
     setIsLoading(true); // For form submission
     setFormError(null); // Clear any lingering form errors before submission attempt
@@ -395,8 +413,8 @@ export default function ProductFormPage() {
         formData.append('variants', JSON.stringify(variants.map(v => ({
           id: v.id, // Include ID for existing variants
           variant_name: v.variant_name,
-          quantity: Number(v.quantity),
-          weight: Number(v.weight),
+          quantity: typeof v.quantity === 'string' ? parseFloat(v.quantity) : v.quantity,
+          weight: typeof v.weight === 'string' ? parseFloat(v.weight) : v.weight,
         }))));
       } else {
         // If haveVariants is false, send an empty array for variants
@@ -423,11 +441,14 @@ export default function ProductFormPage() {
       // Assuming apiService.post correctly handles FormData and the endpoint
       await apiService.post('/products/add_product', formData, true);
 
-      alert(`Product "${productName}" ${isEditMode ? 'updated' : 'created'} successfully!`);
+      const successMessage = `Product "${productName}" ${isEditMode ? 'updated' : 'created'} successfully!`;
+      showToast.success(successMessage);
       router.push('/admin/products/list');
-    } catch (err) {
+    } catch (err: any) {
       console.error(`Error ${isEditMode ? 'updating' : 'creating'} product:`, err);
-      setFormError(`Failed to ${isEditMode ? 'update' : 'create'} product. Please try again.`);
+      const errorMessage = err?.response?.data?.message || err?.message || `Failed to ${isEditMode ? 'update' : 'create'} product. Please try again.`;
+      setFormError(errorMessage);
+      showToast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -449,9 +470,6 @@ export default function ProductFormPage() {
       </div>
     );
   }
-
-  // Determine if the submit button should be disabled
-  const isSubmitDisabled = isLoading || !!formError || !!imageErrors || (existingImages.length + newProductImages.length < 2) || (haveVariants && variants.length === 0) || (haveVariants && variants.some(v => !v.variant_name.trim() || v.quantity <= 0 || v.weight <= 0)) || (!haveVariants && (!quantity.trim() || !productWeight.trim() || parseFloat(quantity) <= 0 || parseFloat(productWeight) <= 0)) || !productName.trim() || !productDescription.trim() || !productCode.trim() || !productBoxWeight.trim() || parseFloat(productPrice) <= 0 || (strikePrice && parseFloat(strikePrice) <= 0) || (strikePrice && parseFloat(strikePrice) < parseFloat(productPrice)) || !selectedSubCategoryId;
 
   return (
     <div className="space-y-8">
@@ -764,7 +782,7 @@ export default function ProductFormPage() {
                           className="w-full p-2 border border-gray-300 rounded-md text-gray-800
                           focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent"
                           value={variant.quantity}
-                          onChange={(e) => handleVariantChange(index, 'quantity', Number(e.target.value))}
+                          onChange={(e) => handleVariantChange(index, 'quantity', e.target.value)}
                           required
                           disabled={isLoading}
                           placeholder="e.g., 50"
@@ -782,7 +800,7 @@ export default function ProductFormPage() {
                           className="w-full p-2 border border-gray-300 rounded-md text-gray-800
                           focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent"
                           value={variant.weight}
-                          onChange={(e) => handleVariantChange(index, 'weight', Number(e.target.value))}
+                          onChange={(e) => handleVariantChange(index, 'weight', e.target.value)}
                           required
                           disabled={isLoading}
                           placeholder="e.g., 0.1"
@@ -945,11 +963,11 @@ export default function ProductFormPage() {
               type="submit"
               className={`px-6 py-3 rounded-md text-white shadow-md transition-all duration-200
                                 flex items-center justify-center gap-2
-                                ${isSubmitDisabled
+                                ${isLoading
                   ? 'bg-gray-400 cursor-not-allowed opacity-80'
                   : 'bg-[var(--color-primary-950)] hover:bg-[color:var(--color-primary-950)]/90 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-primary-950)]'
                 }`}
-              disabled={isSubmitDisabled}
+              disabled={isLoading}
             >
               {isLoading ? (
                 <>

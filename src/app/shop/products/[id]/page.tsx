@@ -7,6 +7,7 @@ import DeliveryPincodeChecker from '@/components/DeliveryPincodeChecker';
 import PolicyIcons from '@/components/PolicyIcons';
 import CartDrawer from '@/components/CartDrawer';
 import CheckoutModal from '@/components/CheckoutModal';
+import WishlistButton from '@/components/WishlistButton';
 import apiService from '@/utils/api/apiService';
 import { useCart } from '@/context/cartContext';
 import { v4 as uuidv4 } from 'uuid';
@@ -14,7 +15,7 @@ import { ProductItemDetails, CartNormalItem, ProductVariant } from '@/context/ca
 import { showToast } from '@/utils/toast';
 
 // Import missing Lucide React icons
-import { AlertCircle, CheckCircle2, Star } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Star, Heart } from 'lucide-react';
 import Image from 'next/image';
 
 // Static product data (kept as is)
@@ -262,13 +263,23 @@ export default function ProductDetailPage() {
           <div className="space-y-2 md:space-y-2 md:pl-8">
             <div className="flex items-start justify-between">
               <h1 className="text-xl md:text-2xl font-normal leading-tight">{product.product_name}</h1>
-              <div className="flex items-center space-x-1 flex-shrink-0 ml-4">
-                <div className="flex text-[#36454F]">
-                  {[...Array(staticProductData.rating)].map((_, i) => (
-                    <Star key={i} className="w-3 h-3" fill="currentColor" />
-                  ))}
+              <div className="flex items-center space-x-3 flex-shrink-0 ml-4">
+                {/* Wishlist Button */}
+                <div className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 transition-colors">
+                  <WishlistButton
+                    productId={product.id}
+                    size={18}
+                  />
                 </div>
-                <span className="text-[12px] text-gray-500">({staticProductData.reviewCount})</span>
+                {/* Rating */}
+                <div className="flex items-center space-x-1">
+                  <div className="flex text-[#36454F]">
+                    {[...Array(staticProductData.rating)].map((_, i) => (
+                      <Star key={i} className="w-3 h-3" fill="currentColor" />
+                    ))}
+                  </div>
+                  <span className="text-[12px] text-gray-500">({staticProductData.reviewCount})</span>
+                </div>
               </div>
             </div>
 
