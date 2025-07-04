@@ -27,7 +27,7 @@ export default function Home() {
     
     fetchHomeCategories();
     fetchOffers();
-    checkAndFetchUserProfile();
+    // checkAndFetchUserProfile();
   }, []);
 
   // Alternative: Use this if you want to scroll to top after data loads
@@ -71,24 +71,24 @@ export default function Home() {
     }
   };
 
-  const checkAndFetchUserProfile = async () => {
-    // Check if accessToken exists in localStorage
-    const accessToken = localStorage.getItem('accessToken');
+  // const checkAndFetchUserProfile = async () => {
+  //   // Check if accessToken exists in localStorage
+  //   const accessToken = localStorage.getItem('accessToken');
     
-    if (accessToken) {
-      try {
-        // Call getUserProfile API
-        await apiService.getUserProfile();
-        // setUserProfile(profile);
-      } catch (err) {
-        console.error('Failed to fetch user profile:', err);
-        // On error, remove accessToken from localStorage
-        localStorage.removeItem('accessToken');
-        // Refresh the page
-        window.location.reload();
-      }
-    }
-  };
+  //   if (accessToken) {
+  //     try {
+  //       // Call getUserProfile API
+  //       await apiService.getUserProfile();
+  //       // setUserProfile(profile);
+  //     } catch (err) {
+  //       console.error('Failed to fetch user profile:', err);
+  //       // On error, remove accessToken from localStorage
+  //       localStorage.removeItem('accessToken');
+  //       // Refresh the page
+  //       window.location.reload();
+  //     }
+  //   }
+  // };
 
   return (
     <ShopLayout>

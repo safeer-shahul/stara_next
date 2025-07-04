@@ -103,7 +103,7 @@ const CartItem = ({ product, onRemove, onQuantityChange, fromProductSummary = fa
             {!fromProductSummary && (
               <button
                 onClick={() => onRemove(product.id)}
-                className="ml-3 w-8 h-8 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-full flex items-center justify-center text-xs hover:from-red-600 hover:to-red-700 transition-all duration-300 transform hover:scale-110 shadow-md"
+                className="ml-3 z-50 w-8 h-8 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-full flex items-center justify-center text-xs hover:from-red-600 hover:to-red-700 transition-all duration-300 transform hover:scale-110 shadow-md"
                 aria-label="Remove item"
               >
                 <X size={14} />

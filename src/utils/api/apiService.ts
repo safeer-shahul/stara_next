@@ -203,26 +203,42 @@ class ApiService {
 
 public async logout(silent: boolean = false, router?: any): Promise<void> {
   if (typeof window !== 'undefined') {
-           
     // 🔄 STEP 1: Save current cart to localStorage before logout
     try {
       console.log('💾 Preserving cart state before logout...');
-               
+      
       // Trigger cart context to save current state
       window.dispatchEvent(new CustomEvent('beforeLogout'));
-               
+      
       // Give time for cart context to respond
       await new Promise(resolve => setTimeout(resolve, 200));
-               
+      
       console.log('✅ Cart state preserved for guest mode');
     } catch (error) {
       console.error('❌ Error preserving cart state:', error);
     }
 
-    // 🗑️ STEP 2: Clear authentication tokens
+    // 🗑️ STEP 2: Clear authentication tokens and conditionally clear admin data
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
-           
+    
+    const adminUserData = localStorage.getItem('adminUserData');
+    if (adminUserData) {
+      try {
+        const userData = JSON.parse(adminUserData);
+        if (userData.is_superuser) {
+          console.log('🔧 Clearing admin user data for admin user');
+          localStorage.removeItem('adminUserData');
+        }
+      } catch (error) {
+        console.error('Error parsing admin user data during logout:', error);
+        localStorage.removeItem('adminUserData');
+      }
+    }
+    
+    // Clear regular user data
+    localStorage.removeItem('me');
+    
     // 📢 STEP 3: Notify components about logout
     window.dispatchEvent(new Event('userLoggedOut'));
 

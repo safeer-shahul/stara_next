@@ -28,33 +28,27 @@ export default function AdminLogin() {
 
   const router = useRouter();
 
-  // Check if already logged in
+  // Check if already logged in (admin only check)
   useEffect(() => {
-    const checkAuth = async () => {
+    const checkAdminAuth = () => {
       const token = localStorage.getItem('accessToken');
-      if (token) {
+      const adminUserData = localStorage.getItem('adminUserData');
+      
+      if (token && adminUserData) {
         try {
-          const userProfile = await apiService.getUserProfile();
-          if (userProfile.is_superuser) {
+          const userData = JSON.parse(adminUserData);
+          if (userData.is_superuser) {
             router.push('/admin');
-          } else {
-            console.warn('User is logged in but not a superuser. Clearing tokens.');
-            localStorage.removeItem('accessToken');
-            localStorage.removeItem('refreshToken');
-            setError('You do not have admin privileges. Please log in with an admin account.');
-            showToast.error('You do not have admin privileges.');
           }
-        } catch (authError) {
-          console.error('Auth check failed:', authError);
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-          setError('Your session expired or is invalid. Please log in again.');
-          showToast.warning('Your session expired. Please log in again.');
+        } catch (error) {
+          console.error('Error parsing admin user data:', error);
+          // Clear invalid admin data
+          localStorage.removeItem('adminUserData');
         }
       }
     };
 
-    checkAuth();
+    checkAdminAuth();
   }, [router]);
 
   const handleSuccessfulLogin = async () => {
@@ -62,6 +56,9 @@ export default function AdminLogin() {
       const userDetails = await apiService.getUserProfile();
       
       if (userDetails.is_superuser) {
+        // Store admin user data in localStorage
+        localStorage.setItem('adminUserData', JSON.stringify(userDetails));
+        
         showToast.success('Welcome back, Admin!');
         router.push('/admin');
       } else {
@@ -69,6 +66,7 @@ export default function AdminLogin() {
         showToast.error('You do not have admin privileges');
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
+        localStorage.removeItem('adminUserData');
         setIsLoading(false);
       }
     } catch (profileError) {
@@ -78,6 +76,7 @@ export default function AdminLogin() {
       showToast.error(errorMsg);
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
+      localStorage.removeItem('adminUserData');
       setIsLoading(false);
     }
   };
@@ -121,7 +120,7 @@ export default function AdminLogin() {
       localStorage.setItem('accessToken', response.access_token);
       localStorage.setItem('refreshToken', response.refresh_token);
 
-      // Fetch and store user profile
+      // Fetch and store user profile in the regular 'me' key for general use
       try {
         const userProfile = await apiService.getUserProfile();
         localStorage.setItem('me', JSON.stringify(userProfile));
