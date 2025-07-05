@@ -31,13 +31,11 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
   const [windowWidth, setWindowWidth] = useState<number>(0);
   const [hoveredProduct, setHoveredProduct] = useState<string | null>(null);
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
-  // const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [isNavigating, setIsNavigating] = useState<string | null>(null);
 
   // NEW STATES FOR VARIANT SELECTION POPUP
   const [isVariantModalOpen, setIsVariantModalOpen] = useState(false);
   const [productForVariantSelection, setProductForVariantSelection] = useState<ProductItemDetails | null>(null);
-
 
   const { dispatchCart, getEffectiveProductStock } = useCart();
 
@@ -77,7 +75,7 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
     router.prefetch(`/shop/products/${productId}`);
   }, [router]);
 
-  // UPDATED: handleAddProductToCart with toast notifications
+  // FIXED: No manual delays - let CartContext handle everything
   const handleAddProductToCart = useCallback((productToAdd: ProductItemDetails, selectedVariantToAdd: ProductVariant | null = null): void => {
     const effectiveStock = getEffectiveProductStock(productToAdd, selectedVariantToAdd?.id);
     
@@ -86,8 +84,6 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
       showToast.warning(`${productToAdd.product_name}${variantText} is currently out of stock or you have reached the maximum quantity allowed.`);
       return;
     }
-
-    // setSelectedProductId(productToAdd.id);
 
     const tempCartItemId = uuidv4();
 
@@ -109,6 +105,7 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
       updated_at: new Date().toISOString(),
     };
 
+    // FIXED: Just dispatch - no manual delays
     dispatchCart({
       type: 'ADD_NORMAL_ITEM',
       payload: cartItem,
@@ -117,11 +114,11 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
     const variantText = selectedVariantToAdd ? ` (${selectedVariantToAdd.variant_name})` : '';
     showToast.success(`${productToAdd.product_name}${variantText} added to cart!`);
 
+    // FIXED: Open cart immediately - CartContext handles the sync
     setIsCartOpen(true);
     setIsVariantModalOpen(false);
     setProductForVariantSelection(null);
   }, [dispatchCart, getEffectiveProductStock]);
-
 
   // UPDATED: handleAddToBag to check for variants
   const handleAddToBag = useCallback((e: React.MouseEvent, product: Product): void => {
@@ -135,10 +132,8 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
     }
   }, [handleAddProductToCart]);
 
-
   const handleCartClose = useCallback(() => {
     setIsCartOpen(false);
-    // setSelectedProductId(null);
   }, []);
 
   const goNext = useCallback(() => {

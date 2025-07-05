@@ -329,7 +329,8 @@ export default function CategoryPage() {
 
       {products.length > 0 ? (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {/* Updated grid classes: grid-cols-2 for mobile, then responsive breakpoints */}
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
             {products.map((product) => {
               const discount = calculateDiscount(product.product_price, product.strike_price);
               const mainImage = product.images?.[0]?.product_image || '';
@@ -363,7 +364,7 @@ export default function CategoryPage() {
                       src={mainImage ? `${process.env.NEXT_PUBLIC_API_BASE_URL}${mainImage}` : '/images/placeholder.png'}
                       alt={product.product_name}
                       fill
-                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+                      sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
                       className={`object-cover object-center transition-all duration-500 ease-in-out transform ${
                         hoveredProduct === product.id ? 'scale-110 opacity-0' : 'scale-100 opacity-100'
                       }`}
@@ -375,22 +376,21 @@ export default function CategoryPage() {
                       src={hoverImage ? `${process.env.NEXT_PUBLIC_API_BASE_URL}${hoverImage}` : '/images/placeholder.png'}
                       alt={`${product.product_name} - alternate view`}
                       fill
-                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+                      sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
                       className={`object-cover object-center transition-all duration-500 ease-in-out transform ${
                         hoveredProduct === product.id ? 'scale-100 opacity-100' : 'scale-110 opacity-0'
                       }`}
                       loading="lazy"
                     />
 
-                    {!product.isInStock && (
-                      <div className="absolute top-2 left-2 bg-red-100 text-red-800 px-2 py-1 text-xs font-medium z-10">
-                        Out of Stock
-                      </div>
-                    )}
-
-                    {discount && (
+                    {/* Top left badge - Always show discount if available, otherwise show out of stock */}
+                    {discount ? (
                       <div className="absolute top-2 left-2 bg-green-100 text-green-800 px-2 py-1 text-xs font-medium z-10">
                         {discount}
+                      </div>
+                    ) : (!product.isInStock || effectiveStock <= 0) && (
+                      <div className="absolute top-2 left-2 bg-red-100 text-red-800 px-2 py-1 text-xs font-medium z-10">
+                        Out of Stock
                       </div>
                     )}
 
@@ -409,27 +409,27 @@ export default function CategoryPage() {
 
                     {/* Shopping Cart Button or Out of Stock Text */}
                     {isButtonDisabled ? (
-                      <div className={`absolute bottom-3 right-3 px-3 py-2 bg-red-500 text-white text-xs font-medium rounded-md transition-opacity ${
+                      <div className={`absolute bottom-3 right-3 px-2 py-1 sm:px-3 sm:py-2 bg-red-500 text-white text-xs font-medium rounded-md transition-opacity ${
                         hoveredProduct === product.id ? 'opacity-100' : 'opacity-0'
                       }`}>
                         Out of Stock
                       </div>
                     ) : (
                       <button
-                        className={`absolute bottom-3 right-3 w-10 h-10 flex items-center justify-center rounded-full shadow-sm transition-opacity bg-gray-800 text-white hover:bg-gray-700 ${
+                        className={`absolute bottom-3 right-3 w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-full shadow-sm transition-opacity bg-gray-800 text-white hover:bg-gray-700 ${
                           hoveredProduct === product.id ? 'opacity-100' : 'opacity-0'
                         }`}
                         onClick={(e) => handleAddToCartButtonClick(e, product)}
                         aria-label="Add to bag"
                       >
-                        <ShoppingCart size={18} />
+                        <ShoppingCart size={16} className="sm:w-[18px] sm:h-[18px]" />
                       </button>
                     )}
                   </div>
 
                   <div className="mt-4">
                     <h3
-                      className={`text-sm md:text-base font-medium cursor-pointer hover:text-blue-500 transition-colors ${
+                      className={`text-xs sm:text-sm md:text-base font-medium cursor-pointer hover:text-blue-500 transition-colors ${
                         isCurrentlyNavigating ? 'text-gray-500' : ''
                       }`}
                       onClick={() => handleProductClick(product.id)}
@@ -439,12 +439,12 @@ export default function CategoryPage() {
                         <span className="ml-2 text-xs text-gray-400">Loading...</span>
                       )}
                     </h3>
-                    <div className="flex items-center mt-1 gap-2">
-                      <span className="text-sm font-semibold">₹{parseFloat(product.product_price).toLocaleString()}</span>
+                    <div className="flex items-center mt-1 gap-1 sm:gap-2">
+                      <span className="text-xs sm:text-sm font-semibold">₹{parseFloat(product.product_price).toLocaleString()}</span>
                       {parseFloat(product.strike_price) > 0 && (
                         <>
                           <span className="text-xs text-gray-500 line-through">₹{parseFloat(product.strike_price).toLocaleString()}</span>
-                          {discount && <span className="text-xs text-green-600">({discount})</span>}
+                          {discount && <span className="text-xs text-green-600 hidden sm:inline">({discount})</span>}
                         </>
                       )}
                     </div>

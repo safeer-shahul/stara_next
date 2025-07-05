@@ -655,11 +655,32 @@ export const cartService = {
     }
   },
 
-  addToCart: async (payload: { product_id?: string; mode: string; item_id?: string; variant_id?: string; is_cart?: string }) => {
+  // FIXED: Enhanced addToCart method that returns the response properly
+  addToCart: async (payload: { product_id?: string; mode: string; item_id?: string; variant_id?: string; is_cart?: string; is_offer?: string }) => {
     console.log("📤 cartService: Calling apiService.addToCart with payload:", payload);
-    const response = await apiService.addToCart(payload);
-    console.log("📥 cartService: apiService.addToCart response:", response);
-    return response;
+    
+    try {
+      const response = await apiService.addToCart(payload);
+      console.log("📥 cartService: apiService.addToCart response:", response);
+      
+      // CRITICAL: For normal items, return the response so context can extract the ID
+      if (payload.mode === '+' && payload.product_id && !payload.is_offer) {
+        console.log("🔍 cartService: Normal item add response - checking for backend ID");
+        if (response && response.items && response.items.length > 0) {
+          console.log("✅ cartService: Found backend items in response:", response.items.map((item: any) => ({
+            id: item.id,
+            product: item.product,
+            variant: item.variant,
+            quantity: item.quantity
+          })));
+        }
+      }
+      
+      return response;
+    } catch (error) {
+      console.error("❌ cartService: Error in addToCart:", error);
+      throw error;
+    }
   },
 
   // Method specifically for removing offer items

@@ -85,7 +85,8 @@ export type CartAction =
   | { type: 'REMOVE_ITEM'; payload: string }
   | { type: 'UPDATE_ITEM_QUANTITY'; payload: { id: string; quantity: number } }
   | { type: 'UPDATE_OFFER_ID'; payload: { tempId: string; actualId: string } }
-  | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'UPDATE_NORMAL_ID'; payload: { tempId: string; actualId: string; quantity: number } }
+  | { type: 'SET_LOADING'; payload: boolean | string }
   | { type: 'CLEAR_CART' }
   | { type: 'FORCE_REFRESH' };
 
@@ -100,7 +101,7 @@ interface CartContextType extends CartState {
   dispatchCart: React.Dispatch<CartAction>;
   getTotalProductQuantitiesInCart: () => Map<string, number>;
   getEffectiveProductStock: (productDetails: ProductItemDetails, variantId?: string) => number;
-  forceRefreshCart: () => Promise<void>;
+  forceRefreshCart: (showLoading?: boolean) => Promise<void>;
   clearCart: () => Promise<void>;
   checkBackendCartEmpty: () => Promise<boolean>;
   calculateTotals: () => {
@@ -161,7 +162,7 @@ const clearLocalStorage = () => {
   }
 };
 
-// Cart Reducer
+// OPTIMIZED Cart Reducer - No loading states for instant operations
 const cartReducer = (state: CartState, action: CartAction): CartState => {
   let newItems: CartItemType[];
 
@@ -235,6 +236,22 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
       });
       return { ...state, cartItems: newItems };
 
+    case 'UPDATE_NORMAL_ID':
+      console.log('🔄 Reducer: UPDATE_NORMAL_ID', `${action.payload.tempId} → ${action.payload.actualId}`);
+      newItems = state.cartItems.map((item) => {
+        if (item.type === 'normal' && item.id === action.payload.tempId) {
+          return {
+            ...item,
+            id: action.payload.actualId,
+            quantity: action.payload.quantity,
+            isSynced: true,
+            updated_at: new Date().toISOString(),
+          };
+        }
+        return item;
+      });
+      return { ...state, cartItems: newItems };
+
     case 'REMOVE_ITEM':
       console.log('🗑️ Reducer: REMOVE_ITEM', action.payload);
       newItems = state.cartItems.filter((item) => item.id !== action.payload);
@@ -260,7 +277,14 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
       return { ...state, cartItems: [] };
 
     case 'SET_LOADING':
-      return { ...state, loading: action.payload };
+      // Only allow loading for specific operations
+      const allowedLoadingOperations = ['FORCE_REFRESH', 'INITIAL_SYNC'];
+      if (typeof action.payload === 'string' && allowedLoadingOperations.includes(action.payload)) {
+        return { ...state, loading: true };
+      } else if (typeof action.payload === 'boolean') {
+        return { ...state, loading: action.payload };
+      }
+      return state; // Ignore other loading requests
 
     default:
       console.warn(`❓ Unhandled action type: ${(action as { type: string }).type}`);
@@ -294,27 +318,30 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     return () => window.removeEventListener('beforeLogout', handleBeforeLogout);
   }, [state.cartItems]);
 
-  // Load cart from API (for authenticated users)
-  const loadCartFromAPI = useCallback(async () => {
+  // OPTIMIZED: Load cart from API with optional loading state
+  const loadCartFromAPI = useCallback(async (showLoading = false) => {
     try {
-      dispatch({ type: 'SET_LOADING', payload: true });
-      console.log('🔄 Loading cart from API...');
+      if (showLoading) {
+        dispatch({ type: 'SET_LOADING', payload: true });
+      }
       
+      console.log('🔄 Loading cart from API...');
       const cartItems = await cartService.fetchCartFromBackend();
       dispatch({ type: 'SET_CART_ITEMS', payload: cartItems });
       
       console.log(`✅ Cart loaded from API: ${cartItems.length} items`);
     } catch (error) {
       console.error('❌ Error loading cart from API:', error);
-      // Fallback to localStorage if API fails
       const fallbackItems = loadFromLocalStorage();
       dispatch({ type: 'SET_CART_ITEMS', payload: fallbackItems });
     } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
+      if (showLoading) {
+        dispatch({ type: 'SET_LOADING', payload: false });
+      }
     }
   }, []);
 
-  // FIXED: More reliable authentication detection and cart initialization
+  // OPTIMIZED: Fast initialization - no loading states
   useEffect(() => {
     if (!isInitialized.current) {
       const initializeCart = async () => {
@@ -324,14 +351,14 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
         console.log('🔍 AccessToken check:', currentAccessToken ? 'Found' : 'Not found');
         
         if (currentAccessToken) {
-          console.log('🔑 Authenticated user detected - switching to API mode');
+          console.log('🔑 Authenticated user detected');
           setAuthMode('authenticated');
           
-          // CRITICAL FIX: Always load from API for authenticated users on initialization
-          await loadCartFromAPI();
+          // Load from API without loading state - let cart drawer handle it
+          await loadCartFromAPI(false);
           
         } else {
-          console.log('👤 Guest user detected - switching to localStorage mode');
+          console.log('👤 Guest user detected');
           setAuthMode('guest');
           
           const storedItems = loadFromLocalStorage();
@@ -353,28 +380,24 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
         prevAccessTokenRef.current = currentAccessToken;
       };
       
-      // Add a small delay to ensure DOM is ready
-      setTimeout(initializeCart, 100);
+      // Initialize immediately - no delays
+      initializeCart();
     }
   }, [loadCartFromAPI]);
 
   // Track authentication state changes (login/logout)
   useEffect(() => {
-    if (!isInitialized.current) return; // Skip if not initialized yet
+    if (!isInitialized.current) return;
     
     const checkAuthChange = () => {
       const currentAccessToken = localStorage.getItem('accessToken');
       const previousToken = prevAccessTokenRef.current;
 
-      // LOGIN DETECTED: Clear localStorage and switch to API mode
       if (!previousToken && currentAccessToken) {
         console.log('🔑 Login detected - switching to API-first mode');
         setAuthMode('authenticated');
         handleLoginTransition();
-      }
-      
-      // LOGOUT DETECTED: Switch back to localStorage mode
-      else if (previousToken && !currentAccessToken) {
+      } else if (previousToken && !currentAccessToken) {
         console.log('🚪 Logout detected - switching to localStorage mode');
         setAuthMode('guest');
         handleLogoutTransition();
@@ -384,7 +407,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     checkAuthChange();
-    const interval = setInterval(checkAuthChange, 1000); // Check every second
+    const interval = setInterval(checkAuthChange, 1000);
     return () => clearInterval(interval);
   }, []);
 
@@ -403,7 +426,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       clearLocalStorage();
       console.log('🗑️ localStorage cleared');
       
-      await loadCartFromAPI();
+      await loadCartFromAPI(false);
       
     } catch (error) {
       console.error('❌ Error during login transition:', error);
@@ -449,10 +472,10 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [authMode]);
 
-  // OPTIMIZED dispatch function - minimal API calls
+  // OPTIMIZED: dispatch function with optimistic updates and no loading states
   const customDispatch: React.Dispatch<CartAction> = useCallback(
     async (action: CartAction) => {
-      // For guest users, use localStorage
+      // For guest users, use localStorage (instant)
       if (authMode === 'guest') {
         dispatch(action);
         if (action.type !== 'SET_LOADING') {
@@ -463,32 +486,109 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
-      // For authenticated users, use API-first approach
+      // For authenticated users, use optimistic updates
       if (authMode === 'authenticated') {
         try {
-          if (action.type === 'REMOVE_ITEM') {
-            const operationKey = `remove-${action.payload}`;
+          if (action.type === 'ADD_NORMAL_ITEM') {
+            const operationKey = `add-${action.payload.product_id}-${action.payload.selectedVariant?.id || 'no-variant'}`;
             if (pendingOperations.current.has(operationKey)) {
-              console.log('⏳ Remove operation already pending for:', action.payload);
+              console.log('⏳ Add operation already pending for:', action.payload.product_id);
               return;
             }
             
             pendingOperations.current.add(operationKey);
 
             try {
-              const itemToRemove = state.cartItems.find(item => item.id === action.payload);
+              console.log('➕ Adding item to backend:', action.payload.product_id);
               
-              console.log('🗑️ Removing item from backend:', action.payload);
+              // OPTIMISTIC UPDATE: Add to UI immediately
+              const itemId = action.payload.id;
+              dispatch(action);
               
+              // Background API call - NO loading states
+              const backendResponse = await cartService.addToCart({
+                product_id: action.payload.product_id.replace(/-/g, ''),
+                mode: '+',
+                ...(action.payload.selectedVariant && {
+                  variant_id: action.payload.selectedVariant.id.replace(/-/g, ''),
+                }),
+              });
+              
+              // Update with backend ID silently
+              if (backendResponse && backendResponse.items && backendResponse.items.length > 0) {
+                const matchingBackendItem = backendResponse.items.find((item: any) => {
+                  const productMatches = item.product.replace(/-/g, '') === action.payload.product_id.replace(/-/g, '');
+                  if (!productMatches) return false;
+                  
+                  const actionVariantId = action.payload.selectedVariant?.id?.replace(/-/g, '');
+                  const backendVariantId = item.variant?.replace(/-/g, '');
+                  
+                  if (actionVariantId && backendVariantId) {
+                    return actionVariantId === backendVariantId;
+                  } else if (!actionVariantId && !backendVariantId) {
+                    return true;
+                  }
+                  return false;
+                });
+                
+                if (matchingBackendItem) {
+                  // Silent update - no loading states
+                  dispatch({ 
+                    type: 'UPDATE_NORMAL_ID', 
+                    payload: { 
+                      tempId: itemId, 
+                      actualId: matchingBackendItem.id,
+                      quantity: matchingBackendItem.quantity
+                    } 
+                  });
+                }
+              }
+              
+              console.log('✅ Item added successfully');
+              
+            } catch (error) {
+              console.error('❌ Error adding item:', error);
+              // Rollback on error
+              dispatch({ type: 'REMOVE_ITEM', payload: action.payload.id });
+            } finally {
+              pendingOperations.current.delete(operationKey);
+            }
+          }
+          
+          else if (action.type === 'REMOVE_ITEM') {
+            const operationKey = `remove-${action.payload}`;
+            if (pendingOperations.current.has(operationKey)) {
+              return;
+            }
+            
+            pendingOperations.current.add(operationKey);
+            
+            // Store item reference before removing
+            const itemToRemove = state.cartItems.find(item => item.id === action.payload);
+            
+            try {
+              // OPTIMISTIC UPDATE: Remove from UI immediately
+              dispatch(action);
+              
+              // Background API call - NO loading states
               if (itemToRemove?.type === 'offer') {
                 await cartService.removeOfferItem(action.payload);
               } else {
                 await cartService.removeNormalItem(action.payload);
               }
               
-              dispatch(action);
+              console.log('✅ Item removed successfully');
               
-              console.log('✅ Item removed from backend and local state');
+            } catch (error) {
+              console.error('❌ Error removing item:', error);
+              // Rollback on error - re-add the item
+              if (itemToRemove) {
+                if (itemToRemove.type === 'normal') {
+                  dispatch({ type: 'ADD_NORMAL_ITEM', payload: itemToRemove as CartNormalItem });
+                } else {
+                  dispatch({ type: 'ADD_OFFER_SET', payload: itemToRemove as CartOfferItem });
+                }
+              }
             } finally {
               pendingOperations.current.delete(operationKey);
             }
@@ -497,27 +597,29 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
           else if (action.type === 'UPDATE_ITEM_QUANTITY') {
             const operationKey = `update-${action.payload.id}`;
             if (pendingOperations.current.has(operationKey)) {
-              console.log('⏳ Update operation already pending for:', action.payload.id);
               return;
             }
             
             pendingOperations.current.add(operationKey);
+            
+            // Store item reference and quantities before updating
+            const itemToUpdate = state.cartItems.find(item => item.id === action.payload.id);
+            if (!itemToUpdate || itemToUpdate.type !== 'normal') {
+              pendingOperations.current.delete(operationKey);
+              return;
+            }
 
+            const normalItem = itemToUpdate as CartNormalItem;
+            const oldQuantity = normalItem.quantity;
+            const newQuantity = action.payload.quantity;
+            const difference = newQuantity - oldQuantity;
+            
             try {
-              const itemToUpdate = state.cartItems.find(item => item.id === action.payload.id);
-              if (!itemToUpdate || itemToUpdate.type !== 'normal') {
-                dispatch(action);
-                return;
-              }
-
-              const normalItem = itemToUpdate as CartNormalItem;
-              const currentQty = normalItem.quantity;
-              const newQty = action.payload.quantity;
-              const difference = newQty - currentQty;
+              // OPTIMISTIC UPDATE: Update UI immediately
+              dispatch(action);
 
               if (difference !== 0) {
-                console.log(`📊 Updating quantity: ${currentQty} → ${newQty} (diff: ${difference})`);
-                
+                // Background API call - NO loading states
                 const mode = difference > 0 ? '+' : '-';
                 const absoluteDiff = Math.abs(difference);
                 
@@ -531,40 +633,19 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
                   });
                 }
                 
-                dispatch(action);
-                
-                console.log(`✅ Quantity updated: ${currentQty} → ${newQty}`);
-              }
-            } finally {
-              pendingOperations.current.delete(operationKey);
-            }
-          }
-          
-          else if (action.type === 'ADD_NORMAL_ITEM') {
-            const operationKey = `add-${action.payload.product_id}-${action.payload.selectedVariant?.id || 'no-variant'}`;
-            if (pendingOperations.current.has(operationKey)) {
-              console.log('⏳ Add operation already pending for:', action.payload.product_id);
-              return;
-            }
-            
-            pendingOperations.current.add(operationKey);
-
-            try {
-              console.log('➕ Adding item to backend:', action.payload.product_id, 'quantity:', action.payload.quantity);
-              
-              for (let i = 0; i < action.payload.quantity; i++) {
-                await cartService.addToCart({
-                  product_id: action.payload.product_id.replace(/-/g, ''),
-                  mode: '+',
-                  ...(action.payload.selectedVariant && {
-                    variant_id: action.payload.selectedVariant.id.replace(/-/g, ''),
-                  }),
-                });
+                console.log('✅ Quantity updated successfully');
               }
               
-              dispatch(action);
-              
-              console.log('✅ Item added to backend and local state');
+            } catch (error) {
+              console.error('❌ Error updating quantity:', error);
+              // Rollback on error - restore old quantity
+              dispatch({ 
+                type: 'UPDATE_ITEM_QUANTITY', 
+                payload: { 
+                  id: action.payload.id, 
+                  quantity: oldQuantity 
+                } 
+              });
             } finally {
               pendingOperations.current.delete(operationKey);
             }
@@ -573,18 +654,19 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
           else if (action.type === 'ADD_OFFER_SET') {
             const operationKey = `add-offer-${action.payload.offer}`;
             if (pendingOperations.current.has(operationKey)) {
-              console.log('⏳ Add offer operation already pending for:', action.payload.offer);
               return;
             }
             
             pendingOperations.current.add(operationKey);
-
+            
             try {
               const offerItem = action.payload as CartOfferItem;
-              console.log('🎁 Adding offer to backend:', offerItem.offer);
-              
               const tempId = offerItem.id;
               
+              // OPTIMISTIC UPDATE: Add to UI immediately
+              dispatch(action);
+              
+              // Background API call - NO loading states
               const productsPayload: { product_id: string; variant_id?: string }[] = [];
               offerItem.offer_items.forEach((p) => {
                 for (let q = 0; q < p.quantity; q++) {
@@ -602,10 +684,8 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
                 products: productsPayload,
               });
               
-              dispatch(action);
-              
+              // Silent update with backend ID
               if (backendResponse && backendResponse.id) {
-                console.log('🔄 Updating offer ID from temp to backend:', tempId, '→', backendResponse.id);
                 dispatch({ 
                   type: 'UPDATE_OFFER_ID', 
                   payload: { 
@@ -615,30 +695,47 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
                 });
               }
               
-              console.log('✅ Offer added to backend and local state with correct ID');
+              console.log('✅ Offer added successfully');
+              
+            } catch (error) {
+              console.error('❌ Error adding offer:', error);
+              // Rollback on error
+              dispatch({ type: 'REMOVE_ITEM', payload: action.payload.id });
             } finally {
               pendingOperations.current.delete(operationKey);
             }
           }
           
           else if (action.type === 'CLEAR_CART') {
-            console.log('🧹 Clearing cart on backend and local state...');
-            await apiService.addToCart({ mode: 'delete_cart' });
-            dispatch(action);
-            console.log('✅ Cart cleared on backend and local state');
+            try {
+              // OPTIMISTIC UPDATE: Clear UI immediately
+              dispatch(action);
+              
+              // Background API call - NO loading states
+              await apiService.addToCart({ mode: 'delete_cart' });
+              
+              console.log('✅ Cart cleared successfully');
+              
+            } catch (error) {
+              console.error('❌ Error clearing cart:', error);
+              // Note: We don't rollback cart clear as it's usually intentional
+            }
           }
           
           else if (action.type === 'FORCE_REFRESH') {
-            await loadCartFromAPI();
+            // This is the only action that should show loading
+            await loadCartFromAPI(true);
             return;
           }
           
           else {
+            // For other actions, just dispatch normally
             dispatch(action);
           }
           
         } catch (error) {
           console.error(`❌ Error in ${action.type}:`, error);
+          // For critical errors, still update the UI
           dispatch(action);
         }
       }
@@ -646,28 +743,46 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     [authMode, state.cartItems, loadCartFromAPI]
   );
 
-  // Force refresh from API (for multi-device sync)
-  const forceRefreshCart = useCallback(async () => {
+  // OPTIMIZED: Force refresh with optional loading
+  const forceRefreshCart = useCallback(async (showLoading = true) => {
     if (authMode === 'authenticated') {
-      await loadCartFromAPI();
+      await loadCartFromAPI(showLoading);
     } else {
-      const storedItems = loadFromLocalStorage();
-      const processedItems = await cartService.processGuestOffers(storedItems);
-      dispatch({ type: 'SET_CART_ITEMS', payload: processedItems });
+      if (showLoading) {
+        dispatch({ type: 'SET_LOADING', payload: true });
+      }
+      
+      try {
+        const storedItems = loadFromLocalStorage();
+        const processedItems = await cartService.processGuestOffers(storedItems);
+        dispatch({ type: 'SET_CART_ITEMS', payload: processedItems });
+      } catch (error) {
+        console.error('❌ Error in force refresh:', error);
+        const fallbackItems = loadFromLocalStorage();
+        dispatch({ type: 'SET_CART_ITEMS', payload: fallbackItems });
+      } finally {
+        if (showLoading) {
+          dispatch({ type: 'SET_LOADING', payload: false });
+        }
+      }
     }
   }, [authMode, loadCartFromAPI]);
 
-  // Clear cart with proper handling
+  // OPTIMIZED: Instant clear cart
   const clearCart = useCallback(async () => {
     if (authMode === 'authenticated') {
       try {
-        await apiService.addToCart({ mode: 'delete_cart' });
+        // Clear UI immediately
         dispatch({ type: 'CLEAR_CART' });
+        
+        // Background API call
+        await apiService.addToCart({ mode: 'delete_cart' });
       } catch (error) {
         console.error('❌ Error clearing cart on backend:', error);
-        dispatch({ type: 'CLEAR_CART' });
+        // UI is already cleared, so no rollback needed
       }
     } else {
+      // Instant for guest users
       dispatch({ type: 'CLEAR_CART' });
       clearLocalStorage();
     }

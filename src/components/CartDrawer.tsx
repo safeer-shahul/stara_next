@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { X, ShoppingCart, Trash2, RefreshCw } from 'lucide-react';
 import CartItem from './CartItem';
 import OfferCartItem from './OfferCartItem';
@@ -23,68 +23,93 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
     forceRefreshCart,
     checkBackendCartEmpty
   } = useCart();
+  
   const [showCheckoutModal, setShowCheckoutModal] = useState<boolean>(false);
-  const [hasPerformedInitialSync, setHasPerformedInitialSync] = useState<boolean>(false);
-  const [isLocalLoading, setIsLocalLoading] = useState<boolean>(false);
+  const [isInitialSyncing, setIsInitialSyncing] = useState<boolean>(false);
+  const [isManualRefreshing, setIsManualRefreshing] = useState<boolean>(false);
+  const [lastSyncTime, setLastSyncTime] = useState<number>(0);
+  
+  // Use refs to prevent unnecessary re-renders and API calls
+  const hasPerformedInitialSync = useRef<boolean>(false);
+  const isCurrentlyOpen = useRef<boolean>(false);
+  const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // FIXED: Better sync logic - only sync if authenticated and drawer opens with items showing 0
+  // FIXED: Only show loading overlay for initial sync when cart is empty
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
+      isCurrentlyOpen.current = true;
       
-      // CRITICAL FIX: Check if cart appears empty but user is authenticated
-      if (authMode === 'authenticated' && !hasPerformedInitialSync) {
-        const performSyncCheck = async () => {
-          try {
-            setIsLocalLoading(true);
-            console.log('🔍 Cart drawer opened - checking cart sync status...');
-            
-            // Check if local cart is empty but backend might have items
-            if (cartItems.length === 0) {
-              console.log('📭 Local cart empty - checking backend...');
-              
-              // Force refresh from backend to ensure we have latest data
-              await forceRefreshCart();
-              console.log('✅ Cart refreshed from backend');
-            } else {
-              // If local cart has items, just do a light check
-              console.log('📦 Local cart has items - doing light backend check...');
-              const backendIsEmpty = await checkBackendCartEmpty();
-              
-              if (backendIsEmpty && cartItems.length > 0) {
-                console.log('🗑️ Backend cart empty but local has items - clearing local cart');
-                dispatchCart({ type: 'CLEAR_CART' });
-                
-                setTimeout(() => {
-                  alert('Your cart was cleared because it was completed on another device.');
-                }, 500);
-              }
-            }
-            
-            setHasPerformedInitialSync(true);
-          } catch (error) {
-            console.error('❌ Error in cart sync check:', error);
-            setHasPerformedInitialSync(true);
-          } finally {
-            setIsLocalLoading(false);
-          }
-        };
+      // Only perform sync if authenticated, haven't synced yet, and it's been more than 30 seconds
+      const timeSinceLastSync = Date.now() - lastSyncTime;
+      const shouldSync = authMode === 'authenticated' && 
+                        !hasPerformedInitialSync.current && 
+                        timeSinceLastSync > 30000; // 30 seconds cooldown
 
-        performSyncCheck();
+      if (shouldSync) {
+        // Clear any existing timeout
+        if (syncTimeoutRef.current) {
+          clearTimeout(syncTimeoutRef.current);
+        }
+        
+        // Only show loading if cart appears empty
+        if (cartItems.length === 0) {
+          setIsInitialSyncing(true);
+        }
+        
+        // Add a small delay to avoid immediate API calls on drawer open
+        syncTimeoutRef.current = setTimeout(() => {
+          if (isCurrentlyOpen.current) {
+            performInitialSync();
+          }
+        }, 500);
       }
     } else {
       document.body.style.overflow = 'auto';
+      isCurrentlyOpen.current = false;
+      
+      // Clear timeout if drawer closes
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+      }
     }
     
     return () => {
       document.body.style.overflow = 'auto';
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+      }
     };
-  }, [isOpen, authMode, hasPerformedInitialSync, cartItems.length, checkBackendCartEmpty, dispatchCart, forceRefreshCart]);
+  }, [isOpen, authMode]); // Removed dependencies that cause loops
 
-  // Reset sync flag when auth mode changes
+  // FIXED: Reset sync status when auth mode changes
   useEffect(() => {
-    setHasPerformedInitialSync(false);
+    hasPerformedInitialSync.current = false;
   }, [authMode]);
+
+  // FIXED: Silent sync function - no loading states for background sync
+  const performInitialSync = useCallback(async () => {
+    if (hasPerformedInitialSync.current || authMode !== 'authenticated') {
+      return;
+    }
+
+    try {
+      console.log('🔍 CartDrawer: Performing silent initial sync...');
+      
+      // Silent sync - no loading indicators
+      await forceRefreshCart();
+      
+      hasPerformedInitialSync.current = true;
+      setLastSyncTime(Date.now());
+      console.log('✅ CartDrawer: Silent sync completed');
+      
+    } catch (error) {
+      console.error('❌ CartDrawer: Error in initial sync:', error);
+      hasPerformedInitialSync.current = true; // Prevent retry loops
+    } finally {
+      setIsInitialSyncing(false);
+    }
+  }, [authMode, forceRefreshCart]);
 
   const handleRemoveItem = useCallback(async (id: string): Promise<void> => {
     console.log(`🗑️ CartDrawer: Removing item with ID: ${id}`);
@@ -155,28 +180,36 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
     try {
       console.log('🧹 CartDrawer: Clearing cart');
       await clearCart();
-      setHasPerformedInitialSync(false);
+      hasPerformedInitialSync.current = false;
+      setLastSyncTime(0);
     } catch (error) {
       console.error('❌ CartDrawer: Error clearing cart:', error);
       dispatchCart({ type: 'CLEAR_CART' });
     }
   }, [clearCart, dispatchCart]);
 
-  // MANUAL refresh function (only called when user clicks refresh button)
+  // FIXED: Manual refresh - only show loading for this specific action
   const handleManualRefresh = useCallback(async (): Promise<void> => {
+    const timeSinceLastSync = Date.now() - lastSyncTime;
+    if (timeSinceLastSync < 5000) { // 5 second cooldown
+      console.log('🔄 Refresh cooldown active, please wait...');
+      return;
+    }
+
     console.log('🔄 Manual cart refresh requested');
-    setIsLocalLoading(true);
-    setHasPerformedInitialSync(false);
+    setIsManualRefreshing(true);
+    hasPerformedInitialSync.current = false;
     
     try {
       await forceRefreshCart();
-      setHasPerformedInitialSync(true);
+      hasPerformedInitialSync.current = true;
+      setLastSyncTime(Date.now());
     } catch (error) {
       console.error('❌ Error in manual refresh:', error);
     } finally {
-      setIsLocalLoading(false);
+      setIsManualRefreshing(false);
     }
-  }, [forceRefreshCart]);
+  }, [forceRefreshCart, lastSyncTime]);
 
   // Calculate totals using cartUtils
   const calculateTotals = useCallback(() => {
@@ -223,8 +256,9 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
   const normalItems = groupedNormalItems();
   const offerItems = cartItems.filter(item => item.type === 'offer') as CartOfferItem[];
   
-  // FIXED: Show loading if either context is loading OR local sync is happening
-  const isLoading = contextLoading || isLocalLoading;
+  // FIXED: Only block interactions during specific loading states
+  const isBlocking = isInitialSyncing || isManualRefreshing;
+  const showLoadingOverlay = isInitialSyncing && cartItems.length === 0;
 
   console.log('🎨 CartDrawer: Rendering with items:', {
     total: cartItems.length,
@@ -232,8 +266,10 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
     offers: offerItems.length,
     totals,
     authMode,
-    isLoading,
-    hasPerformedSync: hasPerformedInitialSync
+    isBlocking,
+    showLoadingOverlay,
+    hasPerformedSync: hasPerformedInitialSync.current,
+    lastSyncTime
   });
 
   return (
@@ -244,6 +280,21 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
         <div className="absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-2xl transform transition-transform rounded-tl-3xl rounded-bl-3xl">
           <div className="flex flex-col h-full relative overflow-hidden">
             
+            {/* FIXED: Loading overlay only for initial sync when cart is empty */}
+            {showLoadingOverlay && (
+              <div className="absolute inset-0 bg-white/95 backdrop-blur-sm z-50 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="w-16 h-16 border-4 border-gray-200 border-t-[var(--color-primary-950)] rounded-full animate-spin mx-auto mb-4"></div>
+                  <p className="text-gray-600 font-medium">Loading your cart...</p>
+                </div>
+              </div>
+            )}
+
+            {/* FIXED: Interaction blocking overlay */}
+            {isBlocking && !showLoadingOverlay && (
+              <div className="absolute inset-0 bg-transparent z-40 cursor-wait" />
+            )}
+            
             {/* Enhanced Header */}
             <div className="relative bg-gradient-to-r from-[var(--color-primary-950)] via-[#1a5f7a] to-[var(--color-primary-950)] text-white shadow-lg">
               <div className="absolute inset-0 opacity-10">
@@ -253,7 +304,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
               
               <div className="relative flex items-center justify-between py-4 px-6">
                 <div className="flex items-center">
-                  <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center mr-3 animate-pulse">
+                  <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center mr-3">
                     <ShoppingCart size={20} />
                   </div>
                   <div>
@@ -265,18 +316,13 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                           Save ₹{totals.offerSavings.toFixed(0)}
                         </span>
                       )}
-                      {/* FIXED: Show loading indicator in header */}
-                      {isLoading && (
-                        <span className="ml-2 bg-yellow-500 text-white text-xs px-2 py-0.5 rounded-full font-bold animate-pulse">
-                          Syncing...
-                        </span>
-                      )}
                     </p>
                   </div>
                 </div>
                 <button 
                   onClick={onClose} 
                   className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 transition-all duration-300 transform hover:scale-110"
+                  disabled={isBlocking}
                 >
                   <X size={20} />
                 </button>
@@ -285,109 +331,97 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
 
             {/* Enhanced Cart Items */}
             <div className="flex-1 overflow-y-auto bg-gradient-to-b from-gray-50 to-white">
-              {isLoading ? (
-                <div className="flex justify-center items-center h-40">
-                  <div className="relative">
-                    <div className="w-12 h-12 border-4 border-gray-200 border-t-[var(--color-primary-950)] rounded-full animate-spin"></div>
-                    <div className="absolute inset-0 w-12 h-12 border-4 border-transparent border-b-yellow-400 rounded-full animate-spin animation-delay-150"></div>
-                  </div>
-                  <p className="ml-4 text-gray-600 font-medium">
-                    {authMode === 'authenticated' ? 'Syncing cart...' : 'Loading cart items...'}
-                  </p>
-                </div>
-              ) : (
-                <>
-                  {cartItems.length > 0 ? (
-                    <div className="p-4 space-y-4">
-                      {/* Normal Items Section */}
-                      {normalItems.length > 0 && (
-                        <div>
-                          <div className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 mb-3">
-                            <div className="flex items-center">
-                              <div className="w-6 h-6 bg-[var(--color-primary-950)] rounded-full flex items-center justify-center mr-2">
-                                <span className="text-white text-xs">🛍️</span>
-                              </div>
-                              <h4 className="text-sm font-bold text-[var(--color-primary-950)]">Regular Items</h4>
-                            </div>
-                            <span className="bg-white text-[var(--color-primary-950)] text-xs font-bold px-2 py-1 rounded-full shadow-sm">
-                              {normalItems.length}
-                            </span>
+              {cartItems.length > 0 ? (
+                <div className="p-4 space-y-4">
+                  {/* Normal Items Section */}
+                  {normalItems.length > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 mb-3">
+                        <div className="flex items-center">
+                          <div className="w-6 h-6 bg-[var(--color-primary-950)] rounded-full flex items-center justify-center mr-2">
+                            <span className="text-white text-xs">🛍️</span>
                           </div>
-                          
-                          <div className="space-y-3">
-                            {normalItems.map((item) => {
-                              const effectiveMaxForThisItem = item.selectedVariant?.quantity ?? item.stock_quantity;
-
-                              return (
-                                <CartItem
-                                  key={`${item.id}-${item.selectedVariant?.id || 'no-variant'}`}
-                                  product={item}
-                                  onRemove={handleRemoveItem}
-                                  onQuantityChange={handleQuantityChange}
-                                  maxAllowedQuantity={effectiveMaxForThisItem}
-                                />
-                              );
-                            })}
-                          </div>
+                          <h4 className="text-sm font-bold text-[var(--color-primary-950)]">Regular Items</h4>
                         </div>
-                      )}
-
-                      {/* Offer Items Section */}
-                      {offerItems.length > 0 && (
-                        <div>
-                          <div className="flex items-center justify-between p-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200 mb-3">
-                            <div className="flex items-center">
-                              <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center mr-2">
-                                <span className="text-white text-xs">🎁</span>
-                              </div>
-                              <h4 className="text-sm font-bold text-green-700">Special Offers</h4>
-                            </div>
-                            <span className="bg-white text-green-700 text-xs font-bold px-2 py-1 rounded-full shadow-sm">
-                              {offerItems.length}
-                            </span>
-                          </div>
-                          
-                          <div className="space-y-3">
-                            {offerItems.map((item) => (
-                              <OfferCartItem
-                                key={item.id}
-                                offerSet={item}
-                                onRemove={handleRemoveItem}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-center py-12 px-6">
-                      <div className="w-24 h-24 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
-                        <ShoppingCart size={40} className="text-gray-400" />
+                        <span className="bg-white text-[var(--color-primary-950)] text-xs font-bold px-2 py-1 rounded-full shadow-sm">
+                          {normalItems.length}
+                        </span>
                       </div>
-                      <h3 className="text-xl font-semibold text-gray-700 mb-2">Your cart is empty</h3>
-                      <p className="text-gray-500 mb-6">Start adding some beautiful jewelry to your cart!</p>
                       
-                      {authMode === 'authenticated' && (
-                        <button
-                          onClick={handleManualRefresh}
-                          disabled={isLoading}
-                          className={`inline-flex items-center px-4 py-2 bg-gradient-to-r from-[var(--color-primary-950)] to-[#1a5f7a] text-white rounded-lg hover:shadow-lg transition-all duration-300 transform hover:scale-105 ${
-                            isLoading ? 'opacity-50 cursor-not-allowed' : ''
-                          }`}
-                        >
-                          <RefreshCw size={16} className={`mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-                          {isLoading ? 'Refreshing...' : 'Refresh Cart'}
-                        </button>
-                      )}
+                      <div className="space-y-3">
+                        {normalItems.map((item) => {
+                          const effectiveMaxForThisItem = item.selectedVariant?.quantity ?? item.stock_quantity;
+
+                          return (
+                            <div key={`${item.id}-${item.selectedVariant?.id || 'no-variant'}`} className={isBlocking ? 'opacity-70 pointer-events-none' : ''}>
+                              <CartItem
+                                product={item}
+                                onRemove={handleRemoveItem}
+                                onQuantityChange={handleQuantityChange}
+                                maxAllowedQuantity={effectiveMaxForThisItem}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
-                </>
+
+                  {/* Offer Items Section */}
+                  {offerItems.length > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200 mb-3">
+                        <div className="flex items-center">
+                          <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center mr-2">
+                            <span className="text-white text-xs">🎁</span>
+                          </div>
+                          <h4 className="text-sm font-bold text-green-700">Special Offers</h4>
+                        </div>
+                        <span className="bg-white text-green-700 text-xs font-bold px-2 py-1 rounded-full shadow-sm">
+                          {offerItems.length}
+                        </span>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        {offerItems.map((item) => (
+                          <div key={item.id} className={isBlocking ? 'opacity-70 pointer-events-none' : ''}>
+                            <OfferCartItem
+                              offerSet={item}
+                              onRemove={handleRemoveItem}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-12 px-6">
+                  <div className="w-24 h-24 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                    <ShoppingCart size={40} className="text-gray-400" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-700 mb-2">Your cart is empty</h3>
+                  <p className="text-gray-500 mb-6">Start adding some beautiful jewelry to your cart!</p>
+                  
+                  {authMode === 'authenticated' && (
+                    <button
+                      onClick={handleManualRefresh}
+                      disabled={isManualRefreshing}
+                      className={`inline-flex items-center px-4 py-2 bg-gradient-to-r from-[var(--color-primary-950)] to-[#1a5f7a] text-white rounded-lg hover:shadow-lg transition-all duration-300 transform hover:scale-105 ${
+                        isManualRefreshing ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
+                    >
+                      <RefreshCw size={16} className={`mr-2 ${isManualRefreshing ? 'animate-spin' : ''}`} />
+                      {isManualRefreshing ? 'Refreshing...' : 'Refresh Cart'}
+                    </button>
+                  )}
+                </div>
               )}
             </div>
 
             {/* Enhanced Cart Summary & Actions */}
-            {cartItems.length > 0 && !isLoading && (
-              <div className="bg-white border-t border-gray-200 shadow-lg">
+            {cartItems.length > 0 && (
+              <div className={`bg-white border-t border-gray-200 shadow-lg ${isBlocking ? 'opacity-70' : ''}`}>
                 {/* Summary Section */}
                 <div className="px-4 py-2 bg-gradient-to-r from-gray-50 to-blue-50">
                   <div className="space-y-2">
@@ -454,7 +488,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                     <button
                       className="flex items-center justify-center px-4 py-3 border-2 border-[var(--color-primary-950)] text-[var(--color-primary-950)] font-semibold rounded-xl hover:bg-[var(--color-primary-950)] hover:text-white transition-all duration-300 transform hover:scale-105"
                       onClick={handleClearCart}
-                      disabled={isLoading}
+                      disabled={isBlocking}
                     >
                       <Trash2 size={16} className="mr-2" />
                       Clear
@@ -462,19 +496,19 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                     
                     <button
                       className={`flex-1 font-bold py-4 rounded-xl transition-all duration-300 transform hover:scale-105 flex items-center justify-center shadow-lg ${
-                        hasOutOfStockItems() || isLoading
+                        hasOutOfStockItems() || isBlocking
                           ? 'bg-gray-400 cursor-not-allowed text-white' 
                           : 'bg-gradient-to-r from-[var(--color-primary-950)] via-[#1a5f7a] to-[var(--color-primary-950)] hover:shadow-xl text-white'
                       }`}
-                      onClick={hasOutOfStockItems() || isLoading ? undefined : handleProceedToCheckout}
-                      disabled={hasOutOfStockItems() || isLoading}
+                      onClick={hasOutOfStockItems() || isBlocking ? undefined : handleProceedToCheckout}
+                      disabled={hasOutOfStockItems() || isBlocking}
                     >
                       {hasOutOfStockItems() ? (
                         <>
                           <span className="mr-2">⚠️</span>
                           Remove Out of Stock Items
                         </>
-                      ) : isLoading ? (
+                      ) : isBlocking ? (
                         <>
                           <span className="mr-2">⏳</span>
                           Please wait...
