@@ -92,6 +92,11 @@ export default function ProductFormPage() {
   const [variants, setVariants] = useState<ProductVariant[]>([]);
   const [deletedVariantIds, setDeletedVariantIds] = useState<string[]>([]); // To track variants for deletion
 
+  // Defensive effect to ensure loading state is reset on mount
+  useEffect(() => {
+    setIsLoading(false);
+  }, []);
+
   // Fetch data on component mount
   const fetchData = useCallback(async () => {
     setIsFetching(true);
@@ -134,7 +139,6 @@ export default function ProductFormPage() {
           setProductWeight(productData.product_weight?.toString() || '');
         }
 
-
         // Find and set the selected category and subcategory based on productData.sub_category ID
         if (productData.sub_category) {
           for (const cat of allCategories) {
@@ -157,18 +161,18 @@ export default function ProductFormPage() {
     } finally {
       setIsFetching(false);
     }
-  }, [isEditMode, productId]); // Dependencies for useCallback
+  }, [isEditMode, productId]);
 
   useEffect(() => {
     fetchData();
-  }, [fetchData]); // Run fetchData on component mount or when dependencies change
+  }, [fetchData]);
 
   // Clean up new image previews when component unmounts
   useEffect(() => {
     return () => {
       newImagePreviews.forEach(url => URL.revokeObjectURL(url));
     };
-  }, [newImagePreviews]); // Only run when newImagePreviews changes
+  }, [newImagePreviews]);
 
   // Update subcategory options when selected category changes
   const getSubCategoriesForSelectedCategory = useCallback(() => {
@@ -251,7 +255,7 @@ export default function ProductFormPage() {
     // Remove the variant from the local state
     setVariants(prevVariants => prevVariants.filter((_, index) => index !== indexToRemove));
     setFormError(null); // Clear form error when removing a variant
-  }, [variants]); // Dependency on `variants` is important here
+  }, [variants]);
 
   const handleVariantChange = useCallback((index: number, field: keyof ProductVariant, value: string | number) => {
     setVariants(prevVariants =>
@@ -270,12 +274,12 @@ export default function ProductFormPage() {
 
   const handleProductPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setProductPrice(e.target.value);
-    setFormError(null); // Clear error when product price changes
+    setFormError(null);
   };
 
   const handleStrikePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setStrikePrice(e.target.value);
-    setFormError(null); // Clear error when strike price changes
+    setFormError(null);
   };
 
   const handleProductCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -305,7 +309,7 @@ export default function ProductFormPage() {
 
   const handleHaveVariantsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setHaveVariants(e.target.checked);
-    setFormError(null); // Clear form error when changing variant setting
+    setFormError(null);
   };
 
   // Client-side validation function
@@ -388,21 +392,21 @@ export default function ProductFormPage() {
       mainProductWeight = 0;
     }
 
-    setIsLoading(true); // For form submission
-    setFormError(null); // Clear any lingering form errors before submission attempt
-    setImageErrors(null); // Clear any lingering image errors before submission attempt
+    setIsLoading(true);
+    setFormError(null);
+    setImageErrors(null);
 
     try {
       const formData = new FormData();
       formData.append('product_name', productName);
       formData.append('product_price', productPrice);
       formData.append('product_description', productDescription);
-      formData.append('sub_category', selectedSubCategoryId); // Use the selected subcategory ID
+      formData.append('sub_category', selectedSubCategoryId);
       formData.append('product_status', productStatus.toString());
       formData.append('strike_price', strikePrice);
       formData.append('product_code', productCode);
       formData.append('product_box_weight', productBoxWeight);
-      formData.append('have_variants', haveVariants.toString()); // Append the new field
+      formData.append('have_variants', haveVariants.toString());
 
       // Always include quantity and product_weight based on variant status
       formData.append('quantity', calculatedQuantity.toString());
@@ -424,18 +428,16 @@ export default function ProductFormPage() {
       // Always send 'for_delete_variants' and 'for_delete' as arrays (empty if nothing to delete)
       formData.append('variant_delete_ids', JSON.stringify(deletedVariantIds));
 
-
       if (isEditMode && productId) {
-        formData.append('id', productId); // Pass original ID without replacing hyphens
-        formData.append('for_delete', JSON.stringify(deletedImageIds)); // Always send for_delete, even if empty
+        formData.append('id', productId);
+        formData.append('for_delete', JSON.stringify(deletedImageIds));
       } else {
         // If it's a new product, no existing images to delete, so send empty array
         formData.append('for_delete', JSON.stringify([]));
       }
 
-
       newProductImages.forEach(image => {
-        formData.append('product_images', image); // Append new images
+        formData.append('product_images', image);
       });
 
       // Assuming apiService.post correctly handles FormData and the endpoint
@@ -449,11 +451,13 @@ export default function ProductFormPage() {
       const errorMessage = err?.response?.data?.message || err?.message || `Failed to ${isEditMode ? 'update' : 'create'} product. Please try again.`;
       setFormError(errorMessage);
       showToast.error(errorMessage);
+      // Defensive programming: ensure isLoading is reset even if there's an error
+      setIsLoading(false);
     } finally {
+      // This should always run, but add defensive reset
       setIsLoading(false);
     }
   };
-
 
   const triggerFileInput = useCallback(() => {
     if (fileInputRef.current) {
@@ -509,7 +513,7 @@ export default function ProductFormPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-8"> {/* Increased vertical spacing for form sections */}
+        <form onSubmit={handleSubmit} className="space-y-8">
           {/* Section: General Information */}
           <div>
             <h4 className="text-lg font-semibold text-gray-700 mb-4 flex items-center">
@@ -584,7 +588,7 @@ export default function ProductFormPage() {
                                     focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent
                                     transition-all duration-200 bg-white"
                     value={selectedSubCategoryId}
-                    onChange={(e) => { setSelectedSubCategoryId(e.target.value); setFormError(null); }} // Clear error on subcategory change
+                    onChange={(e) => { setSelectedSubCategoryId(e.target.value); setFormError(null); }}
                     required
                     disabled={isLoading}
                   >
@@ -608,7 +612,7 @@ export default function ProductFormPage() {
                                   focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent
                                   transition-all duration-200 bg-white"
                   value={productStatus ? "active" : "inactive"}
-                  onChange={(e) => { setProductStatus(e.target.value === "active"); setFormError(null); }} // Clear error on status change
+                  onChange={(e) => { setProductStatus(e.target.value === "active"); setFormError(null); }}
                   disabled={isLoading}
                   required
                 >
@@ -713,7 +717,7 @@ export default function ProductFormPage() {
                                         transition-all duration-200"
                       value={quantity}
                       onChange={handleQuantityChange}
-                      required={!haveVariants} // Required only if no variants
+                      required={!haveVariants}
                       disabled={isLoading}
                       placeholder="e.g., 100"
                     />
@@ -732,7 +736,7 @@ export default function ProductFormPage() {
                                         transition-all duration-200"
                       value={productWeight}
                       onChange={handleProductWeightChange}
-                      required={!haveVariants} // Required only if no variants
+                      required={!haveVariants}
                       disabled={isLoading}
                       placeholder="e.g., 0.5 (for 500g)"
                     />
@@ -826,7 +830,7 @@ export default function ProductFormPage() {
             <h4 className="text-lg font-semibold text-gray-700 mb-4 flex items-center mt-6 border-t pt-6">
               <Info className="w-5 h-5 mr-2 text-purple-500" /> Description
             </h4>
-            <label htmlFor="productDescription" className="sr-only">Description</label> {/*sr-only for accessibility*/}
+            <label htmlFor="productDescription" className="sr-only">Description</label>
             <textarea
               id="productDescription"
               rows={8}
@@ -865,7 +869,7 @@ export default function ProductFormPage() {
                       <Image
                         src={`${process.env.NEXT_PUBLIC_API_BASE_URL}${image.product_image}`}
                         alt={`Existing product image ${image.id}`}
-                        width={128} // Corresponds to h-32/w-32 if square
+                        width={128}
                         height={128}
                         className="h-full w-full object-cover"
                       />
@@ -934,7 +938,7 @@ export default function ProductFormPage() {
                 className="hidden"
                 disabled={isLoading}
               />
-              <Upload className="w-12 h-12 text-gray-400 mx-auto mb-3" /> {/* Larger icon */}
+              <Upload className="w-12 h-12 text-gray-400 mx-auto mb-3" />
               <p className="text-lg font-medium text-[var(--color-primary-950)]">Drag & drop or click to upload</p>
               <p className="text-sm text-gray-500 mt-1">Upload multiple images (JPG, PNG, WebP) for your product.</p>
             </div>

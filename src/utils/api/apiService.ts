@@ -903,6 +903,14 @@ public async logout(silent: boolean = false, router?: any): Promise<void> {
       throw error;
     }
   }
+
+  public async adminDashboardData(): Promise<any> {
+    try {
+      return await this.get<any>(`/dashboard/admin_dashboard`);
+    } catch (error) {
+      throw error;
+    }
+  }
 }
 
 const apiService = ApiService.getInstance();
