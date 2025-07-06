@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Mail, Phone, Clock, Send, X, Eye, Upload, MessageSquare, List, Plus, Calendar } from 'lucide-react';
+import apiService from '@/utils/api/apiService';
 
 interface ImageFile {
   id: string;
@@ -40,32 +41,11 @@ export default function Support() {
   const fetchComplaints = async () => {
     setIsLoadingComplaints(true);
     try {
-      // Replace with your actual API service call
-      // const response = await apiService.fetchUserComplaint();
-      // setComplaints(response.data);
-      
-      // Mock data for demo
-      const mockComplaints: Complaint[] = [
-        {
-          id: '1',
-          subject: 'Product Quality Issue',
-          message: 'I received a damaged item in my recent order...',
-          status: 'In Progress',
-          created_at: '2024-07-05T10:30:00Z',
-          images: ['https://via.placeholder.com/150x150?text=Image1']
-        },
-        {
-          id: '2',
-          subject: 'Shipping Delay',
-          message: 'My order was supposed to arrive yesterday but still pending...',
-          status: 'Resolved',
-          created_at: '2024-07-03T14:15:00Z',
-          images: []
-        }
-      ];
-      setComplaints(mockComplaints);
+      const response = await apiService.getMyEnquiry();
+      setComplaints(response.data || response); // Handle different response structures
     } catch (error) {
       console.error('Error fetching complaints:', error);
+      setFormError('Failed to load complaints. Please try again.');
     } finally {
       setIsLoadingComplaints(false);
     }
@@ -129,25 +109,27 @@ export default function Support() {
       formData.append('subject', subject);
       formData.append('message', message);
       
-      // Add images to form data
-      images.forEach((image, index) => {
-        formData.append(`images`, image.file);
+      // Add images to form data with the key 'enquiry_images'
+      images.forEach((image) => {
+        formData.append('enquiry_images', image.file);
       });
       
-      // Replace with your actual API service call
-      // await apiService.createUserComplaint(formData);
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Use your API service
+      await apiService.createEnquiry(formData);
       
       setSuccess(true);
       setSubject('');
       setMessage('');
       setImages([]);
       
+      // Clean up image URLs
+      images.forEach(image => {
+        URL.revokeObjectURL(image.preview);
+      });
+      
     } catch (err: any) {
       console.error('Error submitting complaint:', err);
-      setFormError('Failed to submit complaint. Please try again.');
+      setFormError(err.message || 'Failed to submit complaint. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -261,7 +243,7 @@ export default function Support() {
                   </button>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <form onSubmit={handleSubmit} className="space-y-4">
                   {formError && (
                     <div className="bg-red-50 border border-red-100 rounded-lg p-3 text-red-700 text-[14px]">
                       {formError}
@@ -360,7 +342,7 @@ export default function Support() {
                       </>
                     )}
                   </button>
-                </div>
+                </form>
               )}
             </div>
           </div>

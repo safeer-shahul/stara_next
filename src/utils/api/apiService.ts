@@ -941,9 +941,9 @@ public async getByReplacementId(id: any): Promise<any> {
     } catch (error) {
       throw error;
     }
-  }
+}
 
-  public async replacementStatusUpdate(id: string, selectedStatus: string, adminNotes: string): Promise<any> {
+public async replacementStatusUpdate(id: string, selectedStatus: string, adminNotes: string): Promise<any> {
   try {
     const data = {
       status: selectedStatus,
@@ -955,6 +955,22 @@ public async getByReplacementId(id: any): Promise<any> {
     throw error;
   }
 }
+
+public async getMyEnquiry(): Promise<any> {
+  try {
+    return await this.get<any>(`/enquiry/get_my_enquiries`);
+  } catch (error) {
+    throw error;
+  }
+}
+
+  public async createEnquiry(data: any): Promise<any> {
+    try {
+      return await this.post<any>('/enquiry/create_enquiry', data,true);
+    } catch (error) {
+      throw error;
+    }
+  }
 
 }
 

@@ -726,6 +726,7 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
                   value={requestDetails}
                   onChange={(e) => setRequestDetails(e.target.value)}
                   rows={3}
+                  required
                   className="shadow-sm focus:ring-[#175e7a] focus:border-[var(--color-primary-950)] block w-full sm:text-sm border-gray-300 rounded-md"
                   placeholder="Please provide any additional details about your replacement request..."
                 />

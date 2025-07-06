@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { MapPin, PackageOpen, Gift } from 'lucide-react';
+import { MapPin, PackageOpen, Gift, ChevronDown, ChevronUp } from 'lucide-react';
 import Image from 'next/image';
 import apiService from '@/utils/api/apiService';
 import CancelOrderModal from './CancelOrderModal';
@@ -57,6 +57,7 @@ export default function OrdersList() {
   const [showComplaintModal, setShowComplaintModal] = useState(false);
   const [showReplacementModal, setShowReplacementModal] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const fetchData = async () => {
@@ -85,6 +86,19 @@ export default function OrdersList() {
 
     fetchData();
   }, []);
+
+  // Toggle order expansion
+  const toggleOrderExpansion = (orderId: string) => {
+    setExpandedOrders(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(orderId)) {
+        newSet.delete(orderId);
+      } else {
+        newSet.add(orderId);
+      }
+      return newSet;
+    });
+  };
 
   // Get full state name from state code
   const getStateName = useCallback((stateCode: string) => {
@@ -235,6 +249,7 @@ export default function OrdersList() {
           {orders.map((order: any) => {
             const itemsCount = getTotalItemCount(order);
             const deliveryDate = order.delivered_date;
+            const isExpanded = expandedOrders.has(order.order_id);
             
             const canCancel = canCancelOrder(order.status);
             const canReplace = canReplaceOrder(order);
@@ -243,207 +258,230 @@ export default function OrdersList() {
             const hasOffers = bundleGroups.length > 0;
             
             return (
-              <div key={order.order_id} className="border border-gray-200 rounded-lg p-3 sm:p-4 hover:shadow-sm transition-shadow">
-                {/* Header Section */}
-                <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center mb-3">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-[14px] font-medium">Order #{order.order_id.replace(/-/g, '')}</h3>
-                    {hasOffers && (
-                      <div className="flex items-center gap-1 text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
-                        <Gift size={12} />
-                        <span>Offer</span>
-                      </div>
-                    )}
+              <div key={order.order_id} className="border border-gray-200 rounded-lg hover:shadow-sm transition-shadow">
+                {/* Header Section - Always Visible */}
+                <div 
+                  className="p-3 sm:p-4 cursor-pointer"
+                  onClick={() => toggleOrderExpansion(order.order_id)}
+                >
+                  <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center mb-3">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-[14px] font-medium">Order #{order.order_id.replace(/-/g, '')}</h3>
+                      {hasOffers && (
+                        <div className="flex items-center gap-1 text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                          <Gift size={12} />
+                          <span>Offer</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs px-2 py-1 rounded-full font-medium inline-flex items-center justify-center min-w-[70px] ${
+                        order.status === "Pending" 
+                          ? "bg-orange-100 text-orange-800" 
+                          : order.status === "Delivered" 
+                            ? "bg-green-100 text-green-800" 
+                            : order.status === "Shipped"
+                              ? "bg-blue-100 text-blue-800"
+                              : order.status === "Cancelled"
+                                ? "bg-red-100 text-red-800"
+                                : "bg-gray-100 text-gray-800"
+                      }`}>
+                        {order.status}
+                      </span>
+                      {isExpanded ? (
+                        <ChevronUp size={16} className="text-gray-400" />
+                      ) : (
+                        <ChevronDown size={16} className="text-gray-400" />
+                      )}
+                    </div>
                   </div>
-                  <span className={`text-xs px-2 py-1 rounded-full font-medium inline-flex items-center justify-center min-w-[70px] ${
-                    order.status === "Pending" 
-                      ? "bg-orange-100 text-orange-800" 
-                      : order.status === "Delivered" 
-                        ? "bg-green-100 text-green-800" 
-                        : order.status === "Shipped"
-                          ? "bg-blue-100 text-blue-800"
-                          : order.status === "Cancelled"
-                            ? "bg-red-100 text-red-800"
-                            : "bg-gray-100 text-gray-800"
-                  }`}>
-                    {order.status}
-                  </span>
-                </div>
-                
-                {/* Order Info */}
-                <div className="flex flex-col gap-1 text-[12px] sm:text-[14px] text-gray-500 mb-3">
-                  <div className="flex flex-wrap gap-x-3 gap-y-1">
-                    <span>Ordered: {formatDate(order.created_at)}</span>
-                    {order.status === 'Delivered' && deliveryDate && (
-                      <>
-                        <span className="hidden sm:inline">•</span>
-                        <span>Delivered: {formatDate(deliveryDate)}</span>
-                      </>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap gap-x-3 gap-y-1">
-                    <span>{itemsCount} {itemsCount === 1 ? 'item' : 'items'}</span>
-                    <span>•</span>
-                    <span className="font-medium text-gray-900">₹{parseFloat(order.total_price || order.payable_price).toFixed(2)}</span>
+                  
+                  {/* Order Summary - Always Visible */}
+                  <div className="flex flex-col gap-1 text-[12px] sm:text-[14px] text-gray-500">
+                    <div className="flex flex-wrap gap-x-3 gap-y-1">
+                      <span>Ordered: {formatDate(order.created_at)}</span>
+                      {order.status === 'Delivered' && deliveryDate && (
+                        <>
+                          <span className="hidden sm:inline">•</span>
+                          <span>Delivered: {formatDate(deliveryDate)}</span>
+                        </>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1">
+                      <span>{itemsCount} {itemsCount === 1 ? 'item' : 'items'}</span>
+                      <span>•</span>
+                      <span className="font-medium text-gray-900">₹{parseFloat(order.total_price || order.payable_price).toFixed(2)}</span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Address Section */}
-                {order.address_details && (
-                  <div className="py-3 px-3 bg-gray-50 rounded-lg mb-3">
-                    <div className="flex items-center mb-1">
-                      <MapPin className="w-3 h-3 sm:w-4 sm:h-4 text-gray-500 mr-2 flex-shrink-0" />
-                      <h4 className="text-[12px] sm:text-sm font-bold text-gray-700">Delivering to:</h4>
-                    </div>
-                    <p className="text-[11px] sm:text-sm ml-5 sm:ml-6 text-gray-600">
-                      {order.address_details.address}, {order.address_details.town}, {getStateName(order.address_details.state)} - {order.address_details.pincode}
-                    </p>
-                    <p className="text-[11px] sm:text-sm ml-5 sm:ml-6 text-gray-600">
-                      <span className="font-medium">Phone:</span> {order.address_details.phone_number_1}
-                      {order.address_details.phone_number_2 && order.address_details.phone_number_2.trim() !== "" && (
-                        <>, {order.address_details.phone_number_2}</>
-                      )}
-                    </p>
-                  </div>
-                )}
-                
-                {/* Items Section */}
-                <div className="mt-3 space-y-2 sm:space-y-3">
-                  {/* Regular Items */}
-                  {order.order_items.length > 0 && (
-                    <div className="space-y-2">
-                      {order.order_items.map((item: any) => (
-                        <div key={item.id} className="flex bg-white p-2 rounded-lg border border-gray-200">
-                          <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-md overflow-hidden mr-2 sm:mr-3 bg-gray-100 flex-shrink-0 relative">
-                            {item.product_details.images && item.product_details.images.length > 0 ? (
-                              <Image 
-                                src={`${process.env.NEXT_PUBLIC_API_BASE_URL}${item.product_details.images[0].product_image}`} 
-                                alt={item.product_details.product_name}
-                                fill
-                                sizes="(max-width: 48px) 100vw, (max-width: 768px) 64px, 64px"
-                                style={{objectFit: 'cover'}}
-                              />
-                            ) : (
-                              <div className="w-full h-full bg-gray-200"></div>
-                            )}
-                          </div>
-                          
-                          <div className="flex-1 min-w-0">
-                            <h4 className="text-[12px] sm:text-[14px] font-medium text-gray-900 line-clamp-2 mb-1">
-                              {item.product_details.product_name}
-                            </h4>
-                            
-                            <div className="flex justify-between items-end">
-                              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                                <p className="text-[11px] sm:text-[13px] text-gray-600">Qty: {item.quantity}</p>
-                                {item.mode && item.mode !== 'Normal' && (
-                                  <span className="text-[10px] sm:text-[11px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded w-fit">
-                                    {item.mode}
-                                  </span>
+                {/* Expandable Content */}
+                {isExpanded && (
+                  <div className="px-3 sm:px-4 pb-3 sm:pb-4 border-t border-gray-100">
+                    {/* Address Section */}
+                    {order.address_details && (
+                      <div className="py-3 px-3 bg-gray-50 rounded-lg mb-3 mt-3">
+                        <div className="flex items-center mb-1">
+                          <MapPin className="w-3 h-3 sm:w-4 sm:h-4 text-gray-500 mr-2 flex-shrink-0" />
+                          <h4 className="text-[12px] sm:text-sm font-bold text-gray-700">Delivering to:</h4>
+                        </div>
+                        <p className="text-[11px] sm:text-sm ml-5 sm:ml-6 text-gray-600">
+                          {order.address_details.address}, {order.address_details.town}, {getStateName(order.address_details.state)} - {order.address_details.pincode}
+                        </p>
+                        <p className="text-[11px] sm:text-sm ml-5 sm:ml-6 text-gray-600">
+                          <span className="font-medium">Phone:</span> {order.address_details.phone_number_1}
+                          {order.address_details.phone_number_2 && order.address_details.phone_number_2.trim() !== "" && (
+                            <>, {order.address_details.phone_number_2}</>
+                          )}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {/* Items Section */}
+                    <div className="space-y-2 sm:space-y-3">
+                      {/* Regular Items */}
+                      {order.order_items.length > 0 && (
+                        <div className="space-y-2">
+                          {order.order_items.map((item: any) => (
+                            <div key={item.id} className="flex bg-white p-2 rounded-lg border border-gray-200">
+                              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-md overflow-hidden mr-2 sm:mr-3 bg-gray-100 flex-shrink-0 relative">
+                                {item.product_details.images && item.product_details.images.length > 0 ? (
+                                  <Image 
+                                    src={`${process.env.NEXT_PUBLIC_API_BASE_URL}${item.product_details.images[0].product_image}`} 
+                                    alt={item.product_details.product_name}
+                                    fill
+                                    sizes="(max-width: 48px) 100vw, (max-width: 768px) 64px, 64px"
+                                    style={{objectFit: 'cover'}}
+                                  />
+                                ) : (
+                                  <div className="w-full h-full bg-gray-200"></div>
                                 )}
                               </div>
                               
-                              <p className="text-[12px] sm:text-[14px] font-medium">₹{parseFloat(item.price || item.total_price).toFixed(2)}</p>
+                              <div className="flex-1 min-w-0">
+                                <h4 className="text-[12px] sm:text-[14px] font-medium text-gray-900 line-clamp-2 mb-1">
+                                  {item.product_details.product_name}
+                                </h4>
+                                
+                                <div className="flex justify-between items-end">
+                                  <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                                    <p className="text-[11px] sm:text-[13px] text-gray-600">Qty: {item.quantity}</p>
+                                    {item.mode && item.mode !== 'Normal' && (
+                                      <span className="text-[10px] sm:text-[11px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded w-fit">
+                                        {item.mode}
+                                      </span>
+                                    )}
+                                  </div>
+                                  
+                                  <p className="text-[12px] sm:text-[14px] font-medium">₹{parseFloat(item.price || item.total_price).toFixed(2)}</p>
+                                </div>
+                              </div>
                             </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Bundle/Offer Items */}
+                      {bundleGroups.map((bundleGroup, bundleIndex) => (
+                        <div key={bundleGroup.bundleId} className="border-2 border-dashed border-green-200 rounded-lg p-2 sm:p-3 bg-green-50">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Gift size={14} className="text-green-600" />
+                            <h5 className="text-[12px] sm:text-[13px] font-semibold text-green-800">{bundleGroup.offerName}</h5>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            {bundleGroup.items.map((item: any) => (
+                              <div key={item.id} className="flex bg-white p-2 rounded-lg border border-green-200">
+                                <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-md overflow-hidden mr-2 sm:mr-3 bg-gray-100 flex-shrink-0 relative">
+                                  {item.product_details.images && item.product_details.images.length > 0 ? (
+                                    <Image 
+                                      src={`${process.env.NEXT_PUBLIC_API_BASE_URL}${item.product_details.images[0].product_image}`} 
+                                      alt={item.product_details.product_name}
+                                      fill
+                                      sizes="(max-width: 40px) 100vw, (max-width: 768px) 56px, 56px"
+                                      style={{objectFit: 'cover'}}
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full bg-gray-200"></div>
+                                  )}
+                                </div>
+                                
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="text-[11px] sm:text-[13px] font-medium text-gray-900 line-clamp-2 mb-1">
+                                    {item.product_details.product_name}
+                                  </h4>
+                                  
+                                  <div className="flex justify-between items-end">
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                                      <p className="text-[10px] sm:text-[12px] text-gray-600">Qty: {item.quantity}</p>
+                                      <span className={`text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0.5 rounded-full font-medium w-fit ${
+                                        item.mode === 'Buy' 
+                                          ? 'bg-blue-100 text-blue-700' 
+                                          : 'bg-green-100 text-green-700'
+                                      }`}>
+                                        {item.mode}
+                                      </span>
+                                    </div>
+                                    
+                                    <p className="text-[11px] sm:text-[13px] font-medium">
+                                      {item.mode === 'Get' ? (
+                                        <span className="text-green-600">FREE</span>
+                                      ) : (
+                                        `₹${parseFloat(item.price || item.total_price).toFixed(2)}`
+                                      )}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </div>
                       ))}
                     </div>
-                  )}
-
-                  {/* Bundle/Offer Items */}
-                  {bundleGroups.map((bundleGroup, bundleIndex) => (
-                    <div key={bundleGroup.bundleId} className="border-2 border-dashed border-green-200 rounded-lg p-2 sm:p-3 bg-green-50">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Gift size={14} className="text-green-600" />
-                        <h5 className="text-[12px] sm:text-[13px] font-semibold text-green-800">{bundleGroup.offerName}</h5>
+                    
+                    {/* Footer Section */}
+                    <div className="mt-3 pt-2 border-t border-gray-100">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-3">
+                        <div className="text-[11px] sm:text-[13px]">
+                          <span className="font-medium">Payment: </span>
+                          <span className={order.payment_status === "Success" ? "text-green-600" : "text-orange-600"}>
+                            {order.payment_status} ({order.payment_mode})
+                          </span>
+                        </div>
+                        <div className="text-[11px] sm:text-[13px] font-medium">
+                          Total: ₹{parseFloat(order.total_price || order.payable_price).toFixed(2)}
+                        </div>
                       </div>
                       
-                      <div className="space-y-2">
-                        {bundleGroup.items.map((item: any) => (
-                          <div key={item.id} className="flex bg-white p-2 rounded-lg border border-green-200">
-                            <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-md overflow-hidden mr-2 sm:mr-3 bg-gray-100 flex-shrink-0 relative">
-                              {item.product_details.images && item.product_details.images.length > 0 ? (
-                                <Image 
-                                  src={`${process.env.NEXT_PUBLIC_API_BASE_URL}${item.product_details.images[0].product_image}`} 
-                                  alt={item.product_details.product_name}
-                                  fill
-                                  sizes="(max-width: 40px) 100vw, (max-width: 768px) 56px, 56px"
-                                  style={{objectFit: 'cover'}}
-                                />
-                              ) : (
-                                <div className="w-full h-full bg-gray-200"></div>
-                              )}
-                            </div>
-                            
-                            <div className="flex-1 min-w-0">
-                              <h4 className="text-[11px] sm:text-[13px] font-medium text-gray-900 line-clamp-2 mb-1">
-                                {item.product_details.product_name}
-                              </h4>
-                              
-                              <div className="flex justify-between items-end">
-                                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                                  <p className="text-[10px] sm:text-[12px] text-gray-600">Qty: {item.quantity}</p>
-                                  <span className={`text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0.5 rounded-full font-medium w-fit ${
-                                    item.mode === 'Buy' 
-                                      ? 'bg-blue-100 text-blue-700' 
-                                      : 'bg-green-100 text-green-700'
-                                  }`}>
-                                    {item.mode}
-                                  </span>
-                                </div>
-                                
-                                <p className="text-[11px] sm:text-[13px] font-medium">
-                                  {item.mode === 'Get' ? (
-                                    <span className="text-green-600">FREE</span>
-                                  ) : (
-                                    `₹${parseFloat(item.price || item.total_price).toFixed(2)}`
-                                  )}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
+                      {/* Action Buttons */}
+                      <div className="flex flex-wrap gap-2">
+                        {canCancel && (
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenCancelModal(order.order_id);
+                            }}
+                            className="px-3 py-1.5 sm:py-1 text-[11px] sm:text-[12px] border border-black text-black rounded hover:bg-gray-50 transition-colors flex-shrink-0"
+                          >
+                            Cancel Order
+                          </button>
+                        )}
+                        
+                        {canReplace && (
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenReplacementModal(order.order_id);
+                            }}
+                            className="px-3 py-1.5 sm:py-1 text-[11px] sm:text-[12px] border border-black text-black rounded hover:bg-gray-50 transition-colors flex-shrink-0"
+                          >
+                            Replace Order
+                          </button>
+                        )}
                       </div>
                     </div>
-                  ))}
-                </div>
-                
-                {/* Footer Section */}
-                <div className="mt-3 pt-2 border-t border-gray-100">
-                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-3">
-                    <div className="text-[11px] sm:text-[13px]">
-                      <span className="font-medium">Payment: </span>
-                      <span className={order.payment_status === "Success" ? "text-green-600" : "text-orange-600"}>
-                        {order.payment_status} ({order.payment_mode})
-                      </span>
-                    </div>
-                    <div className="text-[11px] sm:text-[13px] font-medium">
-                      Total: ₹{parseFloat(order.total_price || order.payable_price).toFixed(2)}
-                    </div>
                   </div>
-                  
-                  {/* Action Buttons */}
-                  <div className="flex flex-wrap gap-2">
-                    {canCancel && (
-                      <button 
-                        onClick={() => handleOpenCancelModal(order.order_id)}
-                        className="px-3 py-1.5 sm:py-1 text-[11px] sm:text-[12px] border border-black text-black rounded hover:bg-gray-50 transition-colors flex-shrink-0"
-                      >
-                        Cancel Order
-                      </button>
-                    )}
-                    
-                    {canReplace && (
-                      <button 
-                        onClick={() => handleOpenReplacementModal(order.order_id)}
-                        className="px-3 py-1.5 sm:py-1 text-[11px] sm:text-[12px] border border-black text-black rounded hover:bg-gray-50 transition-colors flex-shrink-0"
-                      >
-                        Replace Order
-                      </button>
-                    )}
-                  </div>
-                </div>
+                )}
               </div>
             );
           })}
