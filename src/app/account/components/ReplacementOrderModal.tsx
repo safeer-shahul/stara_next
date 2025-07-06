@@ -88,6 +88,22 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
     return allItems;
   };
 
+  // Check if product has variants
+  const hasVariants = (item: any) => {
+    return item.product_details?.product_variant && 
+           Array.isArray(item.product_details.product_variant) && 
+           item.product_details.product_variant.length > 0;
+  };
+
+  // Get available reasons for an item
+  const getAvailableReasons = (item: any) => {
+    if (hasVariants(item)) {
+      return mainReasons; // Both Damaged and Change Size
+    } else {
+      return ['Damaged']; // Only Damaged if no variants
+    }
+  };
+
   // Get offer name for a bundle
   const getOfferName = (bundleItems: any[]) => {
     if (!bundleItems.length || !offers.length) return 'Special Offer';
@@ -131,6 +147,12 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
           ...updated[itemId], 
           selected: value
         };
+        // Reset reason when deselecting
+        if (!value) {
+          updated[itemId].reason = '';
+          updated[itemId].newVariant = orderItem.product_variant || '';
+          updated[itemId].replacementImages = [];
+        }
       } else if (field === 'reason') {
         updated[itemId] = { 
           ...updated[itemId], 
@@ -323,7 +345,7 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
           <div className="absolute inset-0 bg-black opacity-75"></div>
         </div>
 
-        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full">
+        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all  sm:align-middle w-full md:max-w-4xl ">
           <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium text-gray-900">Replace Items</h3>
@@ -372,12 +394,13 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
                       {regularItems.map((item: any) => {
                         const currentItem = replacementItems[item.id] || { selected: false, reason: '', newVariant: item.product_variant || '', replacementImages: [] };
                         const isSelected = currentItem.selected;
-                        const canChangeVariant = currentItem.reason === 'Change Size';
+                        const canChangeVariant = currentItem.reason === 'Change Size' && hasVariants(item);
+                        const availableReasons = getAvailableReasons(item);
                         
                         return (
-                          <div key={item.id} className={`border rounded-lg p-4 ${isSelected ? 'border-blue-300 bg-blue-50' : 'border-gray-200'}`}>
+                          <div key={item.id} className={`border rounded-lg p-3 sm:p-4 ${isSelected ? 'border-blue-300 bg-blue-50' : 'border-gray-200'}`}>
                             <div className="flex items-start space-x-3">
-                              <div className="flex items-center pt-2">
+                              <div className="flex items-center pt-1 sm:pt-2">
                                 <input
                                   type="checkbox"
                                   id={`item-${item.id}`}
@@ -387,13 +410,13 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
                                 />
                               </div>
                               
-                              <div className="w-16 h-16 rounded-md overflow-hidden bg-gray-100 flex-shrink-0 relative">
+                              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-md overflow-hidden bg-gray-100 flex-shrink-0 relative">
                                 {item.product_details.images && item.product_details.images.length > 0 ? (
                                   <Image 
                                     src={`${process.env.NEXT_PUBLIC_API_BASE_URL}${item.product_details.images[0].product_image}`} 
                                     alt={item.product_details.product_name}
                                     fill
-                                    sizes="64px"
+                                    sizes="(max-width: 640px) 48px, 64px"
                                     style={{objectFit: 'cover'}}
                                   />
                                 ) : (
@@ -403,36 +426,36 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
                               
                               <div className="flex-1 min-w-0">
                                 <label htmlFor={`item-${item.id}`} className="cursor-pointer">
-                                  <h4 className="text-sm font-medium text-gray-900 mb-1">{item.product_details.product_name}</h4>
-                                  <p className="text-xs text-gray-500 mb-3">₹{parseFloat(item.price || item.total_price).toFixed(2)} x {item.quantity} available</p>
+                                  <h4 className="text-sm font-medium text-gray-900 mb-1 line-clamp-2">{item.product_details.product_name}</h4>
+                                  <p className="text-xs text-gray-500 mb-2 sm:mb-3">₹{parseFloat(item.price || item.total_price).toFixed(2)} x {item.quantity}</p>
                                 </label>
 
                                 {/* Show controls only if selected */}
                                 {isSelected && (
-                                  <div className="space-y-3">
+                                  <div className="space-y-2 sm:space-y-3">
                                     {/* Reason Selection */}
-                                    <div className="flex items-center space-x-3">
-                                      <span className="text-sm text-gray-600 w-16">Reason:</span>
+                                    <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-3">
+                                      <span className="text-sm text-gray-600 sm:w-16 font-medium">Reason:</span>
                                       <select
                                         value={currentItem.reason}
                                         onChange={(e) => handleItemChange(item.id, 'reason', e.target.value)}
-                                        className="flex-1 border border-gray-300 rounded-md px-3 py-1 text-sm focus:ring-[var(--color-primary-950)] focus:border-[var(--color-primary-950)]"
+                                        className="flex-1 border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-[var(--color-primary-950)] focus:border-[var(--color-primary-950)]"
                                       >
                                         <option value="">Select reason</option>
-                                        {mainReasons.map(reason => (
+                                        {availableReasons.map(reason => (
                                           <option key={reason} value={reason}>{reason}</option>
                                         ))}
                                       </select>
                                     </div>
 
                                     {/* Variant Selection - only show if reason is "Change Size" and product has variants */}
-                                    {canChangeVariant && item.product_details.product_variant && item.product_details.product_variant.length > 0 && (
-                                      <div className="flex items-center space-x-3">
-                                        <span className="text-sm text-gray-600 w-16">New Size:</span>
+                                    {canChangeVariant && (
+                                      <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-3">
+                                        <span className="text-sm text-gray-600 sm:w-16 font-medium">New Size:</span>
                                         <select
                                           value={currentItem.newVariant || ''}
                                           onChange={(e) => handleItemChange(item.id, 'newVariant', e.target.value)}
-                                          className="flex-1 border border-gray-300 rounded-md px-3 py-1 text-sm focus:ring-[var(--color-primary-950)] focus:border-[var(--color-primary-950)]"
+                                          className="flex-1 border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-[var(--color-primary-950)] focus:border-[var(--color-primary-950)]"
                                         >
                                           <option value="">Select new variant</option>
                                           {item.product_details.product_variant.map((variant: any) => (
@@ -449,49 +472,59 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
                                       </div>
                                     )}
 
-                                    {/* Multiple Image Upload for damaged items */}
+                                    {/* Image Upload for damaged items */}
                                     {currentItem.reason === 'Damaged' && (
-                                      <div className="flex items-start space-x-3">
-                                        <span className="text-sm text-gray-600 w-16 pt-1">Images:</span>
+                                      <div className="flex flex-col sm:flex-row sm:items-start space-y-1 sm:space-y-0 sm:space-x-3">
+                                        <span className="text-sm text-gray-600 sm:w-16 font-medium sm:pt-1">Images:</span>
                                         <div className="flex-1">
                                           <input
                                             type="file"
                                             accept="image/*"
                                             multiple
                                             onChange={(e) => handleItemChange(item.id, 'replacementImages', e.target.files)}
-                                            className="w-full border border-gray-300 rounded-md px-3 py-1 text-sm focus:ring-[var(--color-primary-950)] focus:border-[var(--color-primary-950)]"
+                                            className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-[var(--color-primary-950)] focus:border-[var(--color-primary-950)]"
                                           />
-                                          <p className="text-xs text-gray-500 mt-1">Upload multiple images showing the damage (optional)</p>
+                                          <p className="text-xs text-gray-500 mt-1">Upload images showing damage (optional)</p>
                                           
-                                          {/* File Tags */}
+                                          {/* Image Previews */}
                                           {currentItem.replacementImages && currentItem.replacementImages.length > 0 && (
                                             <div className="mt-3">
                                               <p className="text-xs text-gray-600 mb-2">Selected images ({currentItem.replacementImages.length}):</p>
-                                              <div className="flex flex-wrap gap-2">
+                                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                                                 {currentItem.replacementImages.map((file, index) => (
-                                                  <div key={index} className="flex items-center bg-gray-100 rounded-lg px-3 py-2 border border-gray-200 group hover:bg-gray-50 transition-colors">
-                                                    <FileImage size={16} className="text-gray-500 mr-2 flex-shrink-0" />
-                                                    <span className="text-sm text-gray-700 truncate max-w-[120px]" title={file.name}>
-                                                      {file.name}
-                                                    </span>
-                                                    <div className="flex items-center ml-2 space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                  <div key={index} className="relative group">
+                                                    <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
+                                                      <Image
+                                                        src={URL.createObjectURL(file)}
+                                                        alt={file.name}
+                                                        fill
+                                                        className="object-cover"
+                                                        sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 25vw"
+                                                      />
+                                                    </div>
+                                                    {/* Overlay with actions */}
+                                                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all duration-200 rounded-lg flex items-center justify-center space-x-1 opacity-0 group-hover:opacity-100">
                                                       <button
                                                         type="button"
                                                         onClick={() => handleViewImage(file)}
-                                                        className="p-1 hover:bg-gray-200 rounded transition-colors"
+                                                        className="p-1.5 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full transition-all"
                                                         title="View image"
                                                       >
-                                                        <Eye size={12} className="text-gray-600" />
+                                                        <Eye size={14} className="text-gray-700" />
                                                       </button>
                                                       <button
                                                         type="button"
                                                         onClick={() => handleDeleteImage(item.id, index)}
-                                                        className="p-1 hover:bg-red-100 rounded transition-colors"
+                                                        className="p-1.5 bg-red-500 bg-opacity-90 hover:bg-opacity-100 rounded-full transition-all"
                                                         title="Delete image"
                                                       >
-                                                        <Trash2 size={12} className="text-red-500" />
+                                                        <Trash2 size={14} className="text-white" />
                                                       </button>
                                                     </div>
+                                                    {/* File name */}
+                                                    <p className="text-xs text-gray-600 mt-1 truncate" title={file.name}>
+                                                      {file.name}
+                                                    </p>
                                                   </div>
                                                 ))}
                                               </div>
@@ -521,12 +554,13 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
                       {bundleGroup.items.map((item: any) => {
                         const currentItem = replacementItems[item.id] || { selected: false, reason: '', newVariant: item.product_variant || '', replacementImages: [] };
                         const isSelected = currentItem.selected;
-                        const canChangeVariant = currentItem.reason === 'Change Size';
+                        const canChangeVariant = currentItem.reason === 'Change Size' && hasVariants(item);
+                        const availableReasons = getAvailableReasons(item);
                         
                         return (
-                          <div key={item.id} className={`border rounded-lg p-4 ml-4 ${isSelected ? 'border-blue-300 bg-blue-50' : 'border-gray-200'}`}>
+                          <div key={item.id} className={`border rounded-lg p-3 sm:p-4 ml-2 sm:ml-4 ${isSelected ? 'border-blue-300 bg-blue-50' : 'border-gray-200'}`}>
                             <div className="flex items-start space-x-3">
-                              <div className="flex items-center pt-2">
+                              <div className="flex items-center pt-1 sm:pt-2">
                                 <input
                                   type="checkbox"
                                   id={`bundle-item-${item.id}`}
@@ -536,13 +570,13 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
                                 />
                               </div>
                               
-                              <div className="w-14 h-14 rounded-md overflow-hidden bg-gray-100 flex-shrink-0 relative">
+                              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-md overflow-hidden bg-gray-100 flex-shrink-0 relative">
                                 {item.product_details.images && item.product_details.images.length > 0 ? (
                                   <Image 
                                     src={`${process.env.NEXT_PUBLIC_API_BASE_URL}${item.product_details.images[0].product_image}`} 
                                     alt={item.product_details.product_name}
                                     fill
-                                    sizes="56px"
+                                    sizes="(max-width: 640px) 48px, 56px"
                                     style={{objectFit: 'cover'}}
                                   />
                                 ) : (
@@ -552,8 +586,8 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
                               
                               <div className="flex-1 min-w-0">
                                 <label htmlFor={`bundle-item-${item.id}`} className="cursor-pointer">
-                                  <h4 className="text-sm font-medium text-gray-900 mb-1">{item.product_details.product_name}</h4>
-                                  <div className="flex items-center gap-2 mb-3">
+                                  <h4 className="text-sm font-medium text-gray-900 mb-1 line-clamp-2">{item.product_details.product_name}</h4>
+                                  <div className="flex flex-wrap items-center gap-1 sm:gap-2 mb-2 sm:mb-3">
                                     <p className="text-xs text-gray-600">Qty: {item.quantity}</p>
                                     <span className="text-xs bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded">
                                       {item.mode}
@@ -570,30 +604,30 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
 
                                 {/* Same controls as regular items */}
                                 {isSelected && (
-                                  <div className="space-y-3">
+                                  <div className="space-y-2 sm:space-y-3">
                                     {/* Reason Selection */}
-                                    <div className="flex items-center space-x-3">
-                                      <span className="text-sm text-gray-600 w-16">Reason:</span>
+                                    <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-3">
+                                      <span className="text-sm text-gray-600 sm:w-16 font-medium">Reason:</span>
                                       <select
                                         value={currentItem.reason}
                                         onChange={(e) => handleItemChange(item.id, 'reason', e.target.value)}
-                                        className="flex-1 border border-gray-300 rounded-md px-3 py-1 text-sm focus:ring-[var(--color-primary-950)] focus:border-[var(--color-primary-950)]"
+                                        className="flex-1 border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-[var(--color-primary-950)] focus:border-[var(--color-primary-950)]"
                                       >
                                         <option value="">Select reason</option>
-                                        {mainReasons.map(reason => (
+                                        {availableReasons.map(reason => (
                                           <option key={reason} value={reason}>{reason}</option>
                                         ))}
                                       </select>
                                     </div>
 
                                     {/* Variant Selection for bundle items */}
-                                    {canChangeVariant && item.product_details.product_variant && item.product_details.product_variant.length > 0 && (
-                                      <div className="flex items-center space-x-3">
-                                        <span className="text-sm text-gray-600 w-16">New Size:</span>
+                                    {canChangeVariant && (
+                                      <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-3">
+                                        <span className="text-sm text-gray-600 sm:w-16 font-medium">New Size:</span>
                                         <select
                                           value={currentItem.newVariant || ''}
                                           onChange={(e) => handleItemChange(item.id, 'newVariant', e.target.value)}
-                                          className="flex-1 border border-gray-300 rounded-md px-3 py-1 text-sm focus:ring-[var(--color-primary-950)] focus:border-[var(--color-primary-950)]"
+                                          className="flex-1 border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-[var(--color-primary-950)] focus:border-[var(--color-primary-950)]"
                                         >
                                           <option value="">Select new variant</option>
                                           {item.product_details.product_variant.map((variant: any) => (
@@ -610,49 +644,59 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
                                       </div>
                                     )}
 
-                                    {/* Multiple Image Upload for damaged bundle items */}
+                                    {/* Image Upload for damaged bundle items */}
                                     {currentItem.reason === 'Damaged' && (
-                                      <div className="flex items-start space-x-3">
-                                        <span className="text-sm text-gray-600 w-16 pt-1">Images:</span>
+                                      <div className="flex flex-col sm:flex-row sm:items-start space-y-1 sm:space-y-0 sm:space-x-3">
+                                        <span className="text-sm text-gray-600 sm:w-16 font-medium sm:pt-1">Images:</span>
                                         <div className="flex-1">
                                           <input
                                             type="file"
                                             accept="image/*"
                                             multiple
                                             onChange={(e) => handleItemChange(item.id, 'replacementImages', e.target.files)}
-                                            className="w-full border border-gray-300 rounded-md px-3 py-1 text-sm focus:ring-[var(--color-primary-950)] focus:border-[var(--color-primary-950)]"
+                                            className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-[var(--color-primary-950)] focus:border-[var(--color-primary-950)]"
                                           />
-                                          <p className="text-xs text-gray-500 mt-1">Upload multiple images showing the damage (optional)</p>
+                                          <p className="text-xs text-gray-500 mt-1">Upload images showing damage (optional)</p>
                                           
-                                          {/* File Tags */}
+                                          {/* Image Previews */}
                                           {currentItem.replacementImages && currentItem.replacementImages.length > 0 && (
                                             <div className="mt-3">
                                               <p className="text-xs text-gray-600 mb-2">Selected images ({currentItem.replacementImages.length}):</p>
-                                              <div className="flex flex-wrap gap-2">
+                                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                                                 {currentItem.replacementImages.map((file, index) => (
-                                                  <div key={index} className="flex items-center bg-gray-100 rounded-lg px-3 py-2 border border-gray-200 group hover:bg-gray-50 transition-colors">
-                                                    <FileImage size={16} className="text-gray-500 mr-2 flex-shrink-0" />
-                                                    <span className="text-sm text-gray-700 truncate max-w-[120px]" title={file.name}>
-                                                      {file.name}
-                                                    </span>
-                                                    <div className="flex items-center ml-2 space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                  <div key={index} className="relative group">
+                                                    <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
+                                                      <Image
+                                                        src={URL.createObjectURL(file)}
+                                                        alt={file.name}
+                                                        fill
+                                                        className="object-cover"
+                                                        sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 25vw"
+                                                      />
+                                                    </div>
+                                                    {/* Overlay with actions */}
+                                                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all duration-200 rounded-lg flex items-center justify-center space-x-1 opacity-0 group-hover:opacity-100">
                                                       <button
                                                         type="button"
                                                         onClick={() => handleViewImage(file)}
-                                                        className="p-1 hover:bg-gray-200 rounded transition-colors"
+                                                        className="p-1.5 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full transition-all"
                                                         title="View image"
                                                       >
-                                                        <Eye size={12} className="text-gray-600" />
+                                                        <Eye size={14} className="text-gray-700" />
                                                       </button>
                                                       <button
                                                         type="button"
                                                         onClick={() => handleDeleteImage(item.id, index)}
-                                                        className="p-1 hover:bg-red-100 rounded transition-colors"
+                                                        className="p-1.5 bg-red-500 bg-opacity-90 hover:bg-opacity-100 rounded-full transition-all"
                                                         title="Delete image"
                                                       >
-                                                        <Trash2 size={12} className="text-red-500" />
+                                                        <Trash2 size={14} className="text-white" />
                                                       </button>
                                                     </div>
+                                                    {/* File name */}
+                                                    <p className="text-xs text-gray-600 mt-1 truncate" title={file.name}>
+                                                      {file.name}
+                                                    </p>
                                                   </div>
                                                 ))}
                                               </div>
@@ -682,28 +726,27 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
                   value={requestDetails}
                   onChange={(e) => setRequestDetails(e.target.value)}
                   rows={3}
-                  required
                   className="shadow-sm focus:ring-[#175e7a] focus:border-[var(--color-primary-950)] block w-full sm:text-sm border-gray-300 rounded-md"
                   placeholder="Please provide any additional details about your replacement request..."
                 />
               </div>
 
-              <div className="sm:flex sm:flex-row-reverse mt-5">
+              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 mt-5">
+                <button
+                  type="button"
+                  className="w-full sm:w-auto inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:text-sm"
+                  onClick={onClose}
+                >
+                  Cancel
+                </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className={`w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-[var(--color-primary-950)] text-base font-medium text-white hover:bg-[#0f4c67] focus:outline-none sm:ml-3 sm:w-auto sm:text-sm ${
+                  className={`w-full sm:w-auto inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-[var(--color-primary-950)] text-base font-medium text-white hover:bg-[#0f4c67] focus:outline-none sm:text-sm ${
                     submitting ? 'opacity-70 cursor-not-allowed' : ''
                   }`}
                 >
                   {submitting ? 'Processing...' : 'Submit Replacement Request'}
-                </button>
-                <button
-                  type="button"
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:w-auto sm:text-sm"
-                  onClick={onClose}
-                >
-                  Cancel
                 </button>
               </div>
             </form>

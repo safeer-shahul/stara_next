@@ -914,25 +914,48 @@ public async logout(silent: boolean = false, router?: any): Promise<void> {
 
 
 public async getPaginatedReplacementRequests(
-    page: number = 1,
-    pageSize: number = 10,
-    options?: {
-      sort_order?: 'asc' | 'desc'; 
+  page: number = 1,
+  pageSize: number = 10,
+  options?: {
+    status?: string | null;
+  }
+): Promise<any> {
+  try {
+    let url = `/order/get_all_replacements?page=${page}&page_size=${pageSize}`;
+    
+    // Add status parameter if it exists and is not null
+    if (options?.status && options.status !== 'all') {
+      url += `&status=${encodeURIComponent(options.status)}`;
     }
-  ): Promise<any> {
+    
+    return await this.get<any>(url);
+  } catch (error) {
+    console.error('Error fetching paginated replacement requests:', error);
+    throw error;
+  }
+}
+
+public async getByReplacementId(id: any): Promise<any> {
     try {
-      let url = `/order/get_my_complaints?page=${page}&page_size=${pageSize}`;
-
-      if (options?.sort_order) {
-        url += `&sort_order=${options.sort_order}`;
-      }
-
-      return await this.get<any>(url);
+      return await this.get<any>(`/order/get_replacement_req_by_id/${id}`);
     } catch (error) {
-      console.error('Error fetching paginated orders:', error);
       throw error;
     }
   }
+
+  public async replacementStatusUpdate(id: string, selectedStatus: string, adminNotes: string): Promise<any> {
+  try {
+    const data = {
+      status: selectedStatus,
+      admin_notes: adminNotes,
+    };
+    
+    return await this.put<any>(`/order/replacement_status_update/${id}`, data);
+  } catch (error) {
+    throw error;
+  }
+}
+
 }
 
 const apiService = ApiService.getInstance();

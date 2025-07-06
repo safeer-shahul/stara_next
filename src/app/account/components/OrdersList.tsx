@@ -225,9 +225,7 @@ export default function OrdersList() {
         <div className="space-y-4">
           {orders.map((order: any) => {
             const itemsCount = getTotalItemCount(order);
-            const deliveryDate = order.delivery_date || (order.status === 'Delivered' ? 
-              new Date(new Date(order.created_at).getTime() + (2 * 24 * 60 * 60 * 1000)).toISOString() : 
-              null);
+            const deliveryDate = order.delivered_date 
             
             const canCancel = canCancelOrder(order.status);
             const canReplace = canReplaceOrder(order.status);
