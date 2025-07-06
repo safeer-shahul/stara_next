@@ -105,9 +105,18 @@ export default function OrdersList() {
     return status === 'Pending';
   };
 
-  // Check if order can be replaced (only delivered orders)
-  const canReplaceOrder = (status: string) => {
-    return status === 'Delivered';
+  // Check if order can be replaced (only delivered orders, within 3 days, not already requested)
+  const canReplaceOrder = (order: any) => {
+    if (order.status !== 'Delivered') return false;
+    if (order.is_replacement_requested) return false;
+    if (!order.delivered_date) return false;
+
+    // Check if within 3 days of delivery
+    const deliveryDate = new Date(order.delivered_date);
+    const currentDate = new Date();
+    const daysDifference = Math.floor((currentDate.getTime() - deliveryDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    return daysDifference <= 3;
   };
 
   // Check if order can have complaint registered (only delivered orders)
@@ -192,7 +201,7 @@ export default function OrdersList() {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="bg-white rounded-lg shadow p-4 sm:p-6">
         <div className="h-8 bg-gray-200 rounded w-1/3 mb-6"></div>
         {[1, 2, 3].map((i) => (
           <div key={i} className="border rounded-lg p-4 mb-4 animate-pulse">
@@ -209,7 +218,7 @@ export default function OrdersList() {
 
   if (!orders.length) {
     return (
-      <div className="bg-white rounded-lg shadow p-6 text-center">
+      <div className="bg-white rounded-lg shadow p-4 sm:p-6 text-center">
         <PackageOpen size={48} className="mx-auto text-gray-400 mb-4" />
         <h3 className="text-lg font-medium mb-2">No Orders Yet</h3>
         <p className="text-gray-500">Once you place an order, it will appear here.</p>
@@ -219,24 +228,25 @@ export default function OrdersList() {
 
   return (
     <>
-      <div className="bg-white rounded-lg shadow py-6 px-2">
-        <h2 className="text-[16px] font-semibold mb-6">Your Orders</h2>
+      <div className="bg-white rounded-lg shadow py-4 px-2 sm:py-6 sm:px-4">
+        <h2 className="text-[16px] font-semibold mb-4 sm:mb-6 px-2">Your Orders</h2>
         
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           {orders.map((order: any) => {
             const itemsCount = getTotalItemCount(order);
-            const deliveryDate = order.delivered_date 
+            const deliveryDate = order.delivered_date;
             
             const canCancel = canCancelOrder(order.status);
-            const canReplace = canReplaceOrder(order.status);
+            const canReplace = canReplaceOrder(order);
             const canComplaint = canRegisterComplaint(order.status);
             const bundleGroups = getBundleGroups(order);
             const hasOffers = bundleGroups.length > 0;
             
             return (
-              <div key={order.order_id} className="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-2">
-                  <div className="flex items-center gap-2">
+              <div key={order.order_id} className="border border-gray-200 rounded-lg p-3 sm:p-4 hover:shadow-sm transition-shadow">
+                {/* Header Section */}
+                <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center mb-3">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="text-[14px] font-medium">Order #{order.order_id.replace(/-/g, '')}</h3>
                     {hasOffers && (
                       <div className="flex items-center gap-1 text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
@@ -245,7 +255,7 @@ export default function OrdersList() {
                       </div>
                     )}
                   </div>
-                  <span className={`text-xs px-2 py-1 rounded-full font-medium mt-1 sm:mt-0 inline-flex self-start ${
+                  <span className={`text-xs px-2 py-1 rounded-full font-medium inline-flex items-center justify-center min-w-[70px] ${
                     order.status === "Pending" 
                       ? "bg-orange-100 text-orange-800" 
                       : order.status === "Delivered" 
@@ -260,28 +270,35 @@ export default function OrdersList() {
                   </span>
                 </div>
                 
-                <div className="flex flex-wrap gap-x-4 text-[14px] text-gray-500 mb-3">
-                  <span>Ordered: {formatDate(order.created_at)}</span>
-                  {order.status === 'Delivered' && deliveryDate && (
-                    <>
-                      <span>•</span>
-                      <span>Delivered: {formatDate(deliveryDate)}</span>
-                    </>
-                  )}
-                  <span>•</span>
-                  <span>{itemsCount} {itemsCount === 1 ? 'item' : 'items'}</span>
-                  <span>•</span>
-                  <span className="font-medium text-gray-900">₹{parseFloat(order.total_price || order.payable_price).toFixed(2)}</span>
+                {/* Order Info */}
+                <div className="flex flex-col gap-1 text-[12px] sm:text-[14px] text-gray-500 mb-3">
+                  <div className="flex flex-wrap gap-x-3 gap-y-1">
+                    <span>Ordered: {formatDate(order.created_at)}</span>
+                    {order.status === 'Delivered' && deliveryDate && (
+                      <>
+                        <span className="hidden sm:inline">•</span>
+                        <span>Delivered: {formatDate(deliveryDate)}</span>
+                      </>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-x-3 gap-y-1">
+                    <span>{itemsCount} {itemsCount === 1 ? 'item' : 'items'}</span>
+                    <span>•</span>
+                    <span className="font-medium text-gray-900">₹{parseFloat(order.total_price || order.payable_price).toFixed(2)}</span>
+                  </div>
                 </div>
 
+                {/* Address Section */}
                 {order.address_details && (
-                  <div className="py-4 bg-gray-50 rounded-lg mb-3">
-                    <div className="flex items-center">
-                      <MapPin className="w-4 h-4 text-gray-500 mr-2" />
-                      <h4 className="text-sm font-bold text-gray-700">Delivering to:</h4>
+                  <div className="py-3 px-3 bg-gray-50 rounded-lg mb-3">
+                    <div className="flex items-center mb-1">
+                      <MapPin className="w-3 h-3 sm:w-4 sm:h-4 text-gray-500 mr-2 flex-shrink-0" />
+                      <h4 className="text-[12px] sm:text-sm font-bold text-gray-700">Delivering to:</h4>
                     </div>
-                    <p className="text-sm ml-6">{order.address_details.address}, {order.address_details.town}, {getStateName(order.address_details.state)} - {order.address_details.pincode}</p>
-                    <p className="text-sm ml-6">
+                    <p className="text-[11px] sm:text-sm ml-5 sm:ml-6 text-gray-600">
+                      {order.address_details.address}, {order.address_details.town}, {getStateName(order.address_details.state)} - {order.address_details.pincode}
+                    </p>
+                    <p className="text-[11px] sm:text-sm ml-5 sm:ml-6 text-gray-600">
                       <span className="font-medium">Phone:</span> {order.address_details.phone_number_1}
                       {order.address_details.phone_number_2 && order.address_details.phone_number_2.trim() !== "" && (
                         <>, {order.address_details.phone_number_2}</>
@@ -290,19 +307,20 @@ export default function OrdersList() {
                   </div>
                 )}
                 
-                <div className="mt-3 space-y-3">
+                {/* Items Section */}
+                <div className="mt-3 space-y-2 sm:space-y-3">
                   {/* Regular Items */}
                   {order.order_items.length > 0 && (
-                    <div>
+                    <div className="space-y-2">
                       {order.order_items.map((item: any) => (
-                        <div key={item.id} className="flex bg-white p-2 rounded-lg border border-gray-200 mb-2">
-                          <div className="w-16 h-16 rounded-md overflow-hidden mr-3 bg-gray-100 flex-shrink-0 relative">
+                        <div key={item.id} className="flex bg-white p-2 rounded-lg border border-gray-200">
+                          <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-md overflow-hidden mr-2 sm:mr-3 bg-gray-100 flex-shrink-0 relative">
                             {item.product_details.images && item.product_details.images.length > 0 ? (
                               <Image 
                                 src={`${process.env.NEXT_PUBLIC_API_BASE_URL}${item.product_details.images[0].product_image}`} 
                                 alt={item.product_details.product_name}
                                 fill
-                                sizes="(max-width: 64px) 100vw, 64px"
+                                sizes="(max-width: 48px) 100vw, (max-width: 768px) 64px, 64px"
                                 style={{objectFit: 'cover'}}
                               />
                             ) : (
@@ -310,24 +328,22 @@ export default function OrdersList() {
                             )}
                           </div>
                           
-                          <div className="flex-1">
-                            <div className="flex justify-between items-start mb-1">
-                              <h4 className="text-[14px] font-medium text-gray-900 line-clamp-1">{item.product_details.product_name}</h4>
-                            </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-[12px] sm:text-[14px] font-medium text-gray-900 line-clamp-2 mb-1">
+                              {item.product_details.product_name}
+                            </h4>
                             
-                            <div className="flex justify-between">
-                              <div>
-                                <p className="text-[13px] text-gray-600">Qty: {item.quantity}</p>
+                            <div className="flex justify-between items-end">
+                              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                                <p className="text-[11px] sm:text-[13px] text-gray-600">Qty: {item.quantity}</p>
                                 {item.mode && item.mode !== 'Normal' && (
-                                  <span className="text-[11px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded">
+                                  <span className="text-[10px] sm:text-[11px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded w-fit">
                                     {item.mode}
                                   </span>
                                 )}
                               </div>
                               
-                              <div className="text-right">
-                                <p className="text-[14px] font-medium">₹{parseFloat(item.price || item.total_price).toFixed(2)}</p>
-                              </div>
+                              <p className="text-[12px] sm:text-[14px] font-medium">₹{parseFloat(item.price || item.total_price).toFixed(2)}</p>
                             </div>
                           </div>
                         </div>
@@ -337,22 +353,22 @@ export default function OrdersList() {
 
                   {/* Bundle/Offer Items */}
                   {bundleGroups.map((bundleGroup, bundleIndex) => (
-                    <div key={bundleGroup.bundleId} className="border-2 border-dashed border-green-200 rounded-lg p-3 bg-green-50">
+                    <div key={bundleGroup.bundleId} className="border-2 border-dashed border-green-200 rounded-lg p-2 sm:p-3 bg-green-50">
                       <div className="flex items-center gap-2 mb-2">
-                        <Gift size={16} className="text-green-600" />
-                        <h5 className="text-[13px] font-semibold text-green-800">{bundleGroup.offerName}</h5>
+                        <Gift size={14} className="text-green-600" />
+                        <h5 className="text-[12px] sm:text-[13px] font-semibold text-green-800">{bundleGroup.offerName}</h5>
                       </div>
                       
                       <div className="space-y-2">
                         {bundleGroup.items.map((item: any) => (
                           <div key={item.id} className="flex bg-white p-2 rounded-lg border border-green-200">
-                            <div className="w-14 h-14 rounded-md overflow-hidden mr-3 bg-gray-100 flex-shrink-0 relative">
+                            <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-md overflow-hidden mr-2 sm:mr-3 bg-gray-100 flex-shrink-0 relative">
                               {item.product_details.images && item.product_details.images.length > 0 ? (
                                 <Image 
                                   src={`${process.env.NEXT_PUBLIC_API_BASE_URL}${item.product_details.images[0].product_image}`} 
                                   alt={item.product_details.product_name}
                                   fill
-                                  sizes="(max-width: 56px) 100vw, 56px"
+                                  sizes="(max-width: 40px) 100vw, (max-width: 768px) 56px, 56px"
                                   style={{objectFit: 'cover'}}
                                 />
                               ) : (
@@ -360,15 +376,15 @@ export default function OrdersList() {
                               )}
                             </div>
                             
-                            <div className="flex-1">
-                              <div className="flex justify-between items-start mb-1">
-                                <h4 className="text-[13px] font-medium text-gray-900 line-clamp-1">{item.product_details.product_name}</h4>
-                              </div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="text-[11px] sm:text-[13px] font-medium text-gray-900 line-clamp-2 mb-1">
+                                {item.product_details.product_name}
+                              </h4>
                               
-                              <div className="flex justify-between items-center">
-                                <div className="flex items-center gap-2">
-                                  <p className="text-[12px] text-gray-600">Qty: {item.quantity}</p>
-                                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                              <div className="flex justify-between items-end">
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                                  <p className="text-[10px] sm:text-[12px] text-gray-600">Qty: {item.quantity}</p>
+                                  <span className={`text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0.5 rounded-full font-medium w-fit ${
                                     item.mode === 'Buy' 
                                       ? 'bg-blue-100 text-blue-700' 
                                       : 'bg-green-100 text-green-700'
@@ -377,15 +393,13 @@ export default function OrdersList() {
                                   </span>
                                 </div>
                                 
-                                <div className="text-right">
-                                  <p className="text-[13px] font-medium">
-                                    {item.mode === 'Get' ? (
-                                      <span className="text-green-600">FREE</span>
-                                    ) : (
-                                      `₹${parseFloat(item.price || item.total_price).toFixed(2)}`
-                                    )}
-                                  </p>
-                                </div>
+                                <p className="text-[11px] sm:text-[13px] font-medium">
+                                  {item.mode === 'Get' ? (
+                                    <span className="text-green-600">FREE</span>
+                                  ) : (
+                                    `₹${parseFloat(item.price || item.total_price).toFixed(2)}`
+                                  )}
+                                </p>
                               </div>
                             </div>
                           </div>
@@ -395,42 +409,35 @@ export default function OrdersList() {
                   ))}
                 </div>
                 
+                {/* Footer Section */}
                 <div className="mt-3 pt-2 border-t border-gray-100">
-                  <div className="flex justify-between items-center mb-3">
-                    <div className="text-[13px]">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-3">
+                    <div className="text-[11px] sm:text-[13px]">
                       <span className="font-medium">Payment: </span>
                       <span className={order.payment_status === "Success" ? "text-green-600" : "text-orange-600"}>
                         {order.payment_status} ({order.payment_mode})
                       </span>
                     </div>
-                    <div className="text-[13px] font-medium">
+                    <div className="text-[11px] sm:text-[13px] font-medium">
                       Total: ₹{parseFloat(order.total_price || order.payable_price).toFixed(2)}
                     </div>
                   </div>
                   
-                  <div className="flex flex-wrap gap-2 mt-2">
+                  {/* Action Buttons */}
+                  <div className="flex flex-wrap gap-2">
                     {canCancel && (
                       <button 
                         onClick={() => handleOpenCancelModal(order.order_id)}
-                        className="px-3 py-1 cursor-pointer text-[12px] border border-black text-black rounded hover:bg-gray-50 transition-colors"
+                        className="px-3 py-1.5 sm:py-1 text-[11px] sm:text-[12px] border border-black text-black rounded hover:bg-gray-50 transition-colors flex-shrink-0"
                       >
                         Cancel Order
                       </button>
                     )}
                     
-                    {/* {canComplaint && (
-                      <button 
-                        onClick={() => handleOpenComplaintModal(order.order_id)}
-                        className="px-3 py-1 cursor-pointer text-[12px] border border-black text-black rounded hover:bg-gray-50 transition-colors"
-                      >
-                        Register Complaint
-                      </button>
-                    )} */}
-                    
                     {canReplace && (
                       <button 
                         onClick={() => handleOpenReplacementModal(order.order_id)}
-                        className="px-3 py-1 cursor-pointer text-[12px] border border-black text-black rounded hover:bg-gray-50 transition-colors"
+                        className="px-3 py-1.5 sm:py-1 text-[11px] sm:text-[12px] border border-black text-black rounded hover:bg-gray-50 transition-colors flex-shrink-0"
                       >
                         Replace Order
                       </button>
