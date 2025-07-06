@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { LayoutDashboard, Package, ShoppingCart, Users, DollarSign, UserCircle, AlertTriangle, ExternalLink } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingCart, Users, DollarSign, UserCircle, AlertTriangle, ExternalLink, RefreshCw } from 'lucide-react';
 import apiService from '@/utils/api/apiService';
 
 // Define a more specific type for adminUser
@@ -36,6 +36,10 @@ interface DashboardData {
     count: number;
     label: string;
     threshold: number;
+  };
+  pending_replacements: {
+    count: number;
+    label: string;
   };
 }
 
@@ -99,6 +103,16 @@ export default function AdminDashboard() {
       description: dashboardData.new_orders.label,
       patternId: 'orders-pattern',
       route: '/admin/orders/list'
+    },
+    {
+      title: 'Pending Replacements',
+      value: dashboardData.pending_replacements.count.toString(),
+      icon: RefreshCw,
+      color: 'orange',
+      iconColor: 'text-orange-700',
+      description: dashboardData.pending_replacements.label,
+      patternId: 'replacements-pattern',
+      route: '/admin/replacements/list'
     }
   ] : [];
 
@@ -153,6 +167,11 @@ export default function AdminDashboard() {
         bg: 'bg-yellow-50',
         text: 'text-yellow-600',
         hoverBorder: 'hover:border-yellow-300'
+      },
+      orange: {
+        bg: 'bg-orange-50',
+        text: 'text-orange-600',
+        hoverBorder: 'hover:border-orange-300'
       }
     };
     return colorMap[color as keyof typeof colorMap] || colorMap.purple;
@@ -168,6 +187,10 @@ export default function AdminDashboard() {
       green: {
         gradient: 'from-green-600 via-green-700 to-green-800',
         hover: 'hover:from-green-700 hover:via-green-800 hover:to-green-900',
+      },
+      orange: {
+        gradient: 'from-orange-600 via-orange-700 to-orange-800',
+        hover: 'hover:from-orange-700 hover:via-orange-800 hover:to-orange-900',
       }
     };
     return colorMap[color as keyof typeof colorMap] || colorMap.blue;
@@ -190,6 +213,13 @@ export default function AdminDashboard() {
           <path d="M2,2 L18,18 M18,2 L2,18" stroke="white" strokeWidth="0.3" opacity="0.1"/>
         </pattern>
       ),
+      'replacements-pattern': (
+        <pattern id={patternId} x="0" y="0" width="18" height="18" patternUnits="userSpaceOnUse">
+          <circle cx="9" cy="9" r="3" fill="white" opacity="0.2"/>
+          <path d="M3,3 C6,6 12,6 15,3 M15,15 C12,12 6,12 3,15" stroke="white" strokeWidth="0.8" opacity="0.25"/>
+          <rect x="6" y="6" width="6" height="6" fill="none" stroke="white" strokeWidth="0.4" opacity="0.15"/>
+        </pattern>
+      ),
       'warning-pattern': (
         <pattern id={patternId} x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
           <circle cx="10" cy="10" r="2" fill="white" opacity="0.3"/>
@@ -210,8 +240,8 @@ export default function AdminDashboard() {
         </h2>
         
         {/* Loading skeleton for summary cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[1, 2, 3, 4].map((i) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+          {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
               <div className="animate-pulse">
                 <div className="w-12 h-12 bg-gray-200 rounded-full mb-4"></div>
@@ -282,8 +312,8 @@ export default function AdminDashboard() {
       )}
 
       {/* Dashboard Cards Layout */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Special Cards with Gradients - Products and Orders */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+        {/* Special Cards with Gradients - Products, Orders, and Replacements */}
         {specialCards.map((card) => {
           const Icon = card.icon;
           const colors = getGradientClasses(card.color);
