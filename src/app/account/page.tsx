@@ -1,7 +1,7 @@
 // AccountPage.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import ProfileInfo from './components/ProfileInfo';
 import MenuCard from './components/MenuCard';
 import OrdersList from './components/OrdersList';
@@ -15,6 +15,27 @@ export type ActiveComponentType = 'orders' | 'change-password' | 'support' | 'wi
 
 export default function AccountPage() {
   const [activeComponent, setActiveComponent] = useState<ActiveComponentType>(null);
+  const outletRef = useRef<HTMLDivElement>(null);
+
+  // Function to handle menu item click with scroll
+  const handleMenuItemClick = (item: ActiveComponentType) => {
+    setActiveComponent(item);
+    
+    // Only scroll on mobile/tablet devices where outlet is underneath menu
+    // Check if screen is smaller than lg breakpoint (1024px)
+    setTimeout(() => {
+      if (outletRef.current && typeof window !== 'undefined' && window.innerWidth < 1024) {
+        // Get the element's position and add some offset
+        const elementTop = outletRef.current.getBoundingClientRect().top + window.pageYOffset;
+        const offsetTop = elementTop - 5; // 20px offset from top
+        
+        window.scrollTo({
+          top: offsetTop,
+          behavior: 'smooth'
+        });
+      }
+    }, 150);
+  };
 
   // Function to render the active component
   const renderActiveComponent = () => {
@@ -39,9 +60,9 @@ export default function AccountPage() {
       <div className="flex flex-col lg:flex-row gap-6">
         <div className="w-full lg:w-1/3 space-y-6">
           <ProfileInfo />
-          <MenuCard onMenuItemClick={setActiveComponent} activeItem={activeComponent} />
+          <MenuCard onMenuItemClick={handleMenuItemClick} activeItem={activeComponent} />
         </div>
-        <div className="w-full lg:w-2/3">
+        <div ref={outletRef} className="w-full lg:w-2/3">
           {activeComponent ? (
             renderActiveComponent()
           ) : (

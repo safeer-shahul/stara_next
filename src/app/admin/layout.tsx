@@ -5,7 +5,7 @@ import { ReactNode, useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import apiService from '@/utils/api/apiService';
-import { Menu, X, LogOut, LayoutDashboard, Package, ShoppingCart, Percent, Tag, Users, Eye } from 'lucide-react';
+import { Menu, X, LogOut, LayoutDashboard, Package, ShoppingCart, Percent, Tag, Users, Eye, SquareArrowDownRight } from 'lucide-react';
 import { AdminUserProvider } from './context/AdminUserContext';
 
 interface AdminUser {
@@ -76,6 +76,13 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       label: 'Staffs',
       startsWith: true,
       icon: Users,
+      superuserOnly: true,
+    },
+    {
+      href: '/admin/replacements/list',
+      label: 'Replacements',
+      startsWith: true,
+      icon: SquareArrowDownRight,
       superuserOnly: true,
     },
   ], []);

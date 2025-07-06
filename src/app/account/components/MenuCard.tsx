@@ -1,8 +1,8 @@
-// components/MenuCard.tsx
+//  components/MenuCard.tsx
 'use client';
 
-import { Lock, HelpCircle, ChevronRight, ShoppingCart, Heart, MessageSquare } from 'lucide-react'; // Import MessageSquare icon
-import { ActiveComponentType } from '../page'; // Import ActiveComponentType from AccountPage
+import { Lock, HelpCircle, ChevronRight, ShoppingCart, Heart, MessageSquare } from 'lucide-react';
+import { ActiveComponentType } from '../page';
 
 interface MenuCardProps {
   onMenuItemClick: (item: ActiveComponentType) => void;
@@ -31,9 +31,9 @@ export default function MenuCard({ onMenuItemClick, activeItem }: MenuCardProps)
       description: 'Your wishlist products'
     },
     {
-      id: 'complaints', // New menu item
+      id: 'complaints',
       label: 'Complaints',
-      icon: <MessageSquare size={18} />, // Using MessageSquare icon
+      icon: <MessageSquare size={18} />,
       description: 'Register or view complaints'
     },
     {
@@ -68,7 +68,7 @@ export default function MenuCard({ onMenuItemClick, activeItem }: MenuCardProps)
                 }`}>
                   {item.label}
                 </p>
-                <p className="text-sm text-gray-500  text-[14px]">{item.description}</p>
+                <p className="text-sm text-gray-500 text-[14px]">{item.description}</p>
               </div>
             </div>
             <ChevronRight size={16} className="text-gray-400" />

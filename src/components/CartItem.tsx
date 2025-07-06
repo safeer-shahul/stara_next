@@ -138,12 +138,13 @@ const CartItem = ({ product, onRemove, onQuantityChange, fromProductSummary = fa
                 <span className="text-red-600 text-sm font-medium">Out of Stock</span>
               </div>
             ) : (
-              <div className="flex items-center gap-2 p-2 bg-green-50 rounded-lg border border-green-200 mb-3">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-green-700 text-sm font-medium">
-                  Available: {currentMaxLimit} units
-                </span>
-              </div>
+              // <div className="flex items-center gap-2 p-2 bg-green-50 rounded-lg border border-green-200 mb-3">
+              //   <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              //   <span className="text-green-700 text-sm font-medium">
+              //     Available: {currentMaxLimit} units
+              //   </span>
+              // </div>
+              <></>
             )
           ) : (
             <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-200">

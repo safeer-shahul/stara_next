@@ -14,7 +14,7 @@ export default function AccountLayout({
             {children}
           </div>
         </section>
-      </main>\
+      </main>
     </ShopLayout>
   );
 }

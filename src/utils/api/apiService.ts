@@ -911,6 +911,28 @@ public async logout(silent: boolean = false, router?: any): Promise<void> {
       throw error;
     }
   }
+
+
+public async getPaginatedReplacementRequests(
+    page: number = 1,
+    pageSize: number = 10,
+    options?: {
+      sort_order?: 'asc' | 'desc'; 
+    }
+  ): Promise<any> {
+    try {
+      let url = `/order/get_my_complaints?page=${page}&page_size=${pageSize}`;
+
+      if (options?.sort_order) {
+        url += `&sort_order=${options.sort_order}`;
+      }
+
+      return await this.get<any>(url);
+    } catch (error) {
+      console.error('Error fetching paginated orders:', error);
+      throw error;
+    }
+  }
 }
 
 const apiService = ApiService.getInstance();
