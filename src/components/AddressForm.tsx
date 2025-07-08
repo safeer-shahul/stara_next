@@ -2,7 +2,6 @@
 'use client';
 
 import { useState } from 'react';
-// import INDIAN_STATES from './states'; // Removed direct import
 import apiService from '@/utils/api/apiService';
 
 interface Address {
@@ -62,7 +61,6 @@ const INDIAN_STATES: { [key: string]: string } = {
     "WB":"West Bengal"
 };
 
-
 const AddressForm: React.FC<AddressFormProps> = ({ 
   initialData, 
   onSubmit, 
@@ -81,6 +79,12 @@ const AddressForm: React.FC<AddressFormProps> = ({
   const [errors, setErrors] = useState<Partial<Record<keyof Address, string>>>({});
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  
+  // Pincode verification states
+  const [isPincodeVerified, setIsPincodeVerified] = useState(false);
+  const [pincodeVerifying, setPincodeVerifying] = useState(false);
+  const [pincodeError, setPincodeError] = useState<string | null>(null);
+  const [lastVerifiedPincode, setLastVerifiedPincode] = useState<string>('');
 
   const validateForm = (): boolean => {
     const newErrors: Partial<Record<keyof Address, string>> = {};
@@ -101,6 +105,8 @@ const AddressForm: React.FC<AddressFormProps> = ({
       newErrors.pincode = 'Pincode is required';
     } else if (!/^\d{6}$/.test(formData.pincode)) {
       newErrors.pincode = 'Please enter a valid 6-digit pincode';
+    } else if (!isPincodeVerified || formData.pincode !== lastVerifiedPincode) {
+      newErrors.pincode = 'Please verify the pincode first';
     }
     
     if (!formData.phone_number_1.trim()) {
@@ -132,6 +138,42 @@ const AddressForm: React.FC<AddressFormProps> = ({
         ...prev,
         [name]: undefined
       }));
+    }
+
+    // Reset pincode verification when pincode changes
+    if (name === 'pincode' && value !== lastVerifiedPincode) {
+      setIsPincodeVerified(false);
+      setPincodeError(null);
+    }
+  };
+
+  const handlePincodeVerification = async () => {
+    if (!formData.pincode || !/^\d{6}$/.test(formData.pincode)) {
+      setPincodeError('Please enter a valid 6-digit pincode');
+      return;
+    }
+
+    setPincodeVerifying(true);
+    setPincodeError(null);
+    setApiError(null);
+
+    try {
+      const response = await apiService.checkPincode(formData.pincode);
+      
+      if (response && response.delivery_codes && response.delivery_codes.length > 0) {
+        setIsPincodeVerified(true);
+        setLastVerifiedPincode(formData.pincode);
+        setPincodeError(null);
+      } else {
+        setIsPincodeVerified(false);
+        setPincodeError('This pincode is not serviceable. Please check and try again.');
+      }
+    } catch (error) {
+      console.error('Error verifying pincode:', error);
+      setIsPincodeVerified(false);
+      setPincodeError('Failed to verify pincode. Please try again.');
+    } finally {
+      setPincodeVerifying(false);
     }
   };
 
@@ -165,6 +207,10 @@ const AddressForm: React.FC<AddressFormProps> = ({
       }
     }
   };
+
+  const isPincodeReadyForVerification = formData.pincode && /^\d{6}$/.test(formData.pincode);
+  const showVerifyButton = isPincodeReadyForVerification && !isPincodeVerified;
+  const showVerificationStatus = isPincodeReadyForVerification && (isPincodeVerified || pincodeError);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 bg-white p-4 rounded-[12px]">
@@ -234,28 +280,71 @@ const AddressForm: React.FC<AddressFormProps> = ({
         </div>
       </div>
       
-      <div className="grid grid-cols-2 gap-4">
+      <div >
         <div>
           <label className="block text-[13px] font-medium text-gray-700 mb-1">
             Pincode *
           </label>
-          <input
-            type="text"
-            name="pincode"
-            value={formData.pincode}
-            onChange={handleChange}
-            maxLength={6}
-            placeholder="6-digit pincode"
-            className={`w-full px-3 py-2 text-[13px] border rounded-md ${errors.pincode ? 'border-red-500' : 'border-gray-300'}`}
-          />
+          <div className="flex gap-2">
+            <input
+              type="text"
+              name="pincode"
+              value={formData.pincode}
+              onChange={handleChange}
+              maxLength={6}
+              placeholder="6-digit pincode"
+              className={`flex-1 px-3 py-2 text-[13px] border rounded-md ${errors.pincode ? 'border-red-500' : 'border-gray-300'}`}
+            />
+            {showVerifyButton && (
+              <button
+                type="button"
+                onClick={handlePincodeVerification}
+                disabled={pincodeVerifying}
+                className={`px-3 py-2 text-[13px] font-medium rounded-md border ${
+                  pincodeVerifying 
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                    : 'bg-blue-50 text-blue-600 border-blue-300 hover:bg-blue-100'
+                }`}
+              >
+                {pincodeVerifying ? 'Verifying...' : 'Verify'}
+              </button>
+            )}
+          </div>
+          
+          {/* Verification Status */}
+          {showVerificationStatus && (
+            <div className="mt-2">
+              {isPincodeVerified ? (
+                <p className="text-[13px] text-green-600 flex items-center gap-1">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  Pincode verified - delivery available
+                </p>
+              ) : pincodeError && (
+                <p className="text-[13px] text-red-600 flex items-center gap-1">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  {pincodeError}
+                </p>
+              )}
+            </div>
+          )}
+          
           {errors.pincode && (
             <p className="mt-1 text-[13px] text-red-600">{errors.pincode}</p>
           )}
         </div>
         
+        
+      </div>
+      
+      <div className="grid grid-cols-2 gap-4">
+        
         <div>
           <label className="block text-[13px] font-medium text-gray-700 mb-1">
-            Primary Phone Number *
+            Primary Phone*
           </label>
           <input
             type="tel"
@@ -270,11 +359,10 @@ const AddressForm: React.FC<AddressFormProps> = ({
             <p className="mt-1 text-[13px] text-red-600">{errors.phone_number_1}</p>
           )}
         </div>
-      </div>
-      
-      <div>
+
+        <div>
         <label className="block text-[13px] font-medium text-gray-700 mb-1">
-          Alternate Phone Number (Optional)
+          Alternate Phone(Optional)
         </label>
         <input
           type="tel"
@@ -288,6 +376,7 @@ const AddressForm: React.FC<AddressFormProps> = ({
         {errors.phone_number_2 && (
           <p className="mt-1 text-[13px] text-red-600">{errors.phone_number_2}</p>
         )}
+        </div>
       </div>
       
       <div className="flex justify-end space-x-3 pt-4">

@@ -1,12 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-// import { useRouter } from 'next/navigation';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { auth } from './firebase/config';
 import apiService from '@/utils/api/apiService';
 import { showToast } from '@/utils/toast';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, ArrowLeft } from 'lucide-react';
 
 interface RegisterProps {
   switchToLogin: () => void;
@@ -14,20 +13,80 @@ interface RegisterProps {
 }
 
 const Register = ({ switchToLogin, onRegisterSuccess }: RegisterProps) => {
-  // const router = useRouter();
+  const [currentStep, setCurrentStep] = useState<'register' | 'otp'>('register');
+  const [otpToken, setOtpToken] = useState('');
 
   const [formData, setFormData] = useState({
     username: '',
+    first_name: '',
+    last_name: '',
     email: '',
-    mobile: '',
     password: '',
     confirmPassword: '',
   });
+
+  const [otpData, setOtpData] = useState({
+    otp: '',
+  });
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [passwordsMatchError, setPasswordsMatchError] = useState('');
+  const [usernameError, setUsernameError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+
+  // Validation functions
+  const validateUsername = (username: string): string => {
+    if (!username) return '';
+    
+    // Only lowercase letters, digits, and '_' symbol allowed
+    const usernameRegex = /^[a-z0-9_]+$/;
+    
+    if (!usernameRegex.test(username)) {
+      return 'Username can only contain lowercase letters, digits, and _ symbol';
+    }
+    
+    return '';
+  };
+
+  const validatePassword = (password: string): string => {
+    if (!password) return '';
+    
+    const errors = [];
+    
+    // At least one uppercase letter
+    if (!/[A-Z]/.test(password)) {
+      errors.push('one uppercase letter');
+    }
+    
+    // At least one digit
+    if (!/[0-9]/.test(password)) {
+      errors.push('one digit');
+    }
+    
+    // Must contain @ symbol
+    if (!/@/.test(password)) {
+      errors.push('@ symbol');
+    }
+    
+    // No spaces allowed
+    if (/\s/.test(password)) {
+      errors.push('no spaces');
+    }
+    
+    // Minimum 6 characters
+    if (password.length < 6) {
+      errors.push('minimum 6 characters');
+    }
+    
+    if (errors.length > 0) {
+      return `Password must contain: ${errors.join(', ')}`;
+    }
+    
+    return '';
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -37,16 +96,43 @@ const Register = ({ switchToLogin, onRegisterSuccess }: RegisterProps) => {
         [name]: value,
       };
 
+      // Real-time validation
+      if (name === 'username') {
+        setUsernameError(validateUsername(value));
+      }
+      
+      if (name === 'password') {
+        setPasswordError(validatePassword(value));
+        
+        // Also check password match if confirm password exists
+        if (newFormData.confirmPassword) {
+          if (value !== newFormData.confirmPassword) {
+            setPasswordsMatchError('Passwords do not match.');
+          } else {
+            setPasswordsMatchError('');
+          }
+        }
+      }
+
       // Real-time password matching check
-      if (name === 'password' || name === 'confirmPassword') {
-        if (newFormData.password && newFormData.confirmPassword && newFormData.password !== newFormData.confirmPassword) {
+      if (name === 'confirmPassword') {
+        if (newFormData.password && value && newFormData.password !== value) {
           setPasswordsMatchError('Passwords do not match.');
         } else {
           setPasswordsMatchError('');
         }
       }
+      
       return newFormData;
     });
+  };
+
+  const handleOtpChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setOtpData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   };
 
   const handleSuccessfulRegistration = async () => {
@@ -61,13 +147,30 @@ const Register = ({ switchToLogin, onRegisterSuccess }: RegisterProps) => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    // Validate username
+    const usernameValidationError = validateUsername(formData.username);
+    if (usernameValidationError) {
+      setUsernameError(usernameValidationError);
+      showToast.error(usernameValidationError);
+      return;
+    }
+
+    // Validate password
+    const passwordValidationError = validatePassword(formData.password);
+    if (passwordValidationError) {
+      setPasswordError(passwordValidationError);
+      showToast.error(passwordValidationError);
+      return;
+    }
 
     // Final check for password match before submitting
     if (formData.password !== formData.confirmPassword) {
       const errorMsg = 'Passwords do not match. Please correct them.';
+      setPasswordsMatchError(errorMsg);
       setError(errorMsg);
       showToast.error(errorMsg);
       return;
@@ -76,21 +179,62 @@ const Register = ({ switchToLogin, onRegisterSuccess }: RegisterProps) => {
     setIsLoading(true);
 
     try {
-      // Use apiService for registration instead of direct fetch
-      const response = await fetch('/api/auth/register', { // Assuming this is your API route or proxy
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username: formData.username,
-          email: formData.email,
-          mobile: formData.mobile,
-          password: formData.password,
-        }),
+      const data = await apiService.createUserOtp({
+        username: formData.username,
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        email: formData.email,
+        password: formData.password,
       });
 
-      const data = await response.json();
+      // Store the token for OTP verification
+      setOtpToken(data.token);
+      
+      // Switch to OTP verification step
+      setCurrentStep('otp');
+      showToast.success('OTP sent to your email. Please check and verify.');
+
+    } catch (err: any) {
+      console.error('User creation failed:', err);
+      
+      // Handle Axios error structure
+      let errorMessage = 'An unexpected error occurred during registration.';
+      
+      if (err.response?.data?.error) {
+        errorMessage = err.response.data.error;
+      } else if (err.response?.data?.detail) {
+        errorMessage = err.response.data.detail;
+      } else if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+      showToast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    if (!otpData.otp.trim()) {
+      const errorMsg = 'Please enter the OTP sent to your email.';
+      setError(errorMsg);
+      showToast.error(errorMsg);
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const data = await apiService.verifyOtp({
+        otp: otpData.otp,
+        token: otpToken,
+      });
 
       // Store tokens if provided
       if (data.access) {
@@ -104,8 +248,62 @@ const Register = ({ switchToLogin, onRegisterSuccess }: RegisterProps) => {
       await handleSuccessfulRegistration();
 
     } catch (err: any) {
-      console.error('Registration failed:', err);
-      const errorMessage = err.detail || err.message || 'An unexpected error occurred during registration.';
+      console.error('OTP verification failed:', err);
+      
+      // Handle Axios error structure
+      let errorMessage = 'An unexpected error occurred during OTP verification.';
+      
+      if (err.response?.data?.status) {
+        errorMessage = err.response.data.status;
+      } else if (err.response?.data?.error) {
+        errorMessage = err.response.data.error;
+      } else if (err.response?.data?.detail) {
+        errorMessage = err.response.data.detail;
+      } else if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+      showToast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setIsLoading(true);
+    setError('');
+
+    try {
+      const data = await apiService.createUserOtp({
+        username: formData.username,
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        email: formData.email,
+        password: formData.password,
+      });
+
+      setOtpToken(data.token);
+      showToast.success('OTP resent to your email.');
+
+    } catch (err: any) {
+      console.error('Resend OTP failed:', err);
+      
+      // Handle Axios error structure
+      let errorMessage = 'An unexpected error occurred while resending OTP.';
+      
+      if (err.response?.data?.error) {
+        errorMessage = err.response.data.error;
+      } else if (err.response?.data?.detail) {
+        errorMessage = err.response.data.detail;
+      } else if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
       setError(errorMessage);
       showToast.error(errorMessage);
     } finally {
@@ -160,8 +358,96 @@ const Register = ({ switchToLogin, onRegisterSuccess }: RegisterProps) => {
     }
   };
 
+  const goBackToRegister = () => {
+    setCurrentStep('register');
+    setError('');
+    setOtpData({ otp: '' });
+  };
+
   // Determine if the submit button should be disabled
-  const isSubmitDisabled = isLoading || passwordsMatchError !== '';
+  const isSubmitDisabled = isLoading || 
+    passwordsMatchError !== '' || 
+    usernameError !== '' || 
+    passwordError !== '';
+
+  if (currentStep === 'otp') {
+    return (
+      <div>
+        <div className="flex items-center mb-6">
+          <button
+            onClick={goBackToRegister}
+            className="flex items-center text-gray-600 hover:text-gray-800 mr-4"
+            disabled={isLoading}
+          >
+            <ArrowLeft className="w-5 h-5 mr-1" />
+            Back
+          </button>
+          <h2 className="text-xl font-semibold">Verify Your Email</h2>
+        </div>
+
+        <div className="mb-6 p-4 bg-blue-50 text-blue-700 rounded-md text-sm">
+          We've sent a verification code to <strong>{formData.email}</strong>. Please check your email and enter the code below.
+        </div>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-md text-sm">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleVerifyOtp}>
+          <div className="mb-6">
+            <label htmlFor="otp" className="block text-sm font-medium text-gray-700 mb-1">
+              Verification Code
+            </label>
+            <input
+              id="otp"
+              name="otp"
+              type="text"
+              value={otpData.otp}
+              onChange={handleOtpChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200 text-center text-lg tracking-widest"
+              placeholder="Enter 6-digit code"
+              required
+              disabled={isLoading}
+              maxLength={6}
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={isLoading || !otpData.otp.trim()}
+            className={`w-full text-white py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:ring-opacity-50 transition duration-200 flex items-center justify-center ${isLoading || !otpData.otp.trim() ? 'bg-gray-400 cursor-not-allowed' : 'bg-[var(--color-primary-950)] hover:bg-[#124a62]'}`}
+          >
+            {isLoading ? (
+              <>
+                <svg className="animate-spin h-5 w-5 text-white mr-3" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Verifying...
+              </>
+            ) : (
+              'Verify Email'
+            )}
+          </button>
+        </form>
+
+        <div className="mt-4 text-center">
+          <p className="text-sm text-gray-600">
+            Didn't receive the code?{' '}
+            <button
+              onClick={handleResendOtp}
+              className="text-[var(--color-primary-950)] hover:underline focus:outline-none font-medium"
+              disabled={isLoading}
+            >
+              Resend
+            </button>
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -192,11 +478,11 @@ const Register = ({ switchToLogin, onRegisterSuccess }: RegisterProps) => {
           <div className="w-full border-t border-gray-300"></div>
         </div>
         <div className="relative flex justify-center text-sm">
-          <span className="px-2 bg-white text-gray-500">Or sign up with email/mobile</span>
+          <span className="px-2 bg-white text-gray-500">Or sign up with email</span>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleCreateUser}>
         <div className="mb-4">
           <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
             Username
@@ -207,10 +493,48 @@ const Register = ({ switchToLogin, onRegisterSuccess }: RegisterProps) => {
             type="text"
             value={formData.username}
             onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200"
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200 ${usernameError ? 'border-red-500' : 'border-gray-300'}`}
             required
             disabled={isLoading}
+            placeholder="Only lowercase letters, digits, and _ allowed"
           />
+          {usernameError && (
+            <p className="text-red-500 text-xs mt-1">{usernameError}</p>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label htmlFor="first_name" className="block text-sm font-medium text-gray-700 mb-1">
+              First Name
+            </label>
+            <input
+              id="first_name"
+              name="first_name"
+              type="text"
+              value={formData.first_name}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200"
+              required
+              disabled={isLoading}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="last_name" className="block text-sm font-medium text-gray-700 mb-1">
+              Last Name
+            </label>
+            <input
+              id="last_name"
+              name="last_name"
+              type="text"
+              value={formData.last_name}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200"
+              required
+              disabled={isLoading}
+            />
+          </div>
         </div>
 
         <div className="mb-4">
@@ -230,22 +554,6 @@ const Register = ({ switchToLogin, onRegisterSuccess }: RegisterProps) => {
         </div>
 
         <div className="mb-4">
-          <label htmlFor="mobile" className="block text-sm font-medium text-gray-700 mb-1">
-            Mobile Number
-          </label>
-          <input
-            id="mobile"
-            name="mobile"
-            type="tel"
-            value={formData.mobile}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200"
-            required
-            disabled={isLoading}
-          />
-        </div>
-
-        <div className="mb-4">
           <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
             Password
           </label>
@@ -256,9 +564,10 @@ const Register = ({ switchToLogin, onRegisterSuccess }: RegisterProps) => {
               type={showPassword ? "text" : "password"}
               value={formData.password}
               onChange={handleChange}
-              className="w-full px-3 py-2 pr-12 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200"
+              className={`w-full px-3 py-2 pr-12 border rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)] focus:border-transparent transition duration-200 ${passwordError ? 'border-red-500' : 'border-gray-300'}`}
               required
               disabled={isLoading}
+              placeholder="Min 6 chars, 1 uppercase, 1 digit, @ symbol, no spaces"
             />
             <button
               type="button"
@@ -273,6 +582,9 @@ const Register = ({ switchToLogin, onRegisterSuccess }: RegisterProps) => {
               )}
             </button>
           </div>
+          {passwordError && (
+            <p className="text-red-500 text-xs mt-1">{passwordError}</p>
+          )}
         </div>
 
         <div className="mb-6">

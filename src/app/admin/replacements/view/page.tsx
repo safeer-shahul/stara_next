@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { ArrowLeft, RefreshCw, Edit, Calendar, User, Package, FileText, AlertCircle, CheckCircle, XCircle, Clock, Loader2, Image as ImageIcon, X, ZoomIn } from 'lucide-react';
 import Image from 'next/image';
 import apiService from '@/utils/api/apiService';
+import { showToast } from '@/utils/toast';
 
 // Define interfaces for the detailed replacement data
 interface ProductImage {
@@ -147,9 +148,11 @@ function ReplacementViewContent() {
       setReplacement(response);
       setAdminNotes(response.admin_notes || '');
       setSelectedStatus(response.status || '');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to fetch replacement details:', err);
-      setError('Failed to load replacement details. Please try again.');
+      const errorMessage = err?.response?.data?.message || err?.message || 'Failed to load replacement details. Please try again.';
+      setError(errorMessage);
+      showToast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -166,7 +169,7 @@ function ReplacementViewContent() {
 
   // Handle back navigation
   const handleBack = useCallback(() => {
-    router.push('/admin/replacement-requests');
+    router.push('/admin/replacements/list');
   }, [router]);
 
   // Handle order view
@@ -182,11 +185,12 @@ function ReplacementViewContent() {
     try {
       await apiService.replacementStatusUpdate(replacement.id, selectedStatus, adminNotes);
       
-      alert('Replacement request updated successfully!');
+      showToast.success('Replacement request updated successfully!');
       await fetchReplacementDetails();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to update replacement request:', err);
-      setError('Failed to update replacement request. Please try again.');
+      const errorMessage = err?.response?.data?.message || err?.message || 'Failed to update replacement request. Please try again.';
+      showToast.error(errorMessage);
     } finally {
       setIsUpdating(false);
     }
@@ -638,7 +642,7 @@ function ReplacementViewContent() {
                 </div>
                 <button
                   onClick={() => handleViewOrder(replacement.order)}
-                  className="w-full bg-[var(--color-primary-950)] text-white px-4 py-2 rounded-lg hover:bg-[var(--color-primary-900)] transition-colors duration-200 flex items-center justify-center gap-2"
+                  className="w-full bg-[var(--color-primary-950)] cursor-pointer text-white px-4 py-2 rounded-lg hover:bg-[var(--color-primary-800)] transition-colors duration-200 flex items-center justify-center gap-2"
                 >
                   <Package className="w-4 h-4" />
                   View Order Details
@@ -692,7 +696,7 @@ function ReplacementViewContent() {
                     onClick={handleStatusUpdate}
                     disabled={isUpdating}
                     className="w-full bg-[var(--color-primary-950)] text-white px-4 py-2 rounded-lg 
-                               hover:bg-[var(--color-primary-900)] transition-colors duration-200 
+                               hover:bg-[var(--color-primary-800)] cursor-pointer transition-colors duration-200 
                                flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isUpdating ? (

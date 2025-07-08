@@ -1,50 +1,55 @@
 'use client';
 
-import { DollarSign, Truck } from 'lucide-react';
+import { CheckCircle2, XCircle, Truck } from 'lucide-react';
 import { useState } from 'react';
-
-interface DeliveryInfo {
-  deliveryDate?: string;
-  cashOnDelivery?: boolean;
-  error?: string;
-}
+import apiService from '@/utils/api/apiService';
 
 interface DeliveryPincodeCheckerProps {
   defaultDeliveryTime?: string;
-  checkPincodeHandler?: (pincode: string) => Promise<DeliveryInfo>;
 }
 
 export default function DeliveryPincodeChecker({ 
-  defaultDeliveryTime = "3-4 Days",
-  checkPincodeHandler
+  defaultDeliveryTime = "3-4 Days"
 }: DeliveryPincodeCheckerProps) {
   const [pincode, setPincode] = useState<string>('');
   const [showPincodeInput, setShowPincodeInput] = useState<boolean>(false);
-  const [deliveryInfo, setDeliveryInfo] = useState<DeliveryInfo | null>(null);
+  const [isDeliveryAvailable, setIsDeliveryAvailable] = useState<boolean | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // If no custom handler provided, use a default one
   const handlePincodeCheck = async (): Promise<void> => {
-    if (checkPincodeHandler) {
-      const result = await checkPincodeHandler(pincode);
-      setDeliveryInfo(result);
+    if (!pincode || !/^\d{6}$/.test(pincode)) {
+      setError("Please enter a valid 6-digit pincode");
+      setIsDeliveryAvailable(null);
       return;
     }
 
-    // Default implementation
-    if (pincode && pincode.length === 6 && !isNaN(Number(pincode))) {
-      setDeliveryInfo({
-        deliveryDate: `22nd and 25th Mar`,
-        cashOnDelivery: true
-      });
-    } else {
-      setDeliveryInfo({
-        error: "Please enter a valid 6-digit pincode"
-      });
+    setLoading(true);
+    setError(null);
+    setIsDeliveryAvailable(null);
+
+    try {
+      const response = await apiService.checkPincode(pincode);
+      
+      if (response && response.delivery_codes && response.delivery_codes.length > 0) {
+        setIsDeliveryAvailable(true);
+      } else {
+        setIsDeliveryAvailable(false);
+      }
+    } catch (error) {
+      console.error('Error checking pincode:', error);
+      setError("Failed to check pincode. Please try again.");
+      setIsDeliveryAvailable(null);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handlePincodeChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
     setPincode(e.target.value.slice(0, 6));
+    // Clear previous results when user types
+    setError(null);
+    setIsDeliveryAvailable(null);
   };
 
   return (
@@ -75,36 +80,39 @@ export default function DeliveryPincodeChecker({
               maxLength={6}
             />
             <button 
-              className="bg-[#C69A7F] text-white px-4 py-2 rounded-md"
+              className={`bg-[#C69A7F] text-white px-4 py-2 rounded-md ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
               onClick={handlePincodeCheck}
+              disabled={loading}
             >
-              Check
+              {loading ? 'Checking...' : 'Check'}
             </button>
           </div>
-          
-          {deliveryInfo && deliveryInfo.error && (
-            <p className="text-red-500 text-sm mt-2">{deliveryInfo.error}</p>
+                    
+          {error && (
+            <p className="text-red-500 text-sm mt-2">{error}</p>
           )}
-        </div>
-      )}
 
-      {deliveryInfo && !deliveryInfo.error && (
-        <div className="mt-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <Truck className="text-[#C69A7F]" size={20} />
-            <div className='text-[14px]'>
-              Delivery between <span className='text-green-600'>
-                  <span className="font-medium">22<sup>nd</sup></span> and <span className="font-medium">25<sup>th</sup></span> Mar
-                </span>
+          {isDeliveryAvailable !== null && !error && (
+            <div className="mt-4">
+              <div className="flex items-center gap-2">
+                {isDeliveryAvailable ? (
+                  <>
+                    <CheckCircle2 className="text-green-600" size={20} />
+                    <div className='text-[14px] text-green-600'>
+                      Delivery available for this pincode
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="text-red-500" size={20} />
+                    <div className='text-[14px] text-red-500'>
+                      Delivery not available for this pincode
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <DollarSign className="text-[#C69A7F]" size={20} />
-            <div className='text-[14px]'>
-              Cash on delivery <span className="text-green-600">available</span>
-            </div>
-          </div>
+          )}
         </div>
       )}
     </div>

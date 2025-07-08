@@ -418,12 +418,6 @@ public async logout(silent: boolean = false, router?: any): Promise<void> {
     return response;
   }
 
-  // Registration: Verify OTP
-  public async verifyOtp(data: { contact: string; otp: string }): Promise<{ username: string } & MessageResponse> {
-    const response = await this.postPublic<{ username: string } & MessageResponse>('/user/verify-otp/', data);
-    return response;
-  }
-
   // Registration: Set Password (final step, also logs in)
   public async setPassword(data: { username: string; password: string }): Promise<TokenResponse> {
     const response = await this.postPublic<TokenResponse>('/user/set-password/', data);
@@ -918,6 +912,7 @@ public async getPaginatedReplacementRequests(
   pageSize: number = 10,
   options?: {
     status?: string | null;
+    mode?: string;
   }
 ): Promise<any> {
   try {
@@ -928,9 +923,30 @@ public async getPaginatedReplacementRequests(
       url += `&status=${encodeURIComponent(options.status)}`;
     }
     
+    // Add mode parameter if it exists
+    if (options?.mode) {
+      url += `&mode=${encodeURIComponent(options.mode)}`;
+    }
+    
     return await this.get<any>(url);
   } catch (error) {
     console.error('Error fetching paginated replacement requests:', error);
+    throw error;
+  }
+}
+
+public async updateReplacementReceived(id: string, data: { is_recieved: boolean }): Promise<any> {
+  try {
+    return await this.put<any>(`/order/replacement_recieved/${id}`, data);
+  } catch (error) {
+    throw error;
+  }
+}
+
+public async createReplacementOrder(data: { replacement_request_id: string }): Promise<any> {
+  try {
+    return await this.post<any>('/replacement_order/replcement_order_create', data);
+  } catch (error) {
     throw error;
   }
 }
@@ -951,6 +967,15 @@ public async replacementStatusUpdate(id: string, selectedStatus: string, adminNo
     };
     
     return await this.put<any>(`/order/replacement_status_update/${id}`, data);
+  } catch (error) {
+    throw error;
+  }
+}
+
+public async updateStockOnReplace(id: string): Promise<any> {
+  try {
+    
+    return await this.put<any>(`/order/replacement_us_update/${id}`,{});
   } catch (error) {
     throw error;
   }
@@ -986,6 +1011,39 @@ public async getMyReplacementRequests(): Promise<any> {
     } catch (error) {
       throw error;
     }
+}
+
+public async checkPincode(pincode: any): Promise<any> {
+    try {
+      return await this.get<any>(`/order/verify_service_withpin/${pincode}`);
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  public async createUserOtp(data: {
+  username: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  password: string;
+}): Promise<any> {
+  try {
+    return await this.post<any>('/user/create_user_otp', data, true);
+  } catch (error) {
+    throw error;
+  }
+}
+
+public async verifyOtp(data: {
+  otp: string;
+  token: string;
+}): Promise<any> {
+  try {
+    return await this.post<any>('/user/verify_otp', data, true);
+  } catch (error) {
+    throw error;
+  }
 }
 
 }

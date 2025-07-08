@@ -192,20 +192,6 @@ export default function ProductDetailPage() {
     setIsCheckoutToOpen(false);
   };
 
-  const checkPincode = async (pincode: string) => {
-    console.log(`Checking pincode: ${pincode}`);
-    if (pincode && pincode.length === 6 && !isNaN(Number(pincode))) {
-      return {
-        deliveryDate: `22nd and 25th Mar`,
-        cashOnDelivery: true,
-      };
-    } else {
-      return {
-        error: 'Please enter a valid 6-digit pincode',
-      };
-    }
-  };
-
   const handleCartClose = () => {
     setIsCartOpen(false);
     // setSelectedProductId(null);
@@ -396,7 +382,6 @@ export default function ProductDetailPage() {
             <div className="space-y-4">
               <DeliveryPincodeChecker
                 defaultDeliveryTime="3-4 Days"
-                checkPincodeHandler={checkPincode}
               />
               <PolicyIcons />
             </div>
