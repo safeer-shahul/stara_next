@@ -556,6 +556,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                           normalItems={memoizedNormalItems}
                           offerSets={memoizedOfferSets}
                           parentLoading={loading}
+                          isDirectCheckout={checkoutMode === 'buy_now'}
                         />
                       </div>
                     </>

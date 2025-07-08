@@ -972,6 +972,22 @@ public async getMyEnquiry(): Promise<any> {
     }
   }
 
+  public async getLowStock(): Promise<any> {
+  try {
+    return await this.get<any>(`/dashboard/low_stock_items`);
+  } catch (error) {
+    throw error;
+  }
+}
+
+public async getMyReplacementRequests(): Promise<any> {
+    try {
+      return await this.get<any>(`/order/get_my_replacements_req`);
+    } catch (error) {
+      throw error;
+    }
+}
+
 }
 
 const apiService = ApiService.getInstance();

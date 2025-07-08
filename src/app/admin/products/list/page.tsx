@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Package, Plus, Edit, ChevronLeft, ChevronRight, ImageIcon, ArrowLeft, Search, Trash2, Eye } from 'lucide-react';
 import apiService from '@/utils/api/apiService';
+import { useRouter } from 'next/navigation';
 
 // Define more specific types for Product for better type safety
 interface Product {
@@ -19,6 +20,7 @@ interface Product {
 }
 
 export default function ProductsListPage() {
+  const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -98,18 +100,28 @@ export default function ProductsListPage() {
     }
   }, []);
 
+  const handleSmartBackNavigation = () => {
+    // Check if there's a previous page in browser history
+    if (window.history.length > 1) {
+      router.back();
+    } else {
+      // Fallback to products dashboard if no history
+      router.push('/admin/products');
+    }
+  };
+
   return (
     <div className="space-y-8">
       {/* Page Header and Add Button */}
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-4">
-          <Link
-            href="/admin/products"
-            className="text-gray-600 hover:text-[var(--color-primary-950)] transition-colors duration-200"
-            aria-label="Back to Products Dashboard"
+          <button
+            onClick={handleSmartBackNavigation} // Choose your preferred method here
+            className="text-gray-600 cursor-pointer hover:text-[var(--color-primary-950)] transition-colors duration-200 p-1 rounded-md hover:bg-gray-100"
+            aria-label="Go back to previous page"
           >
             <ArrowLeft className="w-6 h-6" />
-          </Link>
+          </button>
           <h2 className="text-3xl font-extrabold text-gray-800">Product List</h2>
         </div>
         <Link

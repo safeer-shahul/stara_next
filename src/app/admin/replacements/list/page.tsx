@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 // Import relevant icons for consistent design
 import { RefreshCw, Plus, Edit, ChevronLeft, ChevronRight, Info, Loader2, Eye, Filter } from 'lucide-react';
 import apiService from '@/utils/api/apiService';
@@ -22,6 +23,7 @@ interface ReplacementRequest {
 }
 
 export default function ReplacementRequestsPage() {
+  const router = useRouter();
   const [allRequests, setAllRequests] = useState<ReplacementRequest[]>([]); // Stores all fetched requests
   const [currentRequestsPage, setCurrentRequestsPage] = useState<ReplacementRequest[]>([]); // Requests for the current page
   const [loading, setLoading] = useState(true);
@@ -108,13 +110,13 @@ export default function ReplacementRequestsPage() {
 
   // Handle view details - route to replacement view page
   const handleViewDetails = useCallback((requestId: string) => {
-    window.location.href = `/admin/replacements/view?id=${requestId}`;
-  }, []);
+    router.push(`/admin/replacements/view?id=${requestId}`);
+  }, [router]);
 
   // Handle order click - route to order view page
   const handleOrderClick = useCallback((orderId: string) => {
-    window.location.href = `http://localhost:3000/admin/orders/view?id=${orderId}`;
-  }, []);
+    router.push(`/admin/orders/view?id=${orderId}`);
+  }, [router]);
 
   return (
     <div className="space-y-8">

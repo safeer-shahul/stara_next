@@ -9,12 +9,14 @@ interface ProductSummaryProps {
   normalItems: CartNormalItem[];
   offerSets: CartOfferItem[];
   parentLoading?: boolean;
+  isDirectCheckout?: boolean;
 }
 
 const ProductSummary: React.FC<ProductSummaryProps> = ({ 
   normalItems, 
   offerSets = [], 
-  parentLoading = false 
+  parentLoading = false,
+  isDirectCheckout = false
 }) => {
   const { calculateTotals } = useCart();
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +33,30 @@ const ProductSummary: React.FC<ProductSummaryProps> = ({
       setError(`Failed to process cart data: ${e.message || 'Unknown error'}`);
     }
   }, [normalItems, offerSets]);
+
+  // Calculate totals based on the provided items (for direct checkout) or cart totals
+  const calculateCurrentTotals = () => {
+    if (isDirectCheckout) {
+      // For direct checkout, only normal items exist (no offer items)
+      const normalSubtotal = normalItems.reduce((sum, item) => {
+        const price = parseFloat(item.product_price);
+        return sum + (price * item.quantity);
+      }, 0);
+
+      const totalItems = normalItems.reduce((sum, item) => sum + item.quantity, 0);
+
+      return {
+        normalSubtotal,
+        offerSubtotal: 0,
+        offerSavings: 0,
+        grandTotal: normalSubtotal,
+        totalItems
+      };
+    } else {
+      // Use cart totals for regular checkout
+      return calculateTotals();
+    }
+  };
 
   if (parentLoading) {
     return (
@@ -59,7 +85,7 @@ const ProductSummary: React.FC<ProductSummaryProps> = ({
     );
   }
 
-  const totals = calculateTotals();
+  const totals = calculateCurrentTotals();
 
   return (
     <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
@@ -69,7 +95,9 @@ const ProductSummary: React.FC<ProductSummaryProps> = ({
           <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center mr-3">
             <span className="text-white text-sm font-bold">📦</span>
           </div>
-          <h4 className="font-semibold text-sm text-white">Order Summary</h4>
+          <h4 className="font-semibold text-sm text-white">
+            {isDirectCheckout ? 'Product Summary' : 'Order Summary'}
+          </h4>
         </div>
       </div>
 
@@ -93,7 +121,7 @@ const ProductSummary: React.FC<ProductSummaryProps> = ({
                   <span className="w-5 h-5 bg-[var(--color-primary-950)] rounded-full flex items-center justify-center mr-2">
                     <span className="text-white text-xs">🛍️</span>
                   </span>
-                  Regular Items
+                  {isDirectCheckout ? 'Product' : 'Regular Items'}
                 </h5>
                 <span className="text-xs font-bold text-[var(--color-primary-950)] bg-white px-2 py-1 rounded-full">
                   {normalItems.length}
@@ -114,8 +142,8 @@ const ProductSummary: React.FC<ProductSummaryProps> = ({
             </div>
           )}
 
-          {/* Offer Items Section */}
-          {offerSets.length > 0 && (
+          {/* Offer Items Section - Only show if NOT in direct checkout mode */}
+          {!isDirectCheckout && offerSets.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center justify-between py-2 px-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-100">
                 <h5 className="text-sm font-semibold text-green-700 flex items-center">
@@ -143,60 +171,62 @@ const ProductSummary: React.FC<ProductSummaryProps> = ({
         </div>
 
         {/* Enhanced Summary Totals */}
-        <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl p-4 border border-gray-200">
-          <div className="space-y-3">
-            {/* Normal Items Subtotal */}
-            {totals.normalSubtotal > 0 && (
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-gray-600 flex items-center">
-                  <span className="w-4 h-4 bg-blue-500 rounded-full mr-2"></span>
-                  Regular Items
-                </span>
-                <span className="font-bold text-gray-800">₹{totals.normalSubtotal.toFixed(2)}</span>
-              </div>
-            )}
-
-            {/* Offer Items Subtotal */}
-            {totals.offerSubtotal > 0 && (
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-gray-600 flex items-center">
-                  <span className="w-4 h-4 bg-green-500 rounded-full mr-2"></span>
-                  Offer Items
-                </span>
-                <span className="font-bold text-gray-800">₹{totals.offerSubtotal.toFixed(2)}</span>
-              </div>
-            )}
-
-            {/* Offer Savings */}
-            {totals.offerSavings > 0 && (
-              <div className="flex justify-between items-center text-xs bg-green-100 -mx-2 px-2 py-2 rounded-lg">
-                <span className="text-green-700 font-medium flex items-center">
-                  <span className="text-sm mr-2">🎉</span>
-                  You Save (Free Items)
-                </span>
-                <span className="font-bold text-green-700">-₹{totals.offerSavings.toFixed(2)}</span>
-              </div>
-            )}
-            
-            {/* Total */}
-            <div className="flex justify-between items-center pt-3 border-t border-gray-300">
-              <div>
-                <span className="text-gray-700 font-semibold">Total</span>
-                <span className="text-xs text-gray-500 ml-1">({totals.totalItems} items)</span>
-              </div>
-              <div className="text-right">
-                <div className="text-lg font-bold text-[var(--color-primary-950)]">
-                  ₹{totals.grandTotal.toFixed(2)}
+        {(normalItems.length > 0 || offerSets.length > 0) && (
+          <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl p-4 border border-gray-200">
+            <div className="space-y-3">
+              {/* Normal Items Subtotal */}
+              {totals.normalSubtotal > 0 && (
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-600 flex items-center">
+                    <span className="w-4 h-4 bg-blue-500 rounded-full mr-2"></span>
+                    {isDirectCheckout ? 'Product Price' : 'Regular Items'}
+                  </span>
+                  <span className="font-bold text-gray-800">₹{totals.normalSubtotal.toFixed(2)}</span>
                 </div>
-                {totals.offerSavings > 0 && (
-                  <div className="text-xs text-green-600 font-medium">
-                    Saved ₹{totals.offerSavings.toFixed(2)}!
+              )}
+
+              {/* Offer Items Subtotal - Only for regular checkout */}
+              {!isDirectCheckout && totals.offerSubtotal > 0 && (
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-600 flex items-center">
+                    <span className="w-4 h-4 bg-green-500 rounded-full mr-2"></span>
+                    Offer Items
+                  </span>
+                  <span className="font-bold text-gray-800">₹{totals.offerSubtotal.toFixed(2)}</span>
+                </div>
+              )}
+
+              {/* Offer Savings - Only for regular checkout */}
+              {!isDirectCheckout && totals.offerSavings > 0 && (
+                <div className="flex justify-between items-center text-xs bg-green-100 -mx-2 px-2 py-2 rounded-lg">
+                  <span className="text-green-700 font-medium flex items-center">
+                    <span className="text-sm mr-2">🎉</span>
+                    You Save (Free Items)
+                  </span>
+                  <span className="font-bold text-green-700">-₹{totals.offerSavings.toFixed(2)}</span>
+                </div>
+              )}
+              
+              {/* Total */}
+              <div className="flex justify-between items-center pt-3 border-t border-gray-300">
+                <div>
+                  <span className="text-gray-700 font-semibold">Total</span>
+                  <span className="text-xs text-gray-500 ml-1">({totals.totalItems} {totals.totalItems === 1 ? 'item' : 'items'})</span>
+                </div>
+                <div className="text-right">
+                  <div className="text-lg font-bold text-[var(--color-primary-950)]">
+                    ₹{totals.grandTotal.toFixed(2)}
                   </div>
-                )}
+                  {!isDirectCheckout && totals.offerSavings > 0 && (
+                    <div className="text-xs text-green-600 font-medium">
+                      Saved ₹{totals.offerSavings.toFixed(2)}!
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Additional Info */}
         {(totals.normalSubtotal > 0 || totals.offerSubtotal > 0) && (

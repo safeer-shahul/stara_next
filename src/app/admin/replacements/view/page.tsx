@@ -171,8 +171,8 @@ function ReplacementViewContent() {
 
   // Handle order view
   const handleViewOrder = useCallback((orderId: string) => {
-    window.location.href = `http://localhost:3000/admin/orders/view?id=${orderId}`;
-  }, []);
+    router.push(`/admin/orders/view?id=${orderId}`);
+  }, [router]);
 
   // Handle status update
   const handleStatusUpdate = useCallback(async () => {

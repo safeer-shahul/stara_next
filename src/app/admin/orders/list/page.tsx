@@ -64,11 +64,11 @@ export default function OrderListPage() {
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const [newDeliveryStatus, setNewDeliveryStatus] = useState<DeliveryStatus>('Pending');
 
-  // CHANGED: Separate state for input values and actual search values
-  const [searchOrderIdInput, setSearchOrderIdInput] = useState(''); // For input field
-  const [searchPhoneNumberInput, setSearchPhoneNumberInput] = useState(''); // For input field
-  const [searchOrderId, setSearchOrderId] = useState(''); // For actual search
-  const [searchPhoneNumber, setSearchPhoneNumber] = useState(''); // For actual search
+  // Separate state for input values and actual search values
+  const [searchOrderIdInput, setSearchOrderIdInput] = useState('');
+  const [searchPhoneNumberInput, setSearchPhoneNumberInput] = useState('');
+  const [searchOrderId, setSearchOrderId] = useState('');
+  const [searchPhoneNumber, setSearchPhoneNumber] = useState('');
 
   const [showCopyDropdown, setShowCopyDropdown] = useState<string | null>(null);
   const [triggerFetch, setTriggerFetch] = useState(0);
@@ -114,13 +114,12 @@ export default function OrderListPage() {
         options.order_mode = selectedOrderMode;
       }
       if (startDate) {
-        options.start_date = startDate.toISOString().split('T')[0];
+        options.start_date = startDate.toISOString();
       }
       if (endDate) {
-        options.end_date = endDate.toISOString().split('T')[0];
+        options.end_date = endDate.toISOString();
       }
 
-      // CHANGED: Use actual search values, not input values
       if (searchOrderId) {
         options.order_id = searchOrderId;
       }
@@ -150,7 +149,6 @@ export default function OrderListPage() {
     }
   }, [currentPage, pageSize, selectedOrderMode, sortOrder, startDate, endDate, adminUser, searchOrderId, searchPhoneNumber]);
 
-  // CHANGED: Remove search input dependencies from useEffect
   useEffect(() => {
     if (adminUser) {
       fetchOrders();
@@ -169,11 +167,15 @@ export default function OrderListPage() {
     }
   }, [currentPage]);
 
+  // CHANGED: Modified to clear dates and search when switching modes
   const handleOrderModeChange = useCallback((mode: OrderMode) => {
     setSelectedOrderMode(mode);
     setCurrentPage(1);
     setSelectedOrderIds([]);
-    // CHANGED: Clear input fields and actual search values
+    // Clear dates when switching modes
+    setStartDate(null);
+    setEndDate(null);
+    // Clear search fields when switching modes
     setSearchOrderIdInput('');
     setSearchPhoneNumberInput('');
     setSearchOrderId('');
@@ -199,21 +201,27 @@ export default function OrderListPage() {
     setTriggerFetch(prev => prev + 1);
   }, []);
 
-  // CHANGED: Modified search handler to update actual search values
+  // CHANGED: Added separate date reset function
+  const handleResetDates = useCallback(() => {
+    setStartDate(null);
+    setEndDate(null);
+    setCurrentPage(1);
+    setTriggerFetch(prev => prev + 1);
+  }, []);
+
   const handleSearch = useCallback(() => {
-    // Update actual search values from input values
     setSearchOrderId(searchOrderIdInput);
     setSearchPhoneNumber(searchPhoneNumberInput);
     setCurrentPage(1);
     setTriggerFetch(prev => prev + 1);
   }, [searchOrderIdInput, searchPhoneNumberInput]);
 
+  // CHANGED: Modified to keep current order mode when resetting search
   const handleResetFilters = useCallback(() => {
-    setSelectedOrderMode('all');
+    // Keep the current order mode, only reset other filters
     setSortOrder('desc');
     setStartDate(null);
     setEndDate(null);
-    // CHANGED: Clear both input and actual search values
     setSearchOrderIdInput('');
     setSearchPhoneNumberInput('');
     setSearchOrderId('');
@@ -224,7 +232,6 @@ export default function OrderListPage() {
     setTriggerFetch(prev => prev + 1);
   }, []);
 
-  // CHANGED: Added handler for Enter key press in search inputs
   const handleSearchKeyPress = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') {
       handleSearch();
@@ -430,6 +437,7 @@ export default function OrderListPage() {
                 </div>
               </div>
 
+              {/* CHANGED: Enhanced date pickers with time and reset button */}
               <div className="flex flex-col sm:flex-row items-center gap-2">
                 <div className="relative">
                   <DatePicker
@@ -438,9 +446,13 @@ export default function OrderListPage() {
                     selectsStart
                     startDate={startDate}
                     endDate={endDate}
-                    placeholderText="From Date"
-                    dateFormat="yyyy-MM-dd"
-                    className="w-full sm:w-36 border border-gray-300 rounded-md py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)]"
+                    placeholderText="From Date & Time"
+                    dateFormat="yyyy-MM-dd HH:mm"
+                    showTimeSelect
+                    timeFormat="HH:mm"
+                    timeIntervals={15}
+                    timeCaption="Time"
+                    className="w-full sm:w-48 border border-gray-300 rounded-md py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)]"
                   />
                   <CalendarDays className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 </div>
@@ -452,17 +464,30 @@ export default function OrderListPage() {
                     startDate={startDate}
                     endDate={endDate}
                     minDate={startDate || undefined}
-                    placeholderText="To Date"
-                    dateFormat="yyyy-MM-dd"
-                    className="w-full sm:w-36 border border-gray-300 rounded-md py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)]"
+                    placeholderText="To Date & Time"
+                    dateFormat="yyyy-MM-dd HH:mm"
+                    showTimeSelect
+                    timeFormat="HH:mm"
+                    timeIntervals={15}
+                    timeCaption="Time"
+                    className="w-full sm:w-48 border border-gray-300 rounded-md py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-950)]"
                   />
                   <CalendarDays className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 </div>
+                {/* CHANGED: Added date reset button */}
+                {(startDate || endDate) && (
+                  <button
+                    onClick={handleResetDates}
+                    className="px-3 py-2 bg-orange-200 text-orange-700 rounded-md hover:bg-orange-300 transition-colors duration-200 flex items-center justify-center"
+                    title="Reset Dates"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             </div>
 
             <div className="flex items-center flex-wrap gap-2">
-              {/* CHANGED: Use input state variables and add onKeyPress handler */}
               <input
                 type="text"
                 placeholder="Search by Order ID"
@@ -491,7 +516,7 @@ export default function OrderListPage() {
               <button
                 onClick={handleResetFilters}
                 className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors duration-200 flex items-center justify-center"
-                title="Reset Filters"
+                title="Reset Search & Filters (Keep Current Mode)"
               >
                 <RotateCcw className="w-5 h-5" />
               </button>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Mail, Phone, Clock, Send, X, Eye, Upload, MessageSquare, List, Plus, Calendar } from 'lucide-react';
+import { Mail, Phone, Clock, Send, X, Eye, Upload, MessageSquare, List, Plus, Calendar, AlertTriangle } from 'lucide-react';
 import apiService from '@/utils/api/apiService';
 
 interface ImageFile {
@@ -10,14 +10,24 @@ interface ImageFile {
   preview: string;
 }
 
+interface ComplaintImage {
+  url: string;
+}
+
 interface Complaint {
   id: string;
   subject: string;
   message: string;
-  status: string;
   created_at: string;
-  images?: string[];
+  updated_at: string;
+  user: number;
+  status?: string; // Optional as it's not in current API response
+  images?: ComplaintImage[]; // Future field for images
 }
+
+// Image validation constants
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB in bytes
 
 export default function Support() {
   const [activeTab, setActiveTab] = useState<'form' | 'history'>('form');
@@ -27,6 +37,7 @@ export default function Support() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [fileErrors, setFileErrors] = useState<string[]>([]); // New state for file validation errors
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [isLoadingComplaints, setIsLoadingComplaints] = useState(false);
@@ -42,7 +53,8 @@ export default function Support() {
     setIsLoadingComplaints(true);
     try {
       const response = await apiService.getMyEnquiry();
-      setComplaints(response.data || response); // Handle different response structures
+      // Handle the array response directly
+      setComplaints(Array.isArray(response) ? response : response.data || []);
     } catch (error) {
       console.error('Error fetching complaints:', error);
       setFormError('Failed to load complaints. Please try again.');
@@ -51,34 +63,104 @@ export default function Support() {
     }
   };
 
+  // Image validation functions
+  const validateImageFile = (file: File): { isValid: boolean; errors: string[] } => {
+    const errors: string[] = [];
+    
+    // Check file type
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      errors.push(`Only JPEG, PNG, and WebP images are allowed`);
+    }
+    
+    // Check file size
+    if (file.size > MAX_FILE_SIZE) {
+      errors.push(`File size must be less than 5MB`);
+    }
+    
+    // Additional check for file extension
+    const fileExtension = file.name.toLowerCase().split('.').pop();
+    const allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
+    if (!fileExtension || !allowedExtensions.includes(fileExtension)) {
+      errors.push(`File must have a valid image extension (.jpg, .jpeg, .png, .webp)`);
+    }
+    
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
+  };
+
+  const validateImageFiles = (files: FileList | File[]): { isValid: boolean; errors: string[]; validFiles: File[] } => {
+    const allErrors: string[] = [];
+    const validFiles: File[] = [];
+    const fileArray = Array.from(files);
+    
+    if (fileArray.length === 0) {
+      return { isValid: true, errors: [], validFiles: [] };
+    }
+    
+    fileArray.forEach(file => {
+      const validation = validateImageFile(file);
+      if (validation.isValid) {
+        validFiles.push(file);
+      } else {
+        allErrors.push(`${file.name}: ${validation.errors.join(', ')}`);
+      }
+    });
+    
+    return {
+      isValid: allErrors.length === 0,
+      errors: allErrors,
+      validFiles
+    };
+  };
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
 
     const maxImages = 5;
     const currentImageCount = images.length;
-    const filesToAdd = Math.min(files.length, maxImages - currentImageCount);
+    const availableSlots = maxImages - currentImageCount;
 
-    if (filesToAdd === 0) {
+    if (availableSlots === 0) {
       setFormError(`Maximum ${maxImages} images allowed`);
       return;
     }
 
+    // Validate the selected files
+    const validation = validateImageFiles(files);
+    
+    // Set file validation errors
+    setFileErrors(validation.errors);
+    
+    // Process valid files
+    const filesToAdd = Math.min(validation.validFiles.length, availableSlots);
     const newImages: ImageFile[] = [];
+    
     for (let i = 0; i < filesToAdd; i++) {
-      const file = files[i];
-      if (file.type.startsWith('image/')) {
-        const imageFile: ImageFile = {
-          id: Date.now().toString() + i,
-          file: file,
-          preview: URL.createObjectURL(file)
-        };
-        newImages.push(imageFile);
-      }
+      const file = validation.validFiles[i];
+      const imageFile: ImageFile = {
+        id: Date.now().toString() + i,
+        file: file,
+        preview: URL.createObjectURL(file)
+      };
+      newImages.push(imageFile);
     }
 
-    setImages(prev => [...prev, ...newImages]);
-    setFormError(null);
+    if (newImages.length > 0) {
+      setImages(prev => [...prev, ...newImages]);
+      setFormError(null);
+    }
+
+    // Show warning if some files were rejected or couldn't fit
+    if (validation.errors.length > 0) {
+      console.warn('File validation errors:', validation.errors);
+    }
+    
+    if (validation.validFiles.length > filesToAdd) {
+      setFormError(`Only ${filesToAdd} images could be added due to the ${maxImages} image limit`);
+    }
   };
 
   const removeImage = (id: string) => {
@@ -91,13 +173,30 @@ export default function Support() {
       }
       return updatedImages;
     });
+    
+    // Clear file errors if all images are removed
+    if (images.length === 1) {
+      setFileErrors([]);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!subject.trim() || !message.trim()) {
-      setFormError('Please fill in all required fields');
+    // Enhanced validation for required fields
+    if (!subject.trim()) {
+      setFormError('Subject is required');
+      return;
+    }
+    
+    if (!message.trim()) {
+      setFormError('Message is required');
+      return;
+    }
+    
+    // Check if there are any file validation errors
+    if (fileErrors.length > 0) {
+      setFormError('Please fix the image validation errors before submitting');
       return;
     }
     
@@ -106,8 +205,8 @@ export default function Support() {
     
     try {
       const formData = new FormData();
-      formData.append('subject', subject);
-      formData.append('message', message);
+      formData.append('subject', subject.trim());
+      formData.append('message', message.trim());
       
       // Add images to form data with the key 'enquiry_images'
       images.forEach((image) => {
@@ -121,6 +220,7 @@ export default function Support() {
       setSubject('');
       setMessage('');
       setImages([]);
+      setFileErrors([]);
       
       // Clean up image URLs
       images.forEach(image => {
@@ -146,7 +246,9 @@ export default function Support() {
     });
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status?: string) => {
+    if (!status) return 'bg-gray-100 text-gray-800'; // Default for no status
+    
     switch (status.toLowerCase()) {
       case 'resolved':
         return 'bg-green-100 text-green-800';
@@ -245,47 +347,54 @@ export default function Support() {
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-4">
                   {formError && (
-                    <div className="bg-red-50 border border-red-100 rounded-lg p-3 text-red-700 text-[14px]">
-                      {formError}
+                    <div className="bg-red-50 border border-red-100 rounded-lg p-3 text-red-700 text-[14px] flex items-start">
+                      <AlertTriangle size={16} className="mr-2 mt-0.5 flex-shrink-0" />
+                      <span>{formError}</span>
                     </div>
                   )}
                   
                   <div>
                     <label htmlFor="subject" className="block text-[14px] font-medium text-gray-700 mb-1">
-                      Subject *
+                      Subject <span className="text-red-500">*</span>
                     </label>
                     <input
                       id="subject"
                       type="text"
                       value={subject}
                       onChange={(e) => setSubject(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[#175e7a] focus:border-[var(--color-primary-950)] outline-none"
+                      className={`w-full px-4 py-2 border rounded-md focus:ring-[#175e7a] focus:border-[var(--color-primary-950)] outline-none ${
+                        !subject.trim() && formError ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                      }`}
                       required
+                      placeholder="Enter the subject of your inquiry"
                     />
                   </div>
                   
                   <div>
                     <label htmlFor="message" className="block text-[14px] font-medium text-gray-700 mb-1">
-                      Message *
+                      Message <span className="text-red-500">*</span>
                     </label>
                     <textarea
                       id="message"
                       rows={4}
                       value={message}
                       onChange={(e) => setMessage(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[#175e7a] focus:border-[var(--color-primary-950)] outline-none"
+                      className={`w-full px-4 py-2 border rounded-md focus:ring-[#175e7a] focus:border-[var(--color-primary-950)] outline-none ${
+                        !message.trim() && formError ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                      }`}
                       required
+                      placeholder="Describe your issue or inquiry in detail"
                     ></textarea>
                   </div>
                   
                   <div>
                     <label className="block text-[14px] font-medium text-gray-700 mb-2">
-                      Attach Images (Max 5)
+                      Attach Images (Optional, Max 5)
                     </label>
                     <input
                       type="file"
                       multiple
-                      accept="image/*"
+                      accept="image/jpeg,image/jpg,image/png,image/webp"
                       onChange={handleImageUpload}
                       className="hidden"
                       id="image-upload"
@@ -295,45 +404,71 @@ export default function Support() {
                       className="flex items-center justify-center w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-md cursor-pointer hover:border-gray-400 transition-colors"
                     >
                       <Upload size={20} className="text-gray-400 mr-2" />
-                      <span className="text-[14px] text-gray-500">Click to upload images</span>
+                      <span className="text-[14px] text-gray-500">Click to upload images (JPEG, PNG, WebP only, max 5MB each)</span>
                     </label>
                     
-                    {images.length > 0 && (
-                      <div className="mt-3 grid grid-cols-3 sm:grid-cols-4 gap-2">
-                        {images.map((image) => (
-                          <div key={image.id} className="relative group">
-                            <img
-                              src={image.preview}
-                              alt="Preview"
-                              className="w-full h-12 sm:h-16 object-cover rounded-md border"
-                            />
-                            <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity rounded-md flex items-center justify-center">
-                              <button
-                                type="button"
-                                onClick={() => setFullScreenImage(image.preview)}
-                                className="text-white p-1 hover:bg-white hover:bg-opacity-20 rounded"
-                              >
-                                <Eye size={14} />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => removeImage(image.id)}
-                                className="text-white p-1 hover:bg-white hover:bg-opacity-20 rounded ml-1"
-                              >
-                                <X size={14} />
-                              </button>
-                            </div>
+                    {/* Display file validation errors */}
+                    {fileErrors.length > 0 && (
+                      <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-md">
+                        <div className="flex items-start">
+                          <AlertTriangle size={14} className="text-red-500 mr-2 mt-0.5 flex-shrink-0" />
+                          <div className="text-[12px] text-red-600">
+                            <p className="font-medium mb-1">Some files were rejected:</p>
+                            <ul className="list-disc list-inside space-y-0.5">
+                              {fileErrors.map((error, index) => (
+                                <li key={index}>{error}</li>
+                              ))}
+                            </ul>
                           </div>
-                        ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {images.length > 0 && (
+                      <div className="mt-3">
+                        <p className="text-[12px] text-gray-600 mb-2">Selected images ({images.length}/5):</p>
+                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                          {images.map((image) => (
+                            <div key={image.id} className="relative group">
+                              <img
+                                src={image.preview}
+                                alt="Preview"
+                                className="w-full h-12 sm:h-16 object-cover rounded-md border border-gray-200"
+                              />
+                              <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity rounded-md flex items-center justify-center space-x-1">
+                                <button
+                                  type="button"
+                                  onClick={() => setFullScreenImage(image.preview)}
+                                  className="text-white p-1 hover:bg-white hover:bg-opacity-20 rounded"
+                                  title="View image"
+                                >
+                                  <Eye size={14} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => removeImage(image.id)}
+                                  className="text-white p-1 hover:bg-white hover:bg-opacity-20 rounded"
+                                  title="Remove image"
+                                >
+                                  <X size={14} />
+                                </button>
+                              </div>
+                              {/* File size display */}
+                              <p className="text-[10px] text-gray-500 mt-1 truncate" title={image.file.name}>
+                                {(image.file.size / 1024 / 1024).toFixed(1)} MB
+                              </p>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
                   
                   <button
                     type="submit"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || fileErrors.length > 0}
                     className={`w-full bg-[var(--color-primary-950)] text-[14px] text-white py-2 px-4 rounded-md font-medium hover:bg-opacity-90 transition-colors flex items-center justify-center ${
-                      isSubmitting ? 'opacity-70 cursor-not-allowed' : ''
+                      isSubmitting || fileErrors.length > 0 ? 'opacity-70 cursor-not-allowed' : ''
                     }`}
                   >
                     {isSubmitting ? 'Sending...' : (
@@ -342,6 +477,10 @@ export default function Support() {
                       </>
                     )}
                   </button>
+                  
+                  <p className="text-[12px] text-gray-500 text-center">
+                    <span className="text-red-500">*</span> Required fields
+                  </p>
                 </form>
               )}
             </div>
@@ -373,9 +512,11 @@ export default function Support() {
                         <h4 className="font-medium text-[14px] mb-1 truncate">{complaint.subject}</h4>
                         <p className="text-[14px] text-gray-600 line-clamp-2 sm:line-clamp-3">{complaint.message}</p>
                       </div>
-                      <span className={`px-2 py-1 rounded-full text-[12px] font-medium whitespace-nowrap ${getStatusColor(complaint.status)}`}>
-                        {complaint.status}
-                      </span>
+                      {complaint.status && (
+                        <span className={`px-2 py-1 rounded-full text-[12px] font-medium whitespace-nowrap ${getStatusColor(complaint.status)}`}>
+                          {complaint.status}
+                        </span>
+                      )}
                     </div>
                     
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between space-y-2 sm:space-y-0">
@@ -384,6 +525,7 @@ export default function Support() {
                         <span className="truncate">{formatDate(complaint.created_at)}</span>
                       </div>
                       
+                      {/* Future image support - will show when images field is added to API */}
                       {complaint.images && complaint.images.length > 0 && (
                         <div className="flex items-center text-[12px] text-gray-500">
                           <span className="mr-2 hidden sm:inline">{complaint.images.length} image(s)</span>
@@ -392,10 +534,10 @@ export default function Support() {
                             {complaint.images.slice(0, 2).map((image, index) => (
                               <img
                                 key={index}
-                                src={image}
+                                src={`${process.env.NEXT_PUBLIC_API_BASE_URL}${image.url}`}
                                 alt="Complaint"
                                 className="w-5 h-5 sm:w-6 sm:h-6 object-cover rounded cursor-pointer hover:opacity-80"
-                                onClick={() => setFullScreenImage(image)}
+                                onClick={() => setFullScreenImage(`${process.env.NEXT_PUBLIC_API_BASE_URL}${image.url}`)}
                               />
                             ))}
                             {complaint.images.length > 2 && (

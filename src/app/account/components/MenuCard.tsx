@@ -1,7 +1,7 @@
 //  components/MenuCard.tsx
 'use client';
 
-import { Lock, HelpCircle, ChevronRight, ShoppingCart, Heart, MessageSquare } from 'lucide-react';
+import { Lock, HelpCircle, ChevronRight, ShoppingCart, Heart, RefreshCw } from 'lucide-react';
 import { ActiveComponentType } from '../page';
 
 interface MenuCardProps {
@@ -31,10 +31,10 @@ export default function MenuCard({ onMenuItemClick, activeItem }: MenuCardProps)
       description: 'Your wishlist products'
     },
     {
-      id: 'complaints',
-      label: 'Complaints',
-      icon: <MessageSquare size={18} />,
-      description: 'Register or view complaints'
+      id: 'replacements',
+      label: 'Replacements',
+      icon: <RefreshCw size={18} />,
+      description: 'Register or view replacements'
     },
     {
       id: 'support',

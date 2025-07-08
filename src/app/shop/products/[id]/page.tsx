@@ -26,7 +26,7 @@ const staticProductData = {
   giftSpecialPrice: '₹399.00',
   delivery: 'Typically arrives in 3-4 Days',
   returnPolicy: '2 Days Return',
-  exchangePolicy: '10 Days Exchange',
+  // exchangePolicy: '10 Days Exchange',
   paymentOptions: 'Cash On Delivery',
   rating: 5,
   reviewCount: 236,

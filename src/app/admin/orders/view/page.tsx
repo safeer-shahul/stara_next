@@ -6,7 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Package, ArrowLeft, Truck, Calendar, CreditCard, MapPin, ShoppingCart, Info, Loader2, DollarSign, Tag, HandCoins, MinusCircle, Gift } from 'lucide-react';
 import apiService from '@/utils/api/apiService';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 // --- Constants ---
 const INDIAN_STATES: { [key: string]: string } = {
@@ -174,6 +174,7 @@ interface BundleGroup {
 }
 
 export default function OrderDetailsPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const id = searchParams.get('id');
   const [order, setOrder] = useState<OrderData | null>(null);
@@ -387,18 +388,28 @@ export default function OrderDetailsPage() {
   const totalItemCount = getTotalItemCount(order);
   const hasOffers = bundleGroups.length > 0;
 
+  const handleSmartBackNavigation = () => {
+    // Check if there's a previous page in browser history
+    if (window.history.length > 1) {
+      router.back();
+    } else {
+      // Fallback to products dashboard if no history
+      router.push('/admin/orders/list');
+    }
+  };
+
   return (
     <div className="space-y-8">
       {/* Page Header */}
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-4">
-          <Link
-            href="/admin/orders/list"
-            className="text-gray-600 hover:text-[var(--color-primary-950)] transition-colors duration-200"
-            aria-label="Back to Order List"
-          >
-            <ArrowLeft className="w-6 h-6" />
-          </Link>
+          <button
+                      onClick={handleSmartBackNavigation} // Choose your preferred method here
+                      className="text-gray-600 cursor-pointer hover:text-[var(--color-primary-950)] transition-colors duration-200 p-1 rounded-md hover:bg-gray-100"
+                      aria-label="Go back to previous page"
+                    >
+                      <ArrowLeft className="w-6 h-6" />
+                    </button>
           <h2 className="text-3xl font-extrabold text-gray-800">
             Order Details
           </h2>

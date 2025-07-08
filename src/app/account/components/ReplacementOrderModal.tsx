@@ -29,6 +29,94 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
 
   const mainReasons = ['Damaged', 'Change Size'];
 
+  const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB in bytes
+
+  // Add state for file validation errors
+  const [fileErrors, setFileErrors] = useState<Record<string, string[]>>({});
+
+  // Helper function to get variant display name
+  const getVariantDisplayName = (item: any) => {
+    if (!item.product_variant) return null;
+    
+    // If product_variant is a string (variant ID), find the variant details
+    if (typeof item.product_variant === 'string') {
+      const variants = item.product_details?.product_variant || [];
+      const variant = variants.find((v: any) => v.id === item.product_variant);
+      return variant ? `Size ${variant.variant_name}` : `Size ${item.product_variant}`;
+    }
+    
+    // If product_variant is an object with variant details
+    if (typeof item.product_variant === 'object' && item.product_variant.variant_name) {
+      return `Size ${item.product_variant.variant_name}`;
+    }
+    
+    return null;
+  };
+
+  // Helper function to get current variant ID for an item
+  const getCurrentVariantId = (item: any) => {
+    if (typeof item.product_variant === 'string') {
+      return item.product_variant;
+    }
+    if (typeof item.product_variant === 'object' && item.product_variant.id) {
+      return item.product_variant.id;
+    }
+    return item.product_variant;
+  };
+
+  // Validation functions (add these inside your component)
+  const validateImageFile = (file: File): { isValid: boolean; errors: string[] } => {
+    const errors: string[] = [];
+    
+    // Check file type
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      errors.push(`Only JPEG, PNG, and WebP images are allowed`);
+    }
+    
+    // Check file size
+    if (file.size > MAX_FILE_SIZE) {
+      errors.push(`File size must be less than 5MB`);
+    }
+    
+    // Additional check for file extension
+    const fileExtension = file.name.toLowerCase().split('.').pop();
+    const allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
+    if (!fileExtension || !allowedExtensions.includes(fileExtension)) {
+      errors.push(`File must have a valid image extension (.jpg, .jpeg, .png, .webp)`);
+    }
+    
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
+  };
+
+  const validateImageFiles = (files: FileList | File[]): { isValid: boolean; errors: string[]; validFiles: File[] } => {
+    const allErrors: string[] = [];
+    const validFiles: File[] = [];
+    const fileArray = Array.from(files);
+    
+    if (fileArray.length === 0) {
+      return { isValid: true, errors: [], validFiles: [] };
+    }
+    
+    fileArray.forEach(file => {
+      const validation = validateImageFile(file);
+      if (validation.isValid) {
+        validFiles.push(file);
+      } else {
+        allErrors.push(`${file.name}: ${validation.errors.join(', ')}`);
+      }
+    });
+    
+    return {
+      isValid: allErrors.length === 0,
+      errors: allErrors,
+      validFiles
+    };
+  };
+
   // Fetch order and offers data when component mounts
   useEffect(() => {
     const fetchData = async () => {
@@ -139,7 +227,12 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
       const updated = { ...prev };
       
       if (!updated[itemId]) {
-        updated[itemId] = { selected: false, reason: '', newVariant: orderItem.product_variant || '', replacementImages: [] };
+        updated[itemId] = { 
+          selected: false, 
+          reason: '', 
+          newVariant: orderItem.product_variant || '', 
+          replacementImages: [] 
+        };
       }
       
       if (field === 'selected') {
@@ -152,6 +245,12 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
           updated[itemId].reason = '';
           updated[itemId].newVariant = orderItem.product_variant || '';
           updated[itemId].replacementImages = [];
+          // Clear any file errors for this item
+          setFileErrors(prev => {
+            const newErrors = { ...prev };
+            delete newErrors[itemId];
+            return newErrors;
+          });
         }
       } else if (field === 'reason') {
         updated[itemId] = { 
@@ -163,12 +262,38 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
       } else if (field === 'newVariant') {
         updated[itemId] = { ...updated[itemId], newVariant: value };
       } else if (field === 'replacementImages') {
-        // Handle multiple file selection
-        const files = value ? Array.from(value as FileList) : [];
-        updated[itemId] = { 
-          ...updated[itemId], 
-          replacementImages: files
-        };
+        // Handle image file validation
+        if (value && value.length > 0) {
+          const validation = validateImageFiles(value);
+          
+          // Update file errors state
+          setFileErrors(prev => ({
+            ...prev,
+            [itemId]: validation.errors
+          }));
+          
+          // Only add valid files
+          updated[itemId] = { 
+            ...updated[itemId], 
+            replacementImages: validation.validFiles
+          };
+          
+          // Show validation errors if any
+          if (validation.errors.length > 0) {
+            console.warn('File validation errors:', validation.errors);
+          }
+        } else {
+          // Clear files and errors
+          updated[itemId] = { 
+            ...updated[itemId], 
+            replacementImages: []
+          };
+          setFileErrors(prev => {
+            const newErrors = { ...prev };
+            delete newErrors[itemId];
+            return newErrors;
+          });
+        }
       }
       
       return updated;
@@ -204,94 +329,114 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  
-  // Check if any items are selected for replacement
-  const selectedItems = Object.entries(replacementItems).filter(([, item]) => item.selected);
-  if (selectedItems.length === 0) {
-    setError('Please select at least one item to replace');
-    return;
-  }
-  
-  // Validate that all selected items have reasons and required fields
-  for (const [itemId, item] of selectedItems) {
-    if (!item.reason) {
-      setError('Please select a reason for all items you want to replace');
+    e.preventDefault();
+    
+    // Check if any items are selected for replacement
+    const selectedItems = Object.entries(replacementItems).filter(([, item]) => item.selected);
+    if (selectedItems.length === 0) {
+      setError('Please select at least one item to replace');
       return;
     }
     
-    if (item.reason === 'Change Size' && !item.newVariant) {
-      setError('Please select a new variant for size change requests');
-      return;
-    }
-  }
-
-  setSubmitting(true);
-  setError('');
-
-  try {
+    // Validate that all selected items have reasons and required fields
     const allItems = getAllOrderItems(orderData);
-    
-    // Prepare replacement items data with image keys
-    const items = selectedItems.map(([itemId, item], index) => {
-      const orderItem = allItems.find(oi => oi.id === itemId);
-      const itemData:any = {
-        order_item_id: itemId,
-        item_reason: item.reason,
-        new_requested_product: orderItem?.product_details?.id || orderItem?.product_id || '',
-        new_requested_product_variant: item.newVariant || '',
-      };
-
-      // Add image_key if item has replacement images
-      if (item.replacementImages && item.replacementImages.length > 0) {
-        itemData.image_key = `item_${index + 1}_images`;
+    for (const [itemId, item] of selectedItems) {
+      if (!item.reason) {
+        setError('Please select a reason for all items you want to replace');
+        return;
       }
-
-      return itemData;
-    });
-    
-    console.log('Replacement request payload for backend:', {
-      order_id: orderId,
-      ...(requestDetails.trim() && { request_details: requestDetails }),
-      items: items
-    });
-
-    // Create FormData for file upload
-    const formData = new FormData();
-
-    // Add order_id
-    formData.append('order_id', orderId);
-
-    // Add request_details only if provided
-    if (requestDetails.trim()) {
-      formData.append('request_details', requestDetails);
+      
+      if (item.reason === 'Change Size' && !item.newVariant) {
+        setError('Please select a new variant for size change requests');
+        return;
+      }
+      
+      // NEW VALIDATION: Check if user is trying to select the same size
+      if (item.reason === 'Change Size') {
+        const orderItem = allItems.find(oi => oi.id === itemId);
+        const currentVariantId = getCurrentVariantId(orderItem);
+        
+        if (item.newVariant === currentVariantId) {
+          setError('You cannot select the same size for size change. Please choose a different size or select "Damaged" if the current size is damaged.');
+          return;
+        }
+      }
+      
+      // Validation: Check if damaged items have at least one image
+      if (item.reason === 'Damaged' && (!item.replacementImages || item.replacementImages.length === 0)) {
+        setError('Please upload at least one image showing damage for all damaged items');
+        return;
+      }
     }
 
-    // Add entire items array as JSON string
-    formData.append('items', JSON.stringify(items));
+    // Validate request details
+    if (!requestDetails.trim()) {
+      setError('Please provide additional details about your replacement request');
+      return;
+    }
 
-    // Add replacement images with their corresponding keys
-    selectedItems.forEach(([itemId, item], index) => {
-      if (item.replacementImages && item.replacementImages.length > 0) {
-        const imageKey = `item_${index + 1}_images`;
-        
-        // Add all images for this item under the same key
-        item.replacementImages.forEach((file) => {
-          formData.append(imageKey, file);
-        });
-      }
-    });
+    setSubmitting(true);
+    setError('');
 
-    // Call your API to process the replacement
-    await apiService.requestReplacement(formData);
+    try {
+      // Prepare replacement items data with image keys
+      const items = selectedItems.map(([itemId, item], index) => {
+        const orderItem = allItems.find(oi => oi.id === itemId);
+        const itemData: any = {
+          order_item_id: itemId,
+          item_reason: item.reason,
+          new_requested_product: orderItem?.product_details?.id || orderItem?.product_id || '',
+          new_requested_product_variant: item.newVariant || '',
+        };
 
-    console.log('Replacement request submitted successfully');
-    onSuccess();
-  } catch (error: any) {
-    setError(error.message || 'Failed to submit replacement request. Please try again.');
-    setSubmitting(false);
-  }
-};
+        // Add image_key if item has replacement images
+        if (item.replacementImages && item.replacementImages.length > 0) {
+          itemData.image_key = `item_${index + 1}_images`;
+        }
+
+        return itemData;
+      });
+      
+      console.log('Replacement request payload for backend:', {
+        order_id: orderId,
+        request_details: requestDetails,
+        items: items
+      });
+
+      // Create FormData for file upload
+      const formData = new FormData();
+
+      // Add order_id
+      formData.append('order_id', orderId);
+
+      // Add request_details (now required)
+      formData.append('request_details', requestDetails);
+
+      // Add entire items array as JSON string
+      formData.append('items', JSON.stringify(items));
+
+      // Add replacement images with their corresponding keys
+      selectedItems.forEach(([itemId, item], index) => {
+        if (item.replacementImages && item.replacementImages.length > 0) {
+          const imageKey = `item_${index + 1}_images`;
+          
+          // Add all images for this item under the same key
+          item.replacementImages.forEach((file) => {
+            formData.append(imageKey, file);
+          });
+        }
+      });
+
+      // Call your API to process the replacement
+      await apiService.requestReplacement(formData);
+
+      console.log('Replacement request submitted successfully');
+      onSuccess();
+    } catch (error: any) {
+      setError(error.message || 'Failed to submit replacement request. Please try again.');
+      setSubmitting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -367,11 +512,16 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
                 {showPolicy && (
                   <div className="p-3 text-sm text-gray-600 bg-white">
                     <ul className="list-disc pl-5 space-y-1">
-                      <li>Replacements must be requested within 2 days of delivery</li>
-                      <li>Original items must be returned in their packaging</li>
+                       <li>Replacements must be requested within <strong>3 days of delivery</strong></li>
+                      <li>You can only request replacement <strong>once per order</strong> (not per item)</li>
+                      <li>All replacement requests are subject to admin approval</li>
+                      <li>For damaged items, you must upload at least one clear image showing the damage</li>
+                      <li>For size changes, you cannot select the same size as your current order</li>
+                      <li>Original items must be returned in their original packaging</li>
                       <li>Shipping for replacement items is free</li>
-                      <li>Processing may take 7-10 business days after we receive your original items</li>
+                      <li>Processing may take 7-10 business days after admin approval and receiving your original items</li>
                       <li>Replacement items will be of the same product and quantity</li>
+                      <li>For more details or assistance, please contact our admin team via email or mobile</li>
                     </ul>
                   </div>
                 )}
@@ -396,6 +546,8 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
                         const isSelected = currentItem.selected;
                         const canChangeVariant = currentItem.reason === 'Change Size' && hasVariants(item);
                         const availableReasons = getAvailableReasons(item);
+                        const variantDisplayName = getVariantDisplayName(item);
+                        const currentVariantId = getCurrentVariantId(item);
                         
                         return (
                           <div key={item.id} className={`border rounded-lg p-3 sm:p-4 ${isSelected ? 'border-blue-300 bg-blue-50' : 'border-gray-200'}`}>
@@ -427,7 +579,14 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
                               <div className="flex-1 min-w-0">
                                 <label htmlFor={`item-${item.id}`} className="cursor-pointer">
                                   <h4 className="text-sm font-medium text-gray-900 mb-1 line-clamp-2">{item.product_details.product_name}</h4>
-                                  <p className="text-xs text-gray-500 mb-2 sm:mb-3">₹{parseFloat(item.price || item.total_price).toFixed(2)} x {item.quantity}</p>
+                                  <div className="flex flex-wrap items-center gap-2 mb-2 sm:mb-3">
+                                    <p className="text-xs text-gray-500">₹{parseFloat(item.price || item.total_price).toFixed(2)} x {item.quantity}</p>
+                                    {variantDisplayName && (
+                                      <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
+                                        {variantDisplayName}
+                                      </span>
+                                    )}
+                                  </div>
                                 </label>
 
                                 {/* Show controls only if selected */}
@@ -462,10 +621,13 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
                                             <option 
                                               key={variant.id} 
                                               value={variant.id}
-                                              disabled={variant.quantity <= 0}
-                                              className={variant.quantity <= 0 ? 'text-gray-400' : ''}
+                                              disabled={variant.quantity <= 0 || variant.id === currentVariantId}
+                                              className={variant.quantity <= 0 || variant.id === currentVariantId ? 'text-gray-400' : ''}
                                             >
-                                              Size {variant.variant_name} {variant.quantity > 0 ? `(${variant.quantity} available)` : '(Out of stock)'}
+                                              Size {variant.variant_name} {
+                                                variant.id === currentVariantId ? '(Current size)' :
+                                                variant.quantity > 0 ? `(${variant.quantity} available)` : '(Out of stock)'
+                                              }
                                             </option>
                                           ))}
                                         </select>
@@ -479,17 +641,38 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
                                         <div className="flex-1">
                                           <input
                                             type="file"
-                                            accept="image/*"
+                                            accept="image/jpeg,image/jpg,image/png,image/webp"
                                             multiple
                                             onChange={(e) => handleItemChange(item.id, 'replacementImages', e.target.files)}
                                             className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-[var(--color-primary-950)] focus:border-[var(--color-primary-950)]"
                                           />
-                                          <p className="text-xs text-gray-500 mt-1">Upload images showing damage (optional)</p>
+                                          <p className="text-xs text-gray-500 mt-1">
+                                            Upload images showing damage (required) - JPEG, PNG, WebP only, max 5MB each
+                                          </p>
+                                          
+                                          {/* Display file validation errors */}
+                                          {fileErrors[item.id] && fileErrors[item.id].length > 0 && (
+                                            <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-md">
+                                              <div className="flex items-start">
+                                                <AlertTriangle size={14} className="text-red-500 mr-2 mt-0.5 flex-shrink-0" />
+                                                <div className="text-xs text-red-600">
+                                                  <p className="font-medium mb-1">Some files were rejected:</p>
+                                                  <ul className="list-disc list-inside space-y-0.5">
+                                                    {fileErrors[item.id].map((error, index) => (
+                                                      <li key={index}>{error}</li>
+                                                    ))}
+                                                  </ul>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          )}
                                           
                                           {/* Image Previews */}
                                           {currentItem.replacementImages && currentItem.replacementImages.length > 0 && (
                                             <div className="mt-3">
-                                              <p className="text-xs text-gray-600 mb-2">Selected images ({currentItem.replacementImages.length}):</p>
+                                              <p className="text-xs text-gray-600 mb-2">
+                                                Selected images ({currentItem.replacementImages.length})
+                                              </p>
                                               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                                                 {currentItem.replacementImages.map((file, index) => (
                                                   <div key={index} className="relative group">
@@ -503,11 +686,11 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
                                                       />
                                                     </div>
                                                     {/* Overlay with actions */}
-                                                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all duration-200 rounded-lg flex items-center justify-center space-x-1 opacity-0 group-hover:opacity-100">
+                                                    <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-80 transition-all duration-200 rounded-lg flex items-center justify-center space-x-1">
                                                       <button
                                                         type="button"
                                                         onClick={() => handleViewImage(file)}
-                                                        className="p-1.5 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full transition-all"
+                                                        className="p-1.5 bg-white opacity-90 hover:opacity-100 rounded-full transition-all"
                                                         title="View image"
                                                       >
                                                         <Eye size={14} className="text-gray-700" />
@@ -515,16 +698,21 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
                                                       <button
                                                         type="button"
                                                         onClick={() => handleDeleteImage(item.id, index)}
-                                                        className="p-1.5 bg-red-500 bg-opacity-90 hover:bg-opacity-100 rounded-full transition-all"
+                                                        className="p-1.5 bg-red-500 opacity-90 hover:opacity-100 rounded-full transition-all"
                                                         title="Delete image"
                                                       >
                                                         <Trash2 size={14} className="text-white" />
                                                       </button>
                                                     </div>
-                                                    {/* File name */}
-                                                    <p className="text-xs text-gray-600 mt-1 truncate" title={file.name}>
-                                                      {file.name}
-                                                    </p>
+                                                    {/* File name and size */}
+                                                    <div className="mt-1">
+                                                      <p className="text-xs text-gray-600 truncate" title={file.name}>
+                                                        {file.name}
+                                                      </p>
+                                                      <p className="text-xs text-gray-500">
+                                                        {(file.size / 1024 / 1024).toFixed(1)} MB
+                                                      </p>
+                                                    </div>
                                                   </div>
                                                 ))}
                                               </div>
@@ -556,6 +744,8 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
                         const isSelected = currentItem.selected;
                         const canChangeVariant = currentItem.reason === 'Change Size' && hasVariants(item);
                         const availableReasons = getAvailableReasons(item);
+                        const variantDisplayName = getVariantDisplayName(item);
+                        const currentVariantId = getCurrentVariantId(item);
                         
                         return (
                           <div key={item.id} className={`border rounded-lg p-3 sm:p-4 ml-2 sm:ml-4 ${isSelected ? 'border-blue-300 bg-blue-50' : 'border-gray-200'}`}>
@@ -599,6 +789,11 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
                                         `₹${parseFloat(item.price || item.total_price).toFixed(2)}`
                                       )}
                                     </p>
+                                    {variantDisplayName && (
+                                      <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
+                                        {variantDisplayName}
+                                      </span>
+                                    )}
                                   </div>
                                 </label>
 
@@ -634,10 +829,13 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
                                             <option 
                                               key={variant.id} 
                                               value={variant.id}
-                                              disabled={variant.quantity <= 0}
-                                              className={variant.quantity <= 0 ? 'text-gray-400' : ''}
+                                              disabled={variant.quantity <= 0 || variant.id === currentVariantId}
+                                              className={variant.quantity <= 0 || variant.id === currentVariantId ? 'text-gray-400' : ''}
                                             >
-                                              Size {variant.variant_name} {variant.quantity > 0 ? `(${variant.quantity} available)` : '(Out of stock)'}
+                                              Size {variant.variant_name} {
+                                                variant.id === currentVariantId ? '(Current size)' :
+                                                variant.quantity > 0 ? `(${variant.quantity} available)` : '(Out of stock)'
+                                              }
                                             </option>
                                           ))}
                                         </select>
@@ -651,12 +849,29 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
                                         <div className="flex-1">
                                           <input
                                             type="file"
-                                            accept="image/*"
+                                            accept="image/jpeg,image/jpg,image/png,image/webp"
                                             multiple
                                             onChange={(e) => handleItemChange(item.id, 'replacementImages', e.target.files)}
                                             className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-[var(--color-primary-950)] focus:border-[var(--color-primary-950)]"
                                           />
-                                          <p className="text-xs text-gray-500 mt-1">Upload images showing damage (optional)</p>
+                                          <p className="text-xs text-gray-500 mt-1">Upload images showing damage (required) - JPEG, PNG, WebP only, max 5MB each</p>
+                                          
+                                          {/* Display file validation errors for bundle items */}
+                                          {fileErrors[item.id] && fileErrors[item.id].length > 0 && (
+                                            <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-md">
+                                              <div className="flex items-start">
+                                                <AlertTriangle size={14} className="text-red-500 mr-2 mt-0.5 flex-shrink-0" />
+                                                <div className="text-xs text-red-600">
+                                                  <p className="font-medium mb-1">Some files were rejected:</p>
+                                                  <ul className="list-disc list-inside space-y-0.5">
+                                                    {fileErrors[item.id].map((error, index) => (
+                                                      <li key={index}>{error}</li>
+                                                    ))}
+                                                  </ul>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          )}
                                           
                                           {/* Image Previews */}
                                           {currentItem.replacementImages && currentItem.replacementImages.length > 0 && (
@@ -675,11 +890,11 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
                                                       />
                                                     </div>
                                                     {/* Overlay with actions */}
-                                                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all duration-200 rounded-lg flex items-center justify-center space-x-1 opacity-0 group-hover:opacity-100">
+                                                    <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-80 transition-all duration-200 rounded-lg flex items-center justify-center space-x-1">
                                                       <button
                                                         type="button"
                                                         onClick={() => handleViewImage(file)}
-                                                        className="p-1.5 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full transition-all"
+                                                        className="p-1.5 bg-white opacity-90 hover:opacity-100 rounded-full transition-all"
                                                         title="View image"
                                                       >
                                                         <Eye size={14} className="text-gray-700" />
@@ -687,16 +902,21 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
                                                       <button
                                                         type="button"
                                                         onClick={() => handleDeleteImage(item.id, index)}
-                                                        className="p-1.5 bg-red-500 bg-opacity-90 hover:bg-opacity-100 rounded-full transition-all"
+                                                        className="p-1.5 bg-red-500 opacity-90 hover:opacity-100 rounded-full transition-all"
                                                         title="Delete image"
                                                       >
                                                         <Trash2 size={14} className="text-white" />
                                                       </button>
                                                     </div>
-                                                    {/* File name */}
-                                                    <p className="text-xs text-gray-600 mt-1 truncate" title={file.name}>
-                                                      {file.name}
-                                                    </p>
+                                                    {/* File name and size */}
+                                                    <div className="mt-1">
+                                                      <p className="text-xs text-gray-600 truncate" title={file.name}>
+                                                        {file.name}
+                                                      </p>
+                                                      <p className="text-xs text-gray-500">
+                                                        {(file.size / 1024 / 1024).toFixed(1)} MB
+                                                      </p>
+                                                    </div>
                                                   </div>
                                                 ))}
                                               </div>
@@ -719,7 +939,7 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
             
               <div className="mb-4">
                 <label htmlFor="requestDetails" className="block text-sm font-medium text-gray-700 mb-2">
-                  Additional Details
+                  Additional Details <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   id="requestDetails"
@@ -728,8 +948,11 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
                   rows={3}
                   required
                   className="shadow-sm focus:ring-[#175e7a] focus:border-[var(--color-primary-950)] block w-full sm:text-sm border-gray-300 rounded-md"
-                  placeholder="Please provide any additional details about your replacement request..."
+                  placeholder="Please provide details about your replacement request, including why you need the replacement..."
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Required: Please explain your replacement request in detail
+                </p>
               </div>
 
               <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 mt-5">
@@ -757,12 +980,12 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
 
       {/* Full Screen Image Modal */}
       {fullScreenImage && (
-        <div className="fixed inset-0 z-[60] bg-black bg-opacity-90 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[60] bg-black opacity-90 flex items-center justify-center p-4">
           <div className="relative max-w-4xl max-h-full w-full h-full flex items-center justify-center">
             {/* Close button */}
             <button
               onClick={closeFullScreenImage}
-              className="absolute top-4 right-4 z-10 p-2 bg-black bg-opacity-30 hover:bg-opacity-50 rounded-full transition-all border border-white border-opacity-20"
+              className="absolute top-4 right-4 z-10 p-2 bg-black opacity-30 hover:opacity-50 rounded-full transition-all border border-white border-opacity-20"
             >
               <X size={24} className="text-white" />
             </button>
@@ -780,7 +1003,7 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
             
             {/* Image name */}
             <div className="absolute bottom-4 left-4 right-4 text-center">
-              <p className="text-white text-sm bg-black bg-opacity-50 rounded px-3 py-1 inline-block">
+              <p className="text-white text-sm bg-black opacity-50 rounded px-3 py-1 inline-block">
                 {fullScreenImage.name}
               </p>
             </div>

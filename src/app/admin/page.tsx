@@ -82,7 +82,7 @@ export default function AdminDashboard() {
     fetchDashboardData();
   }, []);
 
-  // Special cards with gradients and routes
+  // Special cards with gradients and routes (including low stock)
   const specialCards = dashboardData ? [
     {
       title: 'Total Products',
@@ -113,6 +113,16 @@ export default function AdminDashboard() {
       description: dashboardData.pending_replacements.label,
       patternId: 'replacements-pattern',
       route: '/admin/replacements/list'
+    },
+    {
+      title: 'Low Stock Alert',
+      value: dashboardData.low_stock_items.count.toString(),
+      icon: AlertTriangle,
+      color: 'red',
+      iconColor: 'text-red-700',
+      description: dashboardData.low_stock_items.label,
+      patternId: 'warning-pattern',
+      route: '/admin/low-stock'
     }
   ] : [];
 
@@ -134,25 +144,8 @@ export default function AdminDashboard() {
     }
   ] : [];
 
-  // Special low stock card
-  const lowStockCard = dashboardData ? {
-    title: 'Low Stock Alert',
-    value: dashboardData.low_stock_items.count.toString(),
-    icon: AlertTriangle,
-    description: dashboardData.low_stock_items.label,
-    threshold: dashboardData.low_stock_items.threshold,
-    route: '/admin/low-stock',
-    patternId: 'warning-pattern'
-  } : null;
-
   const handleCardClick = (route: string) => {
     router.push(route);
-  };
-
-  const handleLowStockClick = () => {
-    if (lowStockCard) {
-      router.push(lowStockCard.route);
-    }
   };
 
   // Helper for regular card colors
@@ -191,6 +184,10 @@ export default function AdminDashboard() {
       orange: {
         gradient: 'from-orange-600 via-orange-700 to-orange-800',
         hover: 'hover:from-orange-700 hover:via-orange-800 hover:to-orange-900',
+      },
+      red: {
+        gradient: 'from-red-500 via-red-600 to-red-700',
+        hover: 'hover:from-red-600 hover:via-red-700 hover:to-red-800',
       }
     };
     return colorMap[color as keyof typeof colorMap] || colorMap.blue;
@@ -239,9 +236,9 @@ export default function AdminDashboard() {
           Welcome to your Dashboard
         </h2>
         
-        {/* Loading skeleton for summary cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
-          {[1, 2, 3, 4, 5].map((i) => (
+        {/* Loading skeleton for special cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[1, 2, 3, 4].map((i) => (
             <div key={i} className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
               <div className="animate-pulse">
                 <div className="w-12 h-12 bg-gray-200 rounded-full mb-4"></div>
@@ -253,14 +250,18 @@ export default function AdminDashboard() {
           ))}
         </div>
         
-        {/* Loading skeleton for low stock card */}
-        <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 h-40">
-          <div className="animate-pulse">
-            <div className="w-12 h-12 bg-gray-200 rounded-full mb-4"></div>
-            <div className="h-4 bg-gray-200 rounded mb-2"></div>
-            <div className="h-8 bg-gray-200 rounded mb-2"></div>
-            <div className="h-3 bg-gray-200 rounded"></div>
-          </div>
+        {/* Loading skeleton for regular cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          {[1, 2].map((i) => (
+            <div key={i} className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+              <div className="animate-pulse">
+                <div className="w-12 h-12 bg-gray-200 rounded-full mb-4"></div>
+                <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                <div className="h-8 bg-gray-200 rounded mb-2"></div>
+                <div className="h-3 bg-gray-200 rounded"></div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -311,9 +312,8 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Dashboard Cards Layout */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
-        {/* Special Cards with Gradients - Products, Orders, and Replacements */}
+      {/* Special Cards with Gradients - 4 columns on PC */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {specialCards.map((card) => {
           const Icon = card.icon;
           const colors = getGradientClasses(card.color);
@@ -343,7 +343,7 @@ export default function AdminDashboard() {
               <div className="relative z-10 w-full">
                 <div className="bg-white bg-opacity-20 p-3 rounded-full mb-4 w-fit
                                group-hover:bg-opacity-30 transition-all duration-300">
-                  <Icon className={`w-8 h-8 ${card.iconColor}` } />
+                  <Icon className={`w-8 h-8 ${card.iconColor}`} />
                 </div>
                 <h3 className="text-lg font-semibold text-white mb-2">{card.title}</h3>
                 <p className="text-4xl font-bold text-white mb-1">{card.value}</p>
@@ -366,8 +366,10 @@ export default function AdminDashboard() {
             </div>
           );
         })}
+      </div>
 
-        {/* Regular Cards - Users and Revenue */}
+      {/* Regular Cards - Users and Revenue */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         {regularCards.map((card) => {
           const Icon = card.icon;
           const colors = getColorClasses(card.color);
@@ -387,55 +389,6 @@ export default function AdminDashboard() {
           );
         })}
       </div>
-
-      {/* Special Low Stock Alert Card */}
-      {lowStockCard && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div 
-            onClick={handleLowStockClick}
-            className="relative overflow-hidden bg-gradient-to-br from-red-500 via-red-600 to-red-700 
-                       rounded-xl shadow-xl cursor-pointer
-                       transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] 
-                       hover:from-red-600 hover:via-red-700 hover:to-red-800
-                       group p-6 flex flex-col items-start"
-          >
-            {/* SVG Pattern Background */}
-            <div className="absolute inset-0 opacity-10">
-              <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-                <defs>
-                  {getSVGPattern(lowStockCard.patternId)}
-                </defs>
-                <rect width="100%" height="100%" fill={`url(#${lowStockCard.patternId})`} />
-              </svg>
-            </div>
-
-            {/* Content */}
-            <div className="relative z-10 w-full">
-              <div className="bg-white bg-opacity-20 p-3 rounded-full mb-4 w-fit
-                             group-hover:bg-opacity-30 transition-all duration-300">
-                <AlertTriangle className="w-8 h-8 text-red-700" />
-              </div>
-              <h3 className="text-lg font-semibold text-white mb-2">{lowStockCard.title}</h3>
-              <p className="text-4xl font-bold text-white mb-1">{lowStockCard.value}</p>
-              <p className="text-sm text-red-100 opacity-90 mb-2">{lowStockCard.description}</p>
-              
-              {/* Action hint */}
-              <div className="flex items-center justify-between mt-4">
-                <p className="text-red-100 text-xs font-medium group-hover:text-white transition-colors">
-                  Click to view items →
-                </p>
-                <ExternalLink className="w-4 h-4 text-white opacity-70 group-hover:opacity-100 
-                                       transition-opacity duration-300" />
-              </div>
-            </div>
-
-            {/* Shine effect on hover */}
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent 
-                           opacity-0 group-hover:opacity-10 transform translate-x-[-100%] 
-                           group-hover:translate-x-[100%] transition-all duration-1000 ease-in-out"></div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

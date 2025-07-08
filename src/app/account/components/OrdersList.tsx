@@ -59,6 +59,25 @@ export default function OrdersList() {
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
 
+  // Helper function to get variant display name
+  const getVariantDisplayName = (item: any) => {
+    if (!item.product_variant) return null;
+    
+    // If product_variant is a string (variant ID), find the variant details
+    if (typeof item.product_variant === 'string') {
+      const variants = item.product_details?.product_variant || [];
+      const variant = variants.find((v: any) => v.id === item.product_variant);
+      return variant ? `Size ${variant.variant_name}` : `Size ${item.product_variant}`;
+    }
+    
+    // If product_variant is an object with variant details
+    if (typeof item.product_variant === 'object' && item.product_variant.variant_name) {
+      return `Size ${item.product_variant.variant_name}`;
+    }
+    
+    return null;
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -342,42 +361,51 @@ export default function OrdersList() {
                       {/* Regular Items */}
                       {order.order_items.length > 0 && (
                         <div className="space-y-2">
-                          {order.order_items.map((item: any) => (
-                            <div key={item.id} className="flex bg-white p-2 rounded-lg border border-gray-200">
-                              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-md overflow-hidden mr-2 sm:mr-3 bg-gray-100 flex-shrink-0 relative">
-                                {item.product_details.images && item.product_details.images.length > 0 ? (
-                                  <Image 
-                                    src={`${process.env.NEXT_PUBLIC_API_BASE_URL}${item.product_details.images[0].product_image}`} 
-                                    alt={item.product_details.product_name}
-                                    fill
-                                    sizes="(max-width: 48px) 100vw, (max-width: 768px) 64px, 64px"
-                                    style={{objectFit: 'cover'}}
-                                  />
-                                ) : (
-                                  <div className="w-full h-full bg-gray-200"></div>
-                                )}
-                              </div>
-                              
-                              <div className="flex-1 min-w-0">
-                                <h4 className="text-[12px] sm:text-[14px] font-medium text-gray-900 line-clamp-2 mb-1">
-                                  {item.product_details.product_name}
-                                </h4>
+                          {order.order_items.map((item: any) => {
+                            const variantDisplayName = getVariantDisplayName(item);
+                            
+                            return (
+                              <div key={item.id} className="flex bg-white p-2 rounded-lg border border-gray-200">
+                                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-md overflow-hidden mr-2 sm:mr-3 bg-gray-100 flex-shrink-0 relative">
+                                  {item.product_details.images && item.product_details.images.length > 0 ? (
+                                    <Image 
+                                      src={`${process.env.NEXT_PUBLIC_API_BASE_URL}${item.product_details.images[0].product_image}`} 
+                                      alt={item.product_details.product_name}
+                                      fill
+                                      sizes="(max-width: 48px) 100vw, (max-width: 768px) 64px, 64px"
+                                      style={{objectFit: 'cover'}}
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full bg-gray-200"></div>
+                                  )}
+                                </div>
                                 
-                                <div className="flex justify-between items-end">
-                                  <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                                    <p className="text-[11px] sm:text-[13px] text-gray-600">Qty: {item.quantity}</p>
-                                    {item.mode && item.mode !== 'Normal' && (
-                                      <span className="text-[10px] sm:text-[11px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded w-fit">
-                                        {item.mode}
-                                      </span>
-                                    )}
-                                  </div>
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="text-[12px] sm:text-[14px] font-medium text-gray-900 line-clamp-2 mb-1">
+                                    {item.product_details.product_name}
+                                  </h4>
                                   
-                                  <p className="text-[12px] sm:text-[14px] font-medium">₹{parseFloat(item.price || item.total_price).toFixed(2)}</p>
+                                  <div className="flex justify-between items-end">
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                                      <p className="text-[11px] sm:text-[13px] text-gray-600">Qty: {item.quantity}</p>
+                                      {item.mode && item.mode !== 'Normal' && (
+                                        <span className="text-[10px] sm:text-[11px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded w-fit">
+                                          {item.mode}
+                                        </span>
+                                      )}
+                                      {variantDisplayName && (
+                                        <span className="text-[10px] sm:text-[11px] bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded w-fit">
+                                          {variantDisplayName}
+                                        </span>
+                                      )}
+                                    </div>
+                                    
+                                    <p className="text-[12px] sm:text-[14px] font-medium">₹{parseFloat(item.price || item.total_price).toFixed(2)}</p>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
 
@@ -390,50 +418,59 @@ export default function OrdersList() {
                           </div>
                           
                           <div className="space-y-2">
-                            {bundleGroup.items.map((item: any) => (
-                              <div key={item.id} className="flex bg-white p-2 rounded-lg border border-green-200">
-                                <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-md overflow-hidden mr-2 sm:mr-3 bg-gray-100 flex-shrink-0 relative">
-                                  {item.product_details.images && item.product_details.images.length > 0 ? (
-                                    <Image 
-                                      src={`${process.env.NEXT_PUBLIC_API_BASE_URL}${item.product_details.images[0].product_image}`} 
-                                      alt={item.product_details.product_name}
-                                      fill
-                                      sizes="(max-width: 40px) 100vw, (max-width: 768px) 56px, 56px"
-                                      style={{objectFit: 'cover'}}
-                                    />
-                                  ) : (
-                                    <div className="w-full h-full bg-gray-200"></div>
-                                  )}
-                                </div>
-                                
-                                <div className="flex-1 min-w-0">
-                                  <h4 className="text-[11px] sm:text-[13px] font-medium text-gray-900 line-clamp-2 mb-1">
-                                    {item.product_details.product_name}
-                                  </h4>
+                            {bundleGroup.items.map((item: any) => {
+                              const variantDisplayName = getVariantDisplayName(item);
+                              
+                              return (
+                                <div key={item.id} className="flex bg-white p-2 rounded-lg border border-green-200">
+                                  <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-md overflow-hidden mr-2 sm:mr-3 bg-gray-100 flex-shrink-0 relative">
+                                    {item.product_details.images && item.product_details.images.length > 0 ? (
+                                      <Image 
+                                        src={`${process.env.NEXT_PUBLIC_API_BASE_URL}${item.product_details.images[0].product_image}`} 
+                                        alt={item.product_details.product_name}
+                                        fill
+                                        sizes="(max-width: 40px) 100vw, (max-width: 768px) 56px, 56px"
+                                        style={{objectFit: 'cover'}}
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full bg-gray-200"></div>
+                                    )}
+                                  </div>
                                   
-                                  <div className="flex justify-between items-end">
-                                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                                      <p className="text-[10px] sm:text-[12px] text-gray-600">Qty: {item.quantity}</p>
-                                      <span className={`text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0.5 rounded-full font-medium w-fit ${
-                                        item.mode === 'Buy' 
-                                          ? 'bg-blue-100 text-blue-700' 
-                                          : 'bg-green-100 text-green-700'
-                                      }`}>
-                                        {item.mode}
-                                      </span>
-                                    </div>
+                                  <div className="flex-1 min-w-0">
+                                    <h4 className="text-[11px] sm:text-[13px] font-medium text-gray-900 line-clamp-2 mb-1">
+                                      {item.product_details.product_name}
+                                    </h4>
                                     
-                                    <p className="text-[11px] sm:text-[13px] font-medium">
-                                      {item.mode === 'Get' ? (
-                                        <span className="text-green-600">FREE</span>
-                                      ) : (
-                                        `₹${parseFloat(item.price || item.total_price).toFixed(2)}`
-                                      )}
-                                    </p>
+                                    <div className="flex justify-between items-end">
+                                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                                        <p className="text-[10px] sm:text-[12px] text-gray-600">Qty: {item.quantity}</p>
+                                        <span className={`text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0.5 rounded-full font-medium w-fit ${
+                                          item.mode === 'Buy' 
+                                            ? 'bg-blue-100 text-blue-700' 
+                                            : 'bg-green-100 text-green-700'
+                                        }`}>
+                                          {item.mode}
+                                        </span>
+                                        {variantDisplayName && (
+                                          <span className="text-[9px] sm:text-[10px] bg-purple-100 text-purple-700 px-1 sm:px-1.5 py-0.5 rounded w-fit">
+                                            {variantDisplayName}
+                                          </span>
+                                        )}
+                                      </div>
+                                      
+                                      <p className="text-[11px] sm:text-[13px] font-medium">
+                                        {item.mode === 'Get' ? (
+                                          <span className="text-green-600">FREE</span>
+                                        ) : (
+                                          `₹${parseFloat(item.price || item.total_price).toFixed(2)}`
+                                        )}
+                                      </p>
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       ))}

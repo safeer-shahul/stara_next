@@ -55,7 +55,7 @@ export default function AdminLogin() {
     try {
       const userDetails = await apiService.getUserProfile();
       
-      if (userDetails.is_superuser) {
+      if (userDetails.is_superuser || userDetails.is_staff) {
         // Store admin user data in localStorage
         localStorage.setItem('adminUserData', JSON.stringify(userDetails));
         
