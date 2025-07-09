@@ -5,7 +5,7 @@ import { ReactNode, useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import apiService from '@/utils/api/apiService';
-import { Menu, X, LogOut, LayoutDashboard, Package, ShoppingCart, Percent, Tag, Users, Eye, SquareArrowDownRight } from 'lucide-react';
+import { Menu, X, LogOut, LayoutDashboard, Package, ShoppingCart, Percent, Tag, Users, Eye, SquareArrowDownRight, HelpCircle, SquareArrowUpLeft } from 'lucide-react';
 import { AdminUserProvider } from './context/AdminUserContext';
 
 interface AdminUser {
@@ -47,8 +47,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       href: '/admin/products',
       label: 'Products',
       startsWith: true,
-      icon: Package,
-      superuserOnly: true,
+      icon: Package
     },
     {
       href: '/admin/orders/list',
@@ -68,8 +67,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       href: '/admin/coupons/list',
       label: 'Coupons',
       startsWith: true,
-      icon: Tag,
-      superuserOnly: true,
+      icon: Tag
     },
     {
       href: '/admin/staff/list',
@@ -82,7 +80,19 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       href: '/admin/replacements/list',
       label: 'Replacements',
       startsWith: true,
-      icon: SquareArrowDownRight,
+      icon: SquareArrowDownRight
+    },
+    {
+      href: '/admin/replacement-returns/list',
+      label: 'Replacement Returns',
+      startsWith: true,
+      icon: SquareArrowUpLeft
+    },
+    {
+      href: '/admin/complaints',
+      label: 'Complaints',
+      startsWith: true,
+      icon: HelpCircle,
       superuserOnly: true,
     },
   ], []);

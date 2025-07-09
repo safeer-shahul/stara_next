@@ -1046,6 +1046,39 @@ public async verifyOtp(data: {
   }
 }
 
+public async getAllEnquiries(): Promise<any> {
+  try {
+    return await this.get<any>(`/enquiry/get_all_enquiries`);
+  } catch (error) {
+    throw error;
+  }
+}
+
+public async getReplacementOrdersPaginated(
+  page: number = 1,
+  pageSize: number = 10,
+  options?: {
+    start_date?: string; // New: YYYY-MM-DD
+    end_date?: string; // New: YYYY-MM-DD
+  }
+): Promise<any> {
+  try {
+    let url = `/replacement_order/get_all_replacements_orders?page=${page}&page_size=${pageSize}`;
+     
+    if (options?.start_date) {
+      url += `&start_date=${options.start_date}`; 
+    }
+    if (options?.end_date) {
+      url += `&end_date=${options.end_date}`;      
+    }
+          
+    return await this.get<any>(url);
+  } catch (error) {
+    console.error('Error fetching paginated orders:', error);
+    throw error;
+  }
+}
+
 }
 
 const apiService = ApiService.getInstance();
