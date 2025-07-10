@@ -718,7 +718,7 @@ export default function OrderDetailsPage() {
               )}
               <div className="flex justify-between py-3 font-bold text-xl text-gray-900">
                 <span>Payable Total:</span>
-                <span>₹{parseFloat(order.payable_price).toFixed(2)}</span>
+                <span>₹{(parseFloat(order.payable_price) + parseFloat(order.shipping_price)).toFixed(2)}</span>
               </div>
             </div>
           </div>
