@@ -9,14 +9,14 @@ export const metadata: Metadata = {
   title: 'Terms of Service | Stara Jewels',
   description: 'Terms of Service for Stara Jewels',
 };
+
 const TermsOfService: NextPage = () => {
   return (
     <>
-
       <main className="max-w-4xl mx-auto px-4 py-8 md:py-12">
         <div className="mb-8 text-center">
           <h1 className="text-3xl md:text-4xl font-bold mb-2">Terms of Service</h1>
-          <p className="text-gray-600">Last Updated: April 15, 2025</p>
+          <p className="text-gray-600">Last Updated: July 10, 2025</p>
         </div>
 
         <div className="prose max-w-none">
@@ -24,8 +24,7 @@ const TermsOfService: NextPage = () => {
             <h2 className="text-2xl font-semibold mb-4">1. Introduction</h2>
             <p>
               Welcome to Stara Jewels. These Terms of Service govern your use of our website 
-              located at [www.starajewels.com] (the "Website") and the purchase and use of products 
-              and services offered through the Website. By accessing our Website and/or making a purchase, 
+              and the purchase and use of products and services offered through the Website. By accessing our Website and/or making a purchase, 
               you agree to be bound by these Terms of Service and our Privacy Policy.
             </p>
           </section>
@@ -53,7 +52,7 @@ const TermsOfService: NextPage = () => {
             <p>
               Product availability is not guaranteed. We reserve the right to discontinue any product at any 
               time. If a product is unavailable after you place your order, we will notify you and provide 
-              options for substitution or refund.
+              options for substitution or replacement.
             </p>
           </section>
 
@@ -88,9 +87,8 @@ const TermsOfService: NextPage = () => {
           <section className="mb-8">
             <h2 className="text-2xl font-semibold mb-4">6. Shipping Terms</h2>
             <p>
-              We use Delhivery as our shipping partner for all orders. Delivery timelines are estimates only 
-              and are not guaranteed. International shipments may be subject to customs duties and taxes 
-              imposed by the destination country, which are the buyer's responsibility.
+              We provide free shipping on all orders within India through our delivery partner Delhivery. 
+              Delivery timelines are estimates only and are not guaranteed. We currently ship within India only.
             </p>
             <p>
               Risk of loss and title for items pass to you upon delivery of the items to the carrier. You are 
@@ -99,12 +97,19 @@ const TermsOfService: NextPage = () => {
           </section>
 
           <section className="mb-8">
-            <h2 className="text-2xl font-semibold mb-4">7. Return and Refund Terms</h2>
+            <h2 className="text-2xl font-semibold mb-4">7. Replacement Terms</h2>
+            <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200 mb-4">
+              <p className="font-semibold text-yellow-800">
+                Important: Stara Jewels does not offer returns or refunds. We only provide replacements under specific conditions.
+              </p>
+            </div>
             <p>
-              Returns and replacement requests are accepted only within 2 days of delivery. Items must be 
+              Replacement requests are accepted only within 3 days of delivery. Items must be 
               unworn, in original condition with all tags attached. Custom-made or personalized items cannot 
-              be returned. Please refer to our separate Return & Replacement Policy and Refund Policy for 
-              complete details.
+              be replaced. You can only request replacement once per order, and all requests are subject to admin approval.
+            </p>
+            <p>
+              Please refer to our separate Replacement Policy for complete details on eligibility, process, and terms.
             </p>
           </section>
 
@@ -169,7 +174,7 @@ const TermsOfService: NextPage = () => {
             <p>
               These Terms shall be governed by and construed in accordance with the laws of India, 
               without regard to its conflict of law provisions. Any disputes relating to these Terms will 
-              be subject to the exclusive jurisdiction of the courts in [YOUR CITY], India.
+              be subject to the exclusive jurisdiction of the courts in Calicut, India.
             </p>
           </section>
 
@@ -187,12 +192,16 @@ const TermsOfService: NextPage = () => {
             <p>
               If you have any questions about these Terms of Service, please contact us at:
             </p>
-            <div className="mt-4">
-              <p>Stara Jewels</p>
-              <p>Third Floor, Nalonkandy Arcade,
-              Pushpa Junction, Calicut, India 673002</p>
-              <p>Email: starajewels@gmail.com</p>
-              <p>Phone: +91 80869 25925</p>
+            <div className="mt-4 bg-gray-50 p-4 rounded-lg">
+              <p className="font-semibold">Stara Jewels</p>
+              <p>Third Floor, Nalonkandy Arcade,</p>
+              <p>Pushpa Junction, Calicut, India 673002</p>
+              <p className="mt-2">
+                <strong>Email:</strong> starajewels@gmail.com
+              </p>
+              <p>
+                <strong>Phone:</strong> +91 80869 25925
+              </p>
             </div>
           </section>
         </div>
@@ -203,7 +212,6 @@ const TermsOfService: NextPage = () => {
           </Link>
         </div>
       </main>
-
     </>
   );
 };

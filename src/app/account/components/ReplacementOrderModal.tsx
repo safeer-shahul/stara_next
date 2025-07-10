@@ -441,11 +441,11 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
   if (loading) {
     return (
       <div className="fixed inset-0 z-50 overflow-y-auto">
+        {/* Background overlay */}
+        <div className="fixed inset-0 bg-black opacity-75 z-40" onClick={onClose}></div>
+        
         <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-          <div className="fixed inset-0 transition-opacity" onClick={onClose}>
-            <div className="absolute inset-0 bg-black opacity-75"></div>
-          </div>
-          <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+          <div className="relative inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full z-50">
             <div className="bg-white px-4 pt-5 pb-4 sm:p-6">
               <div className="flex justify-center items-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--color-primary-950)]"></div>
@@ -461,11 +461,11 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
   if (!orderData) {
     return (
       <div className="fixed inset-0 z-50 overflow-y-auto">
+        {/* Background overlay */}
+        <div className="fixed inset-0 bg-black opacity-75 z-40" onClick={onClose}></div>
+        
         <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-          <div className="fixed inset-0 transition-opacity" onClick={onClose}>
-            <div className="absolute inset-0 bg-black opacity-75"></div>
-          </div>
-          <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+          <div className="relative inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full z-50">
             <div className="bg-white px-4 pt-5 pb-4 sm:p-6">
               <div className="text-center py-8">
                 <p className="text-red-600">Failed to load order details</p>
@@ -485,12 +485,12 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
+      {/* Background overlay - moved outside flex container */}
+      <div className="fixed inset-0 bg-black opacity-75 z-40" onClick={onClose}></div>
+      
       <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-        <div className="fixed inset-0 transition-opacity" onClick={onClose}>
-          <div className="absolute inset-0 bg-black opacity-75"></div>
-        </div>
-
-        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all  sm:align-middle w-full md:max-w-4xl ">
+        {/* Modal content with higher z-index */}
+        <div className="relative inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:align-middle w-full md:max-w-4xl z-50">
           <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium text-gray-900">Replace Items</h3>

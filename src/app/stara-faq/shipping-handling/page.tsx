@@ -9,44 +9,36 @@ export const metadata: Metadata = {
   title: 'Shipping and handling | Stara Jewels',
   description: 'Shipping and handling information for Stara Jewels',
 };
+
 const ShippingAndHandling: NextPage = () => {
   return (
     <>
- 
       <main className="max-w-4xl mx-auto px-4 py-8 md:py-12">
         <div className="mb-8 text-center">
           <h1 className="text-3xl md:text-4xl font-bold mb-2">Shipping & Handling</h1>
-          <p className="text-gray-600">Last Updated: April 15, 2025</p>
+          <p className="text-gray-600">Last Updated: July 10, 2025</p>
         </div>
 
         <div className="prose max-w-none">
           <section className="mb-8">
-            <h2 className="text-2xl font-semibold mb-4">Domestic Shipping</h2>
+            <h2 className="text-2xl font-semibold mb-4">Free Shipping</h2>
+            <div className="bg-green-50 p-4 rounded-lg border border-green-200 mb-4">
+              <p className="font-bold text-green-800">
+                🎉 Great News! We offer completely FREE shipping on all orders across India!
+              </p>
+            </div>
             <p>
-              Stara Jewels offers shipping for domestic orders via our delivery partner Delhivery.
+              Stara Jewels provides free shipping for all domestic orders via our trusted delivery partner, Delhivery. 
+              There are no minimum order requirements or hidden charges - all shipping is completely free.
             </p>
             <ul className="list-disc pl-8 my-4">
-              <li><strong>Standard Shipping:</strong> 5-7 business days (₹150)</li>
+              <li><strong>Delivery Time:</strong> 5-7 business days</li>
+              <li><strong>Delivery Partner:</strong> Delhivery</li>
+              <li><strong>Shipping Cost:</strong> Free for all orders</li>
+              <li><strong>Coverage:</strong> Pan-India delivery</li>
             </ul>
             <p>
-              Orders over ₹3,000 qualify for free shipping. All orders are processed within 
-              1-2 business days after payment confirmation.
-            </p>
-          </section>
-
-          <section className="mb-8">
-            <h2 className="text-2xl font-semibold mb-4">International Shipping</h2>
-            <p>
-              We ship to most countries worldwide through our delivery partner Delhivery. International shipping rates are calculated at checkout 
-              based on destination and weight:
-            </p>
-            <ul className="list-disc pl-8 my-4">
-              <li><strong>Standard International:</strong> 10-15 business days (rates vary by location)</li>
-            </ul>
-            <p>
-              Please note that international orders may be subject to import duties, taxes, and customs 
-              clearance fees imposed by the destination country. These charges are the responsibility of 
-              the recipient and are not included in our shipping fees.
+              All orders are processed within 1-2 business days after payment confirmation.
             </p>
           </section>
 
@@ -66,27 +58,40 @@ const ShippingAndHandling: NextPage = () => {
             <h2 className="text-2xl font-semibold mb-4">Shipping Restrictions</h2>
             <p>
               Due to our delivery partner Delhivery's limitations, we are unable to ship to P.O. boxes. 
-              Additionally, some international destinations may have restrictions on 
-              importing jewelry. Please check your local customs regulations before placing an order.
+              Please ensure you provide a complete physical address for successful delivery.
+            </p>
+            <p>
+              We currently ship within India only. For any special delivery requirements or remote locations, 
+              please contact our customer service team before placing your order.
             </p>
           </section>
 
           <section className="mb-8">
             <h2 className="text-2xl font-semibold mb-4">Packaging</h2>
             <p>
-              All Stara Jewels items are carefully packaged in our signature gift boxes, secured with 
-              protective materials to prevent damage during transit. Each order includes:
+              All Stara Jewels items are carefully packaged in secure boxes, with protective materials 
+              to prevent damage during transit. Each order includes:
             </p>
             <ul className="list-disc pl-8 my-4">
-              <li>Signature Stara Jewels gift box</li>
+              <li>Secure Stara Jewels packaging box</li>
               <li>Jewelry care instruction card</li>
-              <li>Authentication certificate for select pieces</li>
-              <li>Silver polishing cloth with orders over $75</li>
+              {/* <li>Authentication certificate for select pieces</li> */}
+              {/* <li>Silver polishing cloth with premium orders</li> */}
             </ul>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="text-2xl font-semibold mb-4">Delivery Process</h2>
             <p>
-              If you're purchasing a gift, you can add a personalized gift message at checkout at no 
-              additional cost.
+              Our delivery partner Delhivery ensures safe and secure delivery of your orders. Here's what to expect:
             </p>
+            <ul className="list-disc pl-8 my-4">
+              <li>Orders are processed within 1-2 business days</li>
+              <li>You'll receive tracking information via email and SMS</li>
+              <li>Delivery attempts are made during business hours</li>
+              <li>Signature confirmation required for all jewelry deliveries</li>
+              <li>Multiple delivery attempts will be made if recipient is unavailable</li>
+            </ul>
           </section>
 
           <section className="mb-8">
@@ -106,12 +111,16 @@ const ShippingAndHandling: NextPage = () => {
             <p>
               If you have any questions about shipping or handling, please contact us at:
             </p>
-            <div className="mt-4">
-              <p>Stara Jewels</p>
-              <p>Third Floor, Nalonkandy Arcade,
-              Pushpa Junction, Calicut, India 673002</p>
-              <p>Email: starajewels@gmail.com</p>
-              <p>Phone: +91 80869 25925</p>
+            <div className="mt-4 bg-gray-50 p-4 rounded-lg">
+              <p className="font-semibold">Stara Jewels</p>
+              <p>Third Floor, Nalonkandy Arcade,</p>
+              <p>Pushpa Junction, Calicut, India 673002</p>
+              <p className="mt-2">
+                <strong>Email:</strong> starajewels@gmail.com
+              </p>
+              <p>
+                <strong>Phone:</strong> +91 80869 25925
+              </p>
             </div>
           </section>
         </div>
@@ -122,7 +131,6 @@ const ShippingAndHandling: NextPage = () => {
           </Link>
         </div>
       </main>
-
     </>
   );
 };

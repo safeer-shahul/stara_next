@@ -334,11 +334,11 @@ const BillSummary: React.FC<BillSummaryProps> = ({
               
               <div className="flex justify-between text-[13px]">
                 <span className='text-gray-500'>Shipping</span>
-                {totals.shippingCost > 0 ? (
+                {/* {totals.shippingCost > 0 ? (
                   <span className='font-semibold'>₹{totals.shippingCost.toFixed(2)}</span>
-                ) : (
+                ) : ( */}
                   <span className="text-green-600 font-semibold">Free</span>
-                )}
+                {/* )} */}
               </div>
 
               {totals.tax > 0 && (

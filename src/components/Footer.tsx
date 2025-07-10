@@ -40,7 +40,7 @@ export default function Footer() {
             <h3 className="font-normal text-xl mb-4">Help</h3>
             <ul className="space-y-2">
               <li><a href="/stara-faq/shipping-handling" className="text-gray-400 hover:text-black text-[14px]">Shipping & Handling</a></li>
-              <li><a href="/stara-faq/return-replacement-policy" className="text-gray-400 hover:text-black text-[14px]">Return & Replacement Policy</a></li>
+              <li><a href="/stara-faq/replacement-policy" className="text-gray-400 hover:text-black text-[14px]">Replacement Policy</a></li>
               {/* <li><a href="/stara-faq/refund-policy" className="text-gray-400 hover:text-black text-[14px]">Refund Policy</a></li> */}
               <li><a href="/stara-faq/terms-of-services" className="text-gray-400 hover:text-black text-[14px]">Terms of Service</a></li>
               <li><a href="/stara-faq/privacy-policy" className="text-gray-400 hover:text-black text-[14px]">Privacy Policy</a></li>

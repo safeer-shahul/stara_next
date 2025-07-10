@@ -14,7 +14,7 @@ const PrivacyPolicy: NextPage = () => {
       <main className="max-w-4xl mx-auto px-4 py-8 md:py-12">
         <div className="mb-8 text-center">
           <h1 className="text-3xl md:text-4xl font-bold mb-2">Privacy Policy</h1>
-          <p className="text-gray-600">Last Updated: April 15, 2025</p>
+          <p className="text-gray-600">Last Updated: July 10, 2025</p>
         </div>
 
         <div className="prose max-w-none">
@@ -23,7 +23,7 @@ const PrivacyPolicy: NextPage = () => {
             <p>
               At Stara Jewels, we respect your privacy and are committed to protecting your personal data. 
               This Privacy Policy explains how we collect, use, disclose, and safeguard your information 
-              when you visit our website [www.starajewels.com] or make a purchase from us.
+              when you visit our website or make a purchase from us.
             </p>
             <p>
               Please read this Privacy Policy carefully. By accessing or using our website, you acknowledge 
@@ -43,6 +43,7 @@ const PrivacyPolicy: NextPage = () => {
               <li>Payment information (credit card details, banking information)</li>
               <li>Purchase history and preferences</li>
               <li>Communications with us (including customer service inquiries)</li>
+              <li>Order-related information (replacement requests, warranty claims)</li>
             </ul>
 
             <h3 className="text-xl font-semibold mt-4 mb-2">Non-Personal Information</h3>
@@ -63,6 +64,7 @@ const PrivacyPolicy: NextPage = () => {
             </p>
             <ul className="list-disc pl-8 my-4">
               <li>Direct interactions (when you create an account, make a purchase, or contact us)</li>
+              <li>Order management (including replacement requests and customer service interactions)</li>
               <li>Automated technologies (cookies, web beacons, pixels)</li>
               <li>Third-party sources (payment processors, social media platforms, analytics providers)</li>
             </ul>
@@ -76,8 +78,9 @@ const PrivacyPolicy: NextPage = () => {
             <ul className="list-disc pl-8 my-4">
               <li>Process and fulfill your orders</li>
               <li>Create and manage your account</li>
+              <li>Handle replacement requests and warranty claims</li>
               <li>Provide customer service and support</li>
-              <li>Send transactional emails (order confirmations, shipping updates)</li>
+              <li>Send transactional emails (order confirmations, shipping updates, replacement status)</li>
               <li>Send marketing communications (if you've opted in)</li>
               <li>Improve our website, products, and services</li>
               <li>Analyze usage patterns and trends</li>
@@ -116,6 +119,7 @@ const PrivacyPolicy: NextPage = () => {
             <ul className="list-disc pl-8 my-4">
               <li><strong>Service providers:</strong> Payment processors, shipping companies (including our delivery partner Delhivery), and cloud service providers</li>
               <li><strong>Business partners:</strong> Marketing partners and affiliates</li>
+              <li><strong>Admin team:</strong> For processing replacement requests, warranty claims, and customer service</li>
               <li><strong>Legal authorities:</strong> When required by law or to protect our rights</li>
             </ul>
             <p>
@@ -134,6 +138,7 @@ const PrivacyPolicy: NextPage = () => {
               <li>Regular security assessments and updates</li>
               <li>Access controls and authentication procedures</li>
               <li>Data minimization practices</li>
+              <li>Secure handling of replacement request documentation and images</li>
             </ul>
             <p>
               However, no method of transmission over the Internet or electronic storage is 100% secure. 
@@ -155,6 +160,8 @@ const PrivacyPolicy: NextPage = () => {
               <li>Account information for as long as your account is active</li>
               <li>Transaction data for tax and accounting purposes</li>
               <li>Customer service communications for quality assurance</li>
+              <li>Replacement request documentation for warranty and quality control purposes</li>
+              <li>Order history for customer service and business analytics</li>
             </ul>
           </section>
 
@@ -216,12 +223,16 @@ const PrivacyPolicy: NextPage = () => {
               If you have any questions, concerns, or requests regarding this Privacy Policy or our 
               privacy practices, please contact us at:
             </p>
-            <div className="mt-4">
-              <p>Stara Jewels</p>
-              <p>Third Floor, Nalonkandy Arcade,
-              Pushpa Junction, Calicut, India 673002</p>
-              <p>Email: starajewels@gmail.com</p>
-              <p>Phone: +91 80869 25925</p>
+            <div className="mt-4 bg-gray-50 p-4 rounded-lg">
+              <p className="font-semibold">Stara Jewels</p>
+              <p>Third Floor, Nalonkandy Arcade,</p>
+              <p>Pushpa Junction, Calicut, India 673002</p>
+              <p className="mt-2">
+                <strong>Email:</strong> starajewels@gmail.com
+              </p>
+              <p>
+                <strong>Phone:</strong> +91 80869 25925
+              </p>
             </div>
           </section>
         </div>

@@ -62,12 +62,12 @@ export default function CancelOrderModal({ orderId, onClose, onSuccess }: Cancel
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
+      {/* Background overlay - moved outside flex container */}
+      <div className="fixed inset-0 bg-black opacity-50 z-40" onClick={onClose}></div>
+      
       <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-        <div className="fixed inset-0 transition-opacity" onClick={onClose}>
-          <div className="absolute inset-0 bg-black opacity-50"></div>
-        </div>
-
-        <div className="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-md sm:w-full">
+        {/* Modal content with higher z-index */}
+        <div className="relative inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-md sm:w-full z-50">
           <div className="bg-white px-6 pt-6 pb-4">
             <div className="flex justify-between items-center mb-6">
               <div className="flex items-center gap-3">

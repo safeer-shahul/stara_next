@@ -708,7 +708,8 @@ export default function OrderDetailsPage() {
               )}
               <div className="flex justify-between py-2 border-b border-gray-200">
                 <span className="text-gray-700 flex items-center"><Truck className="w-4 h-4 mr-2 text-gray-500" />Shipping:</span>
-                <span className="text-gray-900 font-medium">₹{parseFloat(order.shipping_price).toFixed(2)}</span>
+                {/* <span className="text-gray-900 font-medium">₹{parseFloat(order.shipping_price).toFixed(2)}</span> */}
+                <span className="text-gray-900 font-medium">FREE</span>
               </div>
               {order.coupon && (
                 <div className="flex justify-between py-2 border-b border-gray-200">
@@ -718,7 +719,8 @@ export default function OrderDetailsPage() {
               )}
               <div className="flex justify-between py-3 font-bold text-xl text-gray-900">
                 <span>Payable Total:</span>
-                <span>₹{(parseFloat(order.payable_price) + parseFloat(order.shipping_price)).toFixed(2)}</span>
+                {/* <span>₹{(parseFloat(order.payable_price) + parseFloat(order.shipping_price)).toFixed(2)}</span> */}
+                <span>₹{(parseFloat(order.payable_price) + 0).toFixed(2)}</span>
               </div>
             </div>
           </div>
