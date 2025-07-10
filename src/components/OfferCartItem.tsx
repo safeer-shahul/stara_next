@@ -284,15 +284,14 @@ export default function OfferCartItem({ offerSet, onRemove, fromProductSummary =
           )} */}
           
           {/* Payment Summary */}
-          {/* <div className="flex justify-between items-center p-2 bg-gradient-to-r from-[var(--color-primary-950)]/10 to-indigo-100 rounded-lg">
+          <div className="flex justify-between items-center p-2 bg-gradient-to-r from-[var(--color-primary-950)]/10 to-indigo-100 rounded-lg">
             <div className="flex items-center gap-2">
-              <span className="text-lg">💳</span>
-              <span className="text-base font-bold text-[var(--color-primary-950)]">You Pay:</span>
+              <span className="text-xs font-bold text-[var(--color-primary-950)]">Total:</span>
             </div>
-            <span className="text-xl font-bold text-[var(--color-primary-950)]">
+            <span className="text-sm font-bold text-[var(--color-primary-950)]">
               ₹{payableTotal.toLocaleString('en-IN')}
             </span>
-          </div> */}
+          </div>
           
           {/* Item Count Summary */}
           {/* {totalPaidItems > 0 && (
