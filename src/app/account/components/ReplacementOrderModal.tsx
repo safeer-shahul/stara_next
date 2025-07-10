@@ -56,10 +56,15 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
 
   // Helper function to get current variant ID for an item
   const getCurrentVariantId = (item: any) => {
+    // Handle null or undefined product_variant
+    if (!item.product_variant) {
+      return null;
+    }
+    
     if (typeof item.product_variant === 'string') {
       return item.product_variant;
     }
-    if (typeof item.product_variant === 'object' && item.product_variant.id) {
+    if (typeof item.product_variant === 'object' && item.product_variant && item.product_variant.id) {
       return item.product_variant.id;
     }
     return item.product_variant;
@@ -356,7 +361,8 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
         const orderItem = allItems.find(oi => oi.id === itemId);
         const currentVariantId = getCurrentVariantId(orderItem);
         
-        if (item.newVariant === currentVariantId) {
+        // Only validate if both current and new variant exist
+        if (currentVariantId && item.newVariant === currentVariantId) {
           setError('You cannot select the same size for size change. Please choose a different size or select "Damaged" if the current size is damaged.');
           return;
         }
@@ -617,7 +623,7 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
                                           className="flex-1 border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-[var(--color-primary-950)] focus:border-[var(--color-primary-950)]"
                                         >
                                           <option value="">Select new variant</option>
-                                          {item.product_details.product_variant.map((variant: any) => (
+                                          {item.product_details.product_variant && item.product_details.product_variant.map((variant: any) => (
                                             <option 
                                               key={variant.id} 
                                               value={variant.id}
@@ -825,7 +831,7 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
                                           className="flex-1 border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-[var(--color-primary-950)] focus:border-[var(--color-primary-950)]"
                                         >
                                           <option value="">Select new variant</option>
-                                          {item.product_details.product_variant.map((variant: any) => (
+                                          {item.product_details.product_variant && item.product_details.product_variant.map((variant: any) => (
                                             <option 
                                               key={variant.id} 
                                               value={variant.id}
