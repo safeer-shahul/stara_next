@@ -202,63 +202,86 @@ class ApiService {
 // import { useRouter } from 'next/router'; // or 'next/navigation' for App Router
 
 public async logout(silent: boolean = false, router?: any): Promise<void> {
-  if (typeof window !== 'undefined') {
-    // 🔄 STEP 1: Save current cart to localStorage before logout
-    try {
-      // console.log('💾 Preserving cart state before logout...');
-      
-      // Trigger cart context to save current state
-      window.dispatchEvent(new CustomEvent('beforeLogout'));
-      
-      // Give time for cart context to respond
-      await new Promise(resolve => setTimeout(resolve, 200));
-      
-      // console.log('✅ Cart state preserved for guest mode');
-    } catch (error) {
-      // console.error('❌ Error preserving cart state:', error);
-    }
-
-    // 🗑️ STEP 2: Clear authentication tokens and conditionally clear admin data
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
-    
-    const adminUserData = localStorage.getItem('adminUserData');
-    if (adminUserData) {
+    if (typeof window !== 'undefined') {
+      // 🔄 STEP 1: Smart cart preservation - only save unsynced items
       try {
-        const userData = JSON.parse(adminUserData);
-        if (userData.is_superuser) {
-          // console.log('🔧 Clearing admin user data for admin user');
+        // console.log('💾 Intelligently preserving cart state before logout...');
+        
+        // Get current cart state
+        const cartItemsStr = localStorage.getItem('cartItems');
+        let currentCartItems = [];
+        
+        if (cartItemsStr) {
+          try {
+            currentCartItems = JSON.parse(cartItemsStr);
+          } catch (parseError) {
+            // console.error('❌ Error parsing current cart items:', parseError);
+            currentCartItems = [];
+          }
+        }
+        
+        // Filter out synced items - only keep unsynced items
+        const unsyncedItems = currentCartItems.filter((item: any) => !item.isSynced);
+        
+        // console.log(`📊 Logout cart analysis:
+        //   - Total items in cart: ${currentCartItems.length}
+        //   - Synced items (will be discarded): ${currentCartItems.filter((item: any) => item.isSynced).length}
+        //   - Unsynced items (will be preserved): ${unsyncedItems.length}`);
+        
+        // Trigger cart context to save only unsynced items
+        window.dispatchEvent(new CustomEvent('beforeLogout'));
+        
+        // Give time for cart context to respond
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // console.log('✅ Smart cart preservation completed');
+      } catch (error) {
+        console.error('❌ Error in smart cart preservation:', error);
+        // Clear localStorage on error to prevent inconsistent state
+        localStorage.removeItem('cartItems');
+      }
+
+      // 🗑️ STEP 2: Clear authentication tokens and admin data
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      
+      const adminUserData = localStorage.getItem('adminUserData');
+      if (adminUserData) {
+        try {
+          const userData = JSON.parse(adminUserData);
+          if (userData.is_superuser) {
+            // console.log('🔧 Clearing admin user data for admin user');
+            localStorage.removeItem('adminUserData');
+          }
+        } catch (error) {
+          // console.error('Error parsing admin user data during logout:', error);
           localStorage.removeItem('adminUserData');
         }
-      } catch (error) {
-        // console.error('Error parsing admin user data during logout:', error);
-        localStorage.removeItem('adminUserData');
       }
-    }
-    
-    // Clear regular user data
-    localStorage.removeItem('me');
-    
-    // 📢 STEP 3: Notify components about logout
-    window.dispatchEvent(new Event('userLoggedOut'));
+      
+      // Clear regular user data
+      localStorage.removeItem('me');
+      
+      // 📢 STEP 3: Notify components about logout
+      window.dispatchEvent(new Event('userLoggedOut'));
 
-    // 🎉 STEP 4: Show success toast (only if not silent)
-    if (!silent) {
-      showToast.success('Successfully logged out!');
-    }
-
-    const currentPath = window.location.pathname;
-
-    // Small delay to let the toast show before redirect
-    setTimeout(() => {
-      if (currentPath.startsWith('/admin') && currentPath !== '/admin/login') {
-        router?.push('/admin/login') || (window.location.href = '/admin/login');
-      } else {
-        router?.push('/') || (window.location.href = '/');
+      // 🎉 STEP 4: Show success toast (only if not silent)
+      if (!silent) {
+        showToast.success('Successfully logged out!');
       }
-    }, 500);
+
+      const currentPath = window.location.pathname;
+
+      // Small delay to let the toast show before redirect
+      setTimeout(() => {
+        if (currentPath.startsWith('/admin') && currentPath !== '/admin/login') {
+          router?.push('/admin/login') || (window.location.href = '/admin/login');
+        } else {
+          router?.push('/') || (window.location.href = '/');
+        }
+      }, 500);
+    }
   }
-}
 
   // Optional: Add method to check if user can logout safely
   public async canLogoutSafely(): Promise<boolean> {

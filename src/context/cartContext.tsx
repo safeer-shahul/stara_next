@@ -310,8 +310,29 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   // Listen for beforeLogout event to save cart
   useEffect(() => {
     const handleBeforeLogout = () => {
-      // console.log('💾 Saving cart before logout...');
-      saveToLocalStorage(state.cartItems);
+      // console.log('💾 Saving ONLY unsynced cart items before logout...');
+      
+      // Filter out synced items - only keep unsynced items for localStorage
+      const unsyncedItems = state.cartItems.filter(item => !item.isSynced);
+      
+      // console.log(`📊 Cart items analysis:
+      //   - Total items: ${state.cartItems.length}
+      //   - Synced items (will be removed): ${state.cartItems.filter(item => item.isSynced).length}
+      //   - Unsynced items (will be preserved): ${unsyncedItems.length}`);
+      
+      if (unsyncedItems.length > 0) {
+        // console.log('💾 Preserving unsynced items:', unsyncedItems.map(item => ({
+        //   id: item.id,
+        //   type: item.type,
+        //   isSynced: item.isSynced,
+        //   name: item.type === 'normal' ? item.product_name : item.offer_name.offer_name
+        // })));
+        
+        saveToLocalStorage(unsyncedItems);
+      } else {
+        // console.log('🧹 No unsynced items to preserve - clearing localStorage');
+        clearLocalStorage();
+      }
     };
 
     window.addEventListener('beforeLogout', handleBeforeLogout);
@@ -413,41 +434,73 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Handle login transition: localStorage → API
   const handleLoginTransition = useCallback(async () => {
-    try {
-      // console.log('📤 Transferring localStorage cart to backend...');
+  try {
+    // console.log('📤 Login transition: Processing localStorage cart...');
+    
+    const localItems = loadFromLocalStorage();
+    
+    if (localItems.length > 0) {
+      // console.log(`📦 Found ${localItems.length} items in localStorage for sync:`, 
+      //   localItems.map(item => ({
+      //     id: item.id,
+      //     type: item.type,
+      //     isSynced: item.isSynced,
+      //     name: item.type === 'normal' ? item.product_name : item.offer_name?.offer_name
+      //   }))
+      // );
       
-      const localItems = loadFromLocalStorage();
+      // Only push unsynced items to backend
+      const unsyncedLocalItems = localItems.filter(item => !item.isSynced);
       
-      if (localItems.length > 0) {
-        await cartService.pushLocalCartToBackend(localItems);
-        // console.log('✅ Local cart transferred to backend');
+      if (unsyncedLocalItems.length > 0) {
+        // console.log(`🔄 Syncing ${unsyncedLocalItems.length} unsynced items to backend...`);
+        await cartService.pushLocalCartToBackend(unsyncedLocalItems);
+        // console.log('✅ Unsynced items pushed to backend');
+      } else {
+        // console.log('ℹ️ No unsynced items found - all items were already synced');
       }
-      
-      clearLocalStorage();
-      // console.log('🗑️ localStorage cleared');
-      
-      await loadCartFromAPI(false);
-      
-    } catch (error) {
-      // console.error('❌ Error during login transition:', error);
-      const fallbackItems = loadFromLocalStorage();
-      dispatch({ type: 'SET_CART_ITEMS', payload: fallbackItems });
+    } else {
+      // console.log('📭 No items found in localStorage');
     }
-  }, [loadCartFromAPI]);
+    
+    // Clear localStorage after successful sync
+    clearLocalStorage();
+    // console.log('🗑️ localStorage cleared after sync');
+    
+    // Load fresh cart from backend
+    await loadCartFromAPI(false);
+    
+  } catch (error) {
+    // console.error('❌ Error during login transition:', error);
+    // On error, still try to load from backend
+    await loadCartFromAPI(false);
+  }
+}, [loadCartFromAPI]);
 
   // Handle logout transition: API → localStorage
   const handleLogoutTransition = useCallback(async () => {
     try {
-      // console.log('💾 Cart preserved for guest mode');
+      // console.log('📤 Logout transition: Loading guest cart from localStorage...');
       
       const storedItems = loadFromLocalStorage();
-      const processedItems = await cartService.processGuestOffers(storedItems);
-      dispatch({ type: 'SET_CART_ITEMS', payload: processedItems });
+      
+      if (storedItems.length > 0) {
+        // console.log(`📦 Found ${storedItems.length} unsynced items in localStorage for guest mode`);
+        
+        // Process guest offers for proper paid/free assignment
+        const processedItems = await cartService.processGuestOffers(storedItems);
+        dispatch({ type: 'SET_CART_ITEMS', payload: processedItems });
+        
+        // console.log('✅ Guest cart loaded with proper offer processing');
+      } else {
+        // console.log('📭 No items found in localStorage - starting with empty cart');
+        dispatch({ type: 'SET_CART_ITEMS', payload: [] });
+      }
       
     } catch (error) {
       // console.error('❌ Error during logout transition:', error);
-      const fallbackItems = loadFromLocalStorage();
-      dispatch({ type: 'SET_CART_ITEMS', payload: fallbackItems });
+      // Fallback to empty cart
+      dispatch({ type: 'SET_CART_ITEMS', payload: [] });
     }
   }, []);
 

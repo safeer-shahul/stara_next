@@ -529,13 +529,20 @@ export const cartService = {
   },
 
   pushLocalCartToBackend: async (localUnsyncedItems: CartItemType[]): Promise<void> => {
-    // console.log("📤 cartService: Pushing", localUnsyncedItems.length, "unsynced items to backend");
+    // console.log("📤 cartService: Pushing", localUnsyncedItems.length, "UNSYNCED items to backend");
     
-    for (const item of localUnsyncedItems) {
+    // Double-check that we're only processing unsynced items
+    const trulyUnsyncedItems = localUnsyncedItems.filter(item => !item.isSynced);
+    
+    if (trulyUnsyncedItems.length !== localUnsyncedItems.length) {
+      console.warn(`⚠️ cartService: Filtered out ${localUnsyncedItems.length - trulyUnsyncedItems.length} synced items that shouldn't be here`);
+    }
+    
+    for (const item of trulyUnsyncedItems) {
       try {
         if (item.type === 'normal') {
           const normalItem = item as CartNormalItem;
-          // console.log(`➕ cartService: Pushing normal item: ${normalItem.product_name} x${normalItem.quantity}`);
+          // console.log(`➕ cartService: Syncing unsynced normal item: ${normalItem.product_name} x${normalItem.quantity}`);
           
           // Add item quantity times to backend
           for (let q = 0; q < normalItem.quantity; q++) {
@@ -547,11 +554,11 @@ export const cartService = {
               })
             });
           }
-          // console.log(`✅ cartService: Successfully pushed normal item ${normalItem.product_name}`);
+          // console.log(`✅ cartService: Successfully synced normal item ${normalItem.product_name}`);
           
         } else if (item.type === 'offer') {
           const offerItem = item as CartOfferItem;
-          // console.log(`🎁 cartService: Pushing offer item: ${offerItem.offer_name.offer_name}`);
+          // console.log(`🎁 cartService: Syncing unsynced offer item: ${offerItem.offer_name.offer_name}`);
 
           const productsPayloadForBackend: { product_id: string; variant_id?: string }[] = [];
 
@@ -571,13 +578,13 @@ export const cartService = {
             offer_id: offerItem.offer.replace(/-/g, ''),
             products: productsPayloadForBackend,
           });
-          // console.log(`✅ cartService: Successfully pushed offer item ${offerItem.offer_name.offer_name}`);
+          // console.log(`✅ cartService: Successfully synced offer item ${offerItem.offer_name.offer_name}`);
         }
       } catch (error) {
-        // console.error(`❌ cartService: Error pushing item to backend (ID: ${item.id}, Type: ${item.type}):`, error);
+        // console.error(`❌ cartService: Error syncing item to backend (ID: ${item.id}, Type: ${item.type}):`, error);
       }
     }
-    // console.log("🏁 cartService: Finished pushing local items to backend");
+    // console.log("🏁 cartService: Finished syncing unsynced local items to backend");
   },
 
   // Method specifically for processing guest offers
