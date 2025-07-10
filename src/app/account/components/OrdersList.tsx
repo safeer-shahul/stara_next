@@ -89,14 +89,14 @@ export default function OrdersList() {
           apiService.getValidOffers()
         ]);
         
-        console.log('Orders response:', ordersResponse);
-        console.log('Offers response:', offersResponse);
+        // console.log('Orders response:', ordersResponse);
+        // console.log('Offers response:', offersResponse);
         
         setOrders(ordersResponse || []);
         setOffers(offersResponse?.data || []);
         setLoading(false);
       } catch (error) {
-        console.error('Error fetching data:', error);
+        // console.error('Error fetching data:', error);
         setOrders([]);
         setOffers([]);
         setLoading(false);
@@ -210,7 +210,7 @@ export default function OrdersList() {
       const response = await apiService.getMyOrders();
       setOrders(response || []);
     } catch (error) {
-      console.error('Error refreshing orders:', error);
+      // console.error('Error refreshing orders:', error);
     }
   };
 

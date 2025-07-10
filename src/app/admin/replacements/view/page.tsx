@@ -149,7 +149,7 @@ function ReplacementViewContent() {
       setAdminNotes(response.admin_notes || '');
       setSelectedStatus(response.status || '');
     } catch (err: any) {
-      console.error('Failed to fetch replacement details:', err);
+      // console.error('Failed to fetch replacement details:', err);
       const errorMessage = err?.response?.data?.message || err?.message || 'Failed to load replacement details. Please try again.';
       setError(errorMessage);
       showToast.error(errorMessage);
@@ -188,7 +188,7 @@ function ReplacementViewContent() {
       showToast.success('Replacement request updated successfully!');
       await fetchReplacementDetails();
     } catch (err: any) {
-      console.error('Failed to update replacement request:', err);
+      // console.error('Failed to update replacement request:', err);
       const errorMessage = err?.response?.data?.message || err?.message || 'Failed to update replacement request. Please try again.';
       showToast.error(errorMessage);
     } finally {

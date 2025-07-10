@@ -41,7 +41,7 @@ export default function AdminLogin() {
             router.push('/admin');
           }
         } catch (error) {
-          console.error('Error parsing admin user data:', error);
+          // console.error('Error parsing admin user data:', error);
           // Clear invalid admin data
           localStorage.removeItem('adminUserData');
         }
@@ -70,7 +70,7 @@ export default function AdminLogin() {
         setIsLoading(false);
       }
     } catch (profileError) {
-      console.error('Profile fetch failed:', profileError);
+      // console.error('Profile fetch failed:', profileError);
       const errorMsg = 'Failed to verify admin privileges. Please try again.';
       setError(errorMsg);
       showToast.error(errorMsg);
@@ -96,7 +96,7 @@ export default function AdminLogin() {
         await handleSuccessfulLogin();
       }, 100);
     } catch (apiError: any) {
-      console.error('Login request failed:', apiError);
+      // console.error('Login request failed:', apiError);
       const errorMessage = apiError.response?.data?.detail || 'Invalid username or password. Please try again.';
       setError(errorMessage);
       showToast.error(errorMessage);
@@ -125,7 +125,7 @@ export default function AdminLogin() {
         const userProfile = await apiService.getUserProfile();
         localStorage.setItem('me', JSON.stringify(userProfile));
       } catch (profileError) {
-        console.warn('Failed to fetch user profile:', profileError);
+        // console.warn('Failed to fetch user profile:', profileError);
       }
 
       setTimeout(async () => {
@@ -133,7 +133,7 @@ export default function AdminLogin() {
       }, 100);
 
     } catch (err) {
-      console.error('Google login error:', err);
+      // console.error('Google login error:', err);
       let errorMessage = 'Failed to login with Google.';
       if (err instanceof Error) {
         if ((err as any).code === 'auth/popup-closed-by-user') {

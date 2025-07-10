@@ -70,7 +70,7 @@ function AddHomeCategoryPage() {
         );
       }
     } catch (err) {
-      console.error('Error fetching category data:', err);
+      // console.error('Error fetching category data:', err);
       setError('Failed to load category data. Please try again.');
     } finally {
       setIsLoading(false);
@@ -118,7 +118,7 @@ function AddHomeCategoryPage() {
         setCurrentPage(page);
       }
     } catch (err) {
-      console.error('Error loading products:', err);
+      // console.error('Error loading products:', err);
       setError('Failed to load products. Please try again.');
     } finally {
       setIsLoading(false);
@@ -182,7 +182,7 @@ function AddHomeCategoryPage() {
       alert(`Home Category "${categoryName}" ${isEditMode ? 'updated' : 'created'} successfully!`);
       router.push('/admin/products/home-category');
     } catch (err) {
-      console.error('Error processing home category:', err);
+      // console.error('Error processing home category:', err);
       setError(`Failed to ${isEditMode ? 'update' : 'create'} home category. Please try again.`);
     } finally {
       setIsSubmitting(false);

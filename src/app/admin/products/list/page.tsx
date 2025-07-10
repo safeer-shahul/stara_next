@@ -62,7 +62,7 @@ export default function ProductsListPage() {
       setTotalItems(response.count);
       setTotalPages(Math.ceil(response.total_pages));
     } catch (err) {
-      console.error('Failed to fetch products:', err);
+      // console.error('Failed to fetch products:', err);
       setError('Failed to load products. Please try again.');
       setProducts([]);
     } finally {
@@ -93,7 +93,7 @@ export default function ProductsListPage() {
   const handleDeleteProduct = useCallback((productId: string) => {
     if (confirm(`Are you sure you want to delete product ${productId}?`)) {
       // Implement actual API call for deletion here
-      console.log(`Deleting product with ID: ${productId}`);
+      // console.log(`Deleting product with ID: ${productId}`);
       // After successful deletion, you might want to refetch products
       // fetchProducts(); // Uncomment this after implementing delete API
       alert('Delete functionality not yet implemented in API.');

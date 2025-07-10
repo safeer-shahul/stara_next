@@ -98,7 +98,7 @@ export default function ReplacementRequestsPage() {
         setTotalItems(totalCount);
         setTotalPages(response.total_pages || 1);
       } catch (err) {
-        console.error('Failed to fetch replacement requests:', err);
+        // console.error('Failed to fetch replacement requests:', err);
         setError('Failed to load replacement requests. Please try again.');
         setAllRequests([]);
         setCurrentRequestsPage([]);
@@ -200,7 +200,7 @@ export default function ReplacementRequestsPage() {
       };
       await fetchData();
     } catch (err: any) {
-      console.error(`Failed to update received status for replacement ${requestId}:`, err);
+      // console.error(`Failed to update received status for replacement ${requestId}:`, err);
       
       // Enhanced error message extraction
       let errorMessage = 'Failed to update received status. Please try again.';
@@ -232,12 +232,12 @@ export default function ReplacementRequestsPage() {
       showToast.error(`${errorMessage}${statusCode}`);
       
       // Also show a more detailed error in console for debugging
-      console.error('Full error response:', {
-        status: err?.response?.status,
-        statusText: err?.response?.statusText,
-        data: err?.response?.data,
-        message: err?.message
-      });
+      // console.error('Full error response:', {
+      //   status: err?.response?.status,
+      //   statusText: err?.response?.statusText,
+      //   data: err?.response?.data,
+      //   message: err?.message
+      // });
     } finally {
       setLoading(false);
     }
@@ -285,7 +285,7 @@ export default function ReplacementRequestsPage() {
           await apiService.updateStockOnReplace(requestId );
           showToast.success('Stock updated successfully!');
         } catch (stockErr: any) {
-          console.error(`Failed to update stock for replacement ${requestId}:`, stockErr);
+          // console.error(`Failed to update stock for replacement ${requestId}:`, stockErr);
           
           // Enhanced error message extraction for stock update
           let stockErrorMessage = 'Failed to update stock. Please try again.';
@@ -313,12 +313,12 @@ export default function ReplacementRequestsPage() {
           const stockStatusCode = stockErr?.response?.status ? ` (Status: ${stockErr.response.status})` : '';
           showToast.error(`Stock Update Error: ${stockErrorMessage}${stockStatusCode}`);
           
-          console.error('Full stock update error response:', {
-            status: stockErr?.response?.status,
-            statusText: stockErr?.response?.statusText,
-            data: stockErr?.response?.data,
-            message: stockErr?.message
-          });
+          // console.error('Full stock update error response:', {
+          //   status: stockErr?.response?.status,
+          //   statusText: stockErr?.response?.statusText,
+          //   data: stockErr?.response?.data,
+          //   message: stockErr?.message
+          // });
         }
       }
       
@@ -349,7 +349,7 @@ export default function ReplacementRequestsPage() {
       };
       await fetchData();
     } catch (err: any) {
-      console.error(`Failed to create replacement order for request ${requestId}:`, err);
+      // console.error(`Failed to create replacement order for request ${requestId}:`, err);
       
       // Enhanced error message extraction
       let errorMessage = 'Failed to create replacement order. Please try again.';
@@ -381,12 +381,12 @@ export default function ReplacementRequestsPage() {
       showToast.error(`${errorMessage}${statusCode}`);
       
       // Also show a more detailed error in console for debugging
-      console.error('Full error response:', {
-        status: err?.response?.status,
-        statusText: err?.response?.statusText,
-        data: err?.response?.data,
-        message: err?.message
-      });
+      // console.error('Full error response:', {
+      //   status: err?.response?.status,
+      //   statusText: err?.response?.statusText,
+      //   data: err?.response?.data,
+      //   message: err?.message
+      // });
     } finally {
       setLoading(false);
     }

@@ -109,7 +109,7 @@ export default function OfferProductsPage() {
         setOfferData({ ...response, products: productsWithStockStatus });
         setError(null);
       } catch (err) {
-        console.error('Failed to fetch offer data:', err);
+        // console.error('Failed to fetch offer data:', err);
         setError('Failed to load offer details. Please try again.');
       } finally {
         setLoading(false);
@@ -220,7 +220,7 @@ export default function OfferProductsPage() {
       setIsNavigating(productId);
       await router.push(`/shop/products/${productId}?from=offer&offer_id=${offerId}`);
     } catch (error) {
-      console.error('Navigation error:', error);
+      // console.error('Navigation error:', error);
     } finally {
       setTimeout(() => setIsNavigating(null), 100);
     }

@@ -44,8 +44,8 @@ export default function ComplaintModal({ orderId, onClose, onSuccess }: Complain
           apiService.getValidOffers()
         ]);
         
-        console.log('Order data response:', orderResponse);
-        console.log('Valid offers response:', offersResponse);
+        // console.log('Order data response:', orderResponse);
+        // console.log('Valid offers response:', offersResponse);
         
         setOrderData(orderResponse);
         setOffers(offersResponse?.data || []);
@@ -60,7 +60,7 @@ export default function ComplaintModal({ orderId, onClose, onSuccess }: Complain
         
         setLoading(false);
       } catch (error) {
-        console.error('Error fetching data:', error);
+        // console.error('Error fetching data:', error);
         setLoading(false);
       }
     };
@@ -159,7 +159,7 @@ export default function ComplaintModal({ orderId, onClose, onSuccess }: Complain
         reason: complaintReason
       };
       
-      console.log('Complaint request data:', complaintData);
+      // console.log('Complaint request data:', complaintData);
       
       // Call your API to process the complaint
       // In a real application, uncomment this:
@@ -167,7 +167,7 @@ export default function ComplaintModal({ orderId, onClose, onSuccess }: Complain
       
       // For demo purposes, simulate API call
       await new Promise(resolve => setTimeout(resolve, 1500));
-      console.log('Complaint request submitted:', complaintData);
+      // console.log('Complaint request submitted:', complaintData);
       
       onSuccess();
     } catch (error: any) {

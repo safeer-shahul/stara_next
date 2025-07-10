@@ -31,7 +31,7 @@ export default function CouponListPage() {
       const response = await apiService.getAllCoupons();
       setCoupons(response.data || []); // Ensure 'data' property is used and default to empty array
     } catch (err) {
-      console.error('Failed to fetch coupons:', err);
+      // console.error('Failed to fetch coupons:', err);
       setError('Failed to load coupons. Please try again.');
       setCoupons([]);
     } finally {
@@ -54,7 +54,7 @@ export default function CouponListPage() {
         day: 'numeric'
       });
     } catch (e) {
-      console.error("Invalid date string:", dateString, e);
+      // console.error("Invalid date string:", dateString, e);
       return dateString; // Return original if invalid
     }
   }, []);
@@ -102,7 +102,7 @@ export default function CouponListPage() {
   // Placeholder for delete functionality
   const handleDeleteCoupon = useCallback((couponId: string) => {
     if (confirm(`Are you sure you want to delete coupon "${couponId}"?`)) {
-      console.log(`Deleting coupon with ID: ${couponId}`);
+      // console.log(`Deleting coupon with ID: ${couponId}`);
       alert('Delete functionality not yet implemented in API.');
     }
   }, []);

@@ -137,11 +137,11 @@ const Register = ({ switchToLogin, onRegisterSuccess }: RegisterProps) => {
 
   const handleSuccessfulRegistration = async () => {
     try {
-      console.log('Registration successful - cart will sync automatically');
+      // console.log('Registration successful - cart will sync automatically');
       showToast.success('Account created successfully! Welcome aboard!');
       onRegisterSuccess();
     } catch (error) {
-      console.error('Error after registration:', error);
+      // console.error('Error after registration:', error);
       showToast.success('Account created successfully! Welcome aboard!');
       onRegisterSuccess();
     }
@@ -195,7 +195,7 @@ const Register = ({ switchToLogin, onRegisterSuccess }: RegisterProps) => {
       showToast.success('OTP sent to your email. Please check and verify.');
 
     } catch (err: any) {
-      console.error('User creation failed:', err);
+      // console.error('User creation failed:', err);
       
       // Handle Axios error structure
       let errorMessage = 'An unexpected error occurred during registration.';
@@ -248,7 +248,7 @@ const Register = ({ switchToLogin, onRegisterSuccess }: RegisterProps) => {
       await handleSuccessfulRegistration();
 
     } catch (err: any) {
-      console.error('OTP verification failed:', err);
+      // console.error('OTP verification failed:', err);
       
       // Handle Axios error structure
       let errorMessage = 'An unexpected error occurred during OTP verification.';
@@ -289,7 +289,7 @@ const Register = ({ switchToLogin, onRegisterSuccess }: RegisterProps) => {
       showToast.success('OTP resent to your email.');
 
     } catch (err: any) {
-      console.error('Resend OTP failed:', err);
+      // console.error('Resend OTP failed:', err);
       
       // Handle Axios error structure
       let errorMessage = 'An unexpected error occurred while resending OTP.';
@@ -334,7 +334,7 @@ const Register = ({ switchToLogin, onRegisterSuccess }: RegisterProps) => {
         const userProfile = await apiService.getUserProfile();
         localStorage.setItem('me', JSON.stringify(userProfile));
       } catch (profileError) {
-        console.warn('Failed to fetch user profile:', profileError);
+        // console.warn('Failed to fetch user profile:', profileError);
         // Continue with registration even if profile fetch fails
       }
 
@@ -342,7 +342,7 @@ const Register = ({ switchToLogin, onRegisterSuccess }: RegisterProps) => {
       await handleSuccessfulRegistration();
 
     } catch (err) {
-      console.error('Google signup error:', err);
+      // console.error('Google signup error:', err);
       let errorMessage = 'Failed to sign up with Google.';
       if (err instanceof Error) {
         if ((err as any).code === 'auth/popup-closed-by-user') {

@@ -21,7 +21,7 @@ export default function CategoryPage() {
   const router = useRouter();
   const categorySlug = params?.category as string;
   const subCategoryId = searchParams.get('id');
-  console.log(categorySlug, subCategoryId);
+  // console.log(categorySlug, subCategoryId);
 
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -89,7 +89,7 @@ export default function CategoryPage() {
         }
 
         setTotalProducts(productsData.total_products || 0);
-        console.log(totalProducts)
+        // console.log(totalProducts)
 
         const loadedProductsCount = (currentPage - 1) * pageSize + (productsData.products || []).length;
         setAllProductsLoaded(loadedProductsCount >= productsData.total_products);
@@ -101,7 +101,7 @@ export default function CategoryPage() {
 
         setCategoryName(formattedName);
       } catch (err) {
-        console.error('Failed to fetch category products:', err);
+        // console.error('Failed to fetch category products:', err);
         setProducts([]);
         setTotalProducts(0);
         setAllProductsLoaded(true);
@@ -144,7 +144,7 @@ export default function CategoryPage() {
       setIsNavigating(productId);
       await router.push(`/shop/products/${productId}`);
     } catch (error) {
-      console.error('Navigation error:', error);
+      // console.error('Navigation error:', error);
     } finally {
       setTimeout(() => setIsNavigating(null), 100);
     }
@@ -157,7 +157,7 @@ export default function CategoryPage() {
 
   const handleAddToWishlist = useCallback((e: React.MouseEvent, productId: string) => {
     e.stopPropagation();
-    console.log('Added to wishlist:', productId);
+    // console.log('Added to wishlist:', productId);
   }, []);
 
   // UPDATED: handleAddProductToCart with toast notifications

@@ -58,7 +58,7 @@ export default function Support() {
       const response = await apiService.getMyEnquiry();
       setComplaints(Array.isArray(response) ? response : response.data || []);
     } catch (error) {
-      console.error('Error fetching complaints:', error);
+      // console.error('Error fetching complaints:', error);
       setFormError('Failed to load complaints. Please try again.');
     } finally {
       setIsLoadingComplaints(false);
@@ -157,7 +157,7 @@ export default function Support() {
 
     // Show warning if some files were rejected or couldn't fit
     if (validation.errors.length > 0) {
-      console.warn('File validation errors:', validation.errors);
+      // console.warn('File validation errors:', validation.errors);
     }
     
     if (validation.validFiles.length > filesToAdd) {
@@ -230,7 +230,7 @@ export default function Support() {
       });
       
     } catch (err: any) {
-      console.error('Error submitting complaint:', err);
+      // console.error('Error submitting complaint:', err);
       setFormError(err.message || 'Failed to submit complaint. Please try again.');
     } finally {
       setIsSubmitting(false);

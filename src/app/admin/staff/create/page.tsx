@@ -51,7 +51,7 @@ export default function AddEditStaffPage() {
       setEmail(staffData.email || '');
       setIsActive(staffData.is_active ?? true); // Use fetched status for edit mode
     } catch (err) {
-      console.error('Error fetching staff details:', err);
+      // console.error('Error fetching staff details:', err);
       setFormError('Failed to load staff details. Please try again.');
     } finally {
       setIsFetchingInitialData(false);
@@ -122,7 +122,7 @@ export default function AddEditStaffPage() {
       alert(`Staff member "${firstName} ${lastName}" ${isEditMode ? 'updated' : 'created'} successfully!`);
       router.push('/admin/staff/list');
     } catch (err: any) {
-      console.error(`Error ${isEditMode ? 'updating' : 'creating'} staff:`, err);
+      // console.error(`Error ${isEditMode ? 'updating' : 'creating'} staff:`, err);
       let errorMessage = `Failed to ${isEditMode ? 'update' : 'create'} staff member. Please try again.`;
       if (err.response?.data?.detail) {
           errorMessage = `Error: ${err.response.data.detail}`;

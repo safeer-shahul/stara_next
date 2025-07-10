@@ -188,7 +188,7 @@ export default function OrderDetailsPage() {
       const response: OrderData = await apiService.getOrderById(orderId);
       setOrder(response);
     } catch (err) {
-      console.error('Failed to fetch order details:', err);
+      // console.error('Failed to fetch order details:', err);
       setError('Failed to load order details. Please try again.');
       setOrder(null);
     } finally {
@@ -215,7 +215,7 @@ export default function OrderDetailsPage() {
         hour12: true
       });
     } catch (e) {
-      console.error("Invalid date string:", dateString, e);
+      // console.error("Invalid date string:", dateString, e);
       return dateString;
     }
   }, []);

@@ -35,11 +35,11 @@ const Login = ({ switchToRegister, onLoginSuccess, switchToForgotPassword }: Log
 
   const handleSuccessfulLogin = async () => {
     try {
-      console.log('Login successful - cart will sync automatically');
+      // console.log('Login successful - cart will sync automatically');
       showToast.success('Successfully logged in!');
       onLoginSuccess();
     } catch (error) {
-      console.error('Error after login:', error);
+      // console.error('Error after login:', error);
       showToast.success('Successfully logged in!');
       onLoginSuccess();
     }
@@ -63,7 +63,7 @@ const Login = ({ switchToRegister, onLoginSuccess, switchToForgotPassword }: Log
       await handleSuccessfulLogin();
 
     } catch (err: any) {
-      console.error('Login failed:', err);
+      // console.error('Login failed:', err);
       const errorMessage = err.detail || err.message || 'Login failed. Please check your username and password.';
       setError(errorMessage);
       showToast.error(errorMessage);
@@ -94,7 +94,7 @@ const Login = ({ switchToRegister, onLoginSuccess, switchToForgotPassword }: Log
         const userProfile = await apiService.getUserProfile();
         localStorage.setItem('me', JSON.stringify(userProfile));
       } catch (profileError) {
-        console.warn('Failed to fetch user profile:', profileError);
+        // console.warn('Failed to fetch user profile:', profileError);
         // Continue with login even if profile fetch fails
       }
 
@@ -102,7 +102,7 @@ const Login = ({ switchToRegister, onLoginSuccess, switchToForgotPassword }: Log
       await handleSuccessfulLogin();
 
     } catch (err) {
-      console.error('Google login error:', err);
+      // console.error('Google login error:', err);
       let errorMessage = 'Failed to login with Google.';
       if (err instanceof Error) {
         if ((err as any).code === 'auth/popup-closed-by-user') {

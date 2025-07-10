@@ -81,7 +81,7 @@ export default function OfferCartSidebar({
     const handleBuyNow = useCallback(async () => {
         if (!isOfferComplete()) return;
 
-        console.log('🎁 OfferCartSidebar: Adding offer to cart, authMode:', authMode, 'isAuthenticated:', isAuthenticated);
+        // console.log('🎁 OfferCartSidebar: Adding offer to cart, authMode:', authMode, 'isAuthenticated:', isAuthenticated);
 
         const filledSlots = slots.filter(slot => slot.product);
 
@@ -116,7 +116,7 @@ export default function OfferCartSidebar({
         // FIXED: Only assign paid/free status for GUEST users
         // For authenticated users, let the backend determine paid/free status
         if (authMode === 'guest' && !isAuthenticated) {
-            console.log("🎁 OfferCartSidebar: Guest user detected - assigning paid/free status based on price");
+            // console.log("🎁 OfferCartSidebar: Guest user detected - assigning paid/free status based on price");
             
             // Create individual product units for sorting
             const individualProducts: (ProductItemDetails & { quantity: number; selectedVariant?: ProductVariant; originalIndex: number })[] = [];
@@ -138,10 +138,10 @@ export default function OfferCartSidebar({
                 return priceB - priceA; // Descending order
             });
             
-            console.log('🎁 OfferCartSidebar: Sorted products by price:', sortedProducts.map(p => ({
-                name: p.product_name,
-                price: p.product_price
-            })));
+            // console.log('🎁 OfferCartSidebar: Sorted products by price:', sortedProducts.map(p => ({
+            //     name: p.product_name,
+            //     price: p.product_price
+            // })));
             
             // Assign paid/free status
             const processedProducts: (ProductItemDetails & { quantity: number; selectedVariant?: ProductVariant; isPaid?: boolean })[] = [];
@@ -178,15 +178,15 @@ export default function OfferCartSidebar({
             });
             
             aggregatedOfferItems = Array.from(finalAggregatedMap.values());
-            console.log("🎁 OfferCartSidebar: Guest offer items with paid/free status:", 
-                aggregatedOfferItems.map(item => ({
-                    name: item.product_name,
-                    isPaid: item.isPaid,
-                    quantity: item.quantity
-                }))
-            );
+            // console.log("🎁 OfferCartSidebar: Guest offer items with paid/free status:", 
+            //     aggregatedOfferItems.map(item => ({
+            //         name: item.product_name,
+            //         isPaid: item.isPaid,
+            //         quantity: item.quantity
+            //     }))
+            // );
         } else {
-            console.log("🔑 OfferCartSidebar: Authenticated user - assigning temporary paid/free status for immediate display");
+            // console.log("🔑 OfferCartSidebar: Authenticated user - assigning temporary paid/free status for immediate display");
             // For authenticated users, assign paid/free status temporarily for immediate display
             // Backend will sync the correct status later
             const individualProducts: (ProductItemDetails & { quantity: number; selectedVariant?: ProductVariant; originalIndex: number })[] = [];
@@ -242,13 +242,13 @@ export default function OfferCartSidebar({
             });
             
             aggregatedOfferItems = Array.from(finalAggregatedMap.values());
-            console.log("🔑 OfferCartSidebar - temporary paid/free assignment for immediate display:", 
-                aggregatedOfferItems.map(item => ({
-                    name: item.product_name,
-                    isPaid: item.isPaid,
-                    quantity: item.quantity
-                }))
-            );
+            // console.log("🔑 OfferCartSidebar - temporary paid/free assignment for immediate display:", 
+            //     aggregatedOfferItems.map(item => ({
+            //         name: item.product_name,
+            //         isPaid: item.isPaid,
+            //         quantity: item.quantity
+            //     }))
+            // );
         }
 
         // FIXED: Let CartContext handle ID management completely
@@ -266,7 +266,7 @@ export default function OfferCartSidebar({
         };
 
         try {
-            console.log("🎁 OfferCartSidebar: Dispatching ADD_OFFER_SET with items:", aggregatedOfferItems);
+            // console.log("🎁 OfferCartSidebar: Dispatching ADD_OFFER_SET with items:", aggregatedOfferItems);
             
             // FIXED: Just dispatch - no manual delay needed, CartContext handles everything
             dispatchCart({ type: 'ADD_OFFER_SET', payload: offerSetPayload });
@@ -277,7 +277,7 @@ export default function OfferCartSidebar({
             }, 50);
             
         } catch (error) {
-            console.error('❌ OfferCartSidebar: Failed to add to cart:', error);
+            // console.error('❌ OfferCartSidebar: Failed to add to cart:', error);
             alert('Failed to add offer. Please try again.');
         }
     }, [dispatchCart, offerData, isOfferComplete, onOpenCartDrawer, slots, isAuthenticated, authMode]);

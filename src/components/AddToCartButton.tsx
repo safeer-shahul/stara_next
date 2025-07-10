@@ -50,7 +50,7 @@ export default function AddToCartButton({
     try {
       await toggleWishlist(productId);
     } catch (error) {
-      console.error('Error toggling wishlist:', error);
+      // console.error('Error toggling wishlist:', error);
     } finally {
       // Reset animation state after a short delay
       setTimeout(() => setIsWishlistAnimating(false), 300);

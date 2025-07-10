@@ -34,7 +34,7 @@ export default function OfferListPage() {
       const response = await apiService.getAllOffers();
       setOffers(response.data || []); // Ensure 'data' property is used and default to empty array
     } catch (err) {
-      console.error('Failed to fetch offers:', err);
+      // console.error('Failed to fetch offers:', err);
       setError('Failed to load offers. Please try again.');
       setOffers([]);
     } finally {
@@ -57,7 +57,7 @@ export default function OfferListPage() {
         day: 'numeric'
       });
     } catch (e) {
-      console.error("Invalid date string:", dateString, e);
+      // console.error("Invalid date string:", dateString, e);
       return dateString; // Return original if invalid
     }
   }, []);
@@ -88,7 +88,7 @@ export default function OfferListPage() {
   const handleDeleteOffer = useCallback((offerId: string) => {
     if (confirm(`Are you sure you want to delete offer "${offerId}"?`)) {
       // Implement actual API call for deletion here
-      console.log(`Deleting offer with ID: ${offerId}`);
+      // console.log(`Deleting offer with ID: ${offerId}`);
       // After successful deletion, refetch offers to update the list
       // apiService.deleteOffer(offerId).then(() => fetchOffers());
       alert('Delete functionality not yet implemented in API.');

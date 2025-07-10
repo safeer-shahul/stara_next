@@ -21,7 +21,7 @@ const CartItem = ({ product, onRemove, onQuantityChange, fromProductSummary = fa
     if (product.quantity < currentMaxLimit && !isOutOfStockOverall) {
       onQuantityChange(product.id, 1);
     } else if (product.quantity >= currentMaxLimit) {
-      console.log(`⚠️ Cannot add more of ${product.product_name}. Max available for your cart: ${currentMaxLimit}`);
+      // console.log(`⚠️ Cannot add more of ${product.product_name}. Max available for your cart: ${currentMaxLimit}`);
     }
   };
 

@@ -123,7 +123,7 @@ export default function ProductFormPage() {
         if (productData.images && productData.images.length > 0) {
           setExistingImages(productData.images);
         }
-        console.log('hello productData', productData)
+        // console.log('hello productData', productData)
         // Handle variants data
         // Use productData.product_variant instead of productData.variants
         if (productData.have_variants && productData.product_variant && productData.product_variant.length > 0) {
@@ -154,7 +154,7 @@ export default function ProductFormPage() {
         }
       }
     } catch (err) {
-      console.error(`Error fetching ${isEditMode ? 'product data' : 'categories'}:`, err);
+      // console.error(`Error fetching ${isEditMode ? 'product data' : 'categories'}:`, err);
       const errorMessage = `Failed to load ${isEditMode ? 'product data' : 'categories'}. Please try again.`;
       setFormError(errorMessage);
       showToast.error(errorMessage);
@@ -447,7 +447,7 @@ export default function ProductFormPage() {
       showToast.success(successMessage);
       router.push('/admin/products/list');
     } catch (err: any) {
-      console.error(`Error ${isEditMode ? 'updating' : 'creating'} product:`, err);
+      // console.error(`Error ${isEditMode ? 'updating' : 'creating'} product:`, err);
       const errorMessage = err?.response?.data?.message || err?.message || `Failed to ${isEditMode ? 'update' : 'create'} product. Please try again.`;
       setFormError(errorMessage);
       showToast.error(errorMessage);

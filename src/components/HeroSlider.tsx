@@ -23,7 +23,7 @@ export default function HeroSlider() {
         setBanners(activeBanners);
         setError(null);
       } catch (err) {
-        console.error('Failed to fetch hero banners:', err);
+        // console.error('Failed to fetch hero banners:', err);
         setError('Failed to load hero banners. Please try again.');
         setBanners([]);
       } finally {

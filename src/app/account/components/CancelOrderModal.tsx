@@ -48,10 +48,10 @@ export default function CancelOrderModal({ orderId, onClose, onSuccess }: Cancel
         cancel_reason: reason === 'Other' ? otherReason : reason
       });
       
-      console.log('Order cancelled successfully:', {
-        order_id: orderId,
-        cancel_reason: reason === 'Other' ? otherReason : reason
-      });
+      // console.log('Order cancelled successfully:', {
+      //   order_id: orderId,
+      //   cancel_reason: reason === 'Other' ? otherReason : reason
+      // });
       
       onSuccess();
     } catch (err: any) {

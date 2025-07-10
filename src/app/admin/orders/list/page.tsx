@@ -141,7 +141,7 @@ export default function OrderListPage() {
       setTotalItems(response.total);
       setTotalPages(Math.ceil(response.total / pageSize));
     } catch (err) {
-      console.error('Failed to fetch orders:', err);
+      // console.error('Failed to fetch orders:', err);
       setError('Failed to load orders. Please try again.');
       setOrders([]);
     } finally {
@@ -267,7 +267,7 @@ export default function OrderListPage() {
       alert('Selected orders assigned successfully!');
       setTriggerFetch(prev => prev + 1);
     } catch (err) {
-      console.error('Failed to assign orders:', err);
+      // console.error('Failed to assign orders:', err);
       setError('Failed to assign orders. Please try again.');
     } finally {
       setLoading(false);
@@ -278,12 +278,12 @@ export default function OrderListPage() {
     setLoading(true);
     setError(null);
     try {
-      console.log('currentPackingStatus', orderId)
+      // console.log('currentPackingStatus', orderId)
       await apiService.markOrderAsPacked(orderId, !currentPackingStatus);
       alert(`Order ${orderId.substring(0, 8)}... packing status updated!`);
       setTriggerFetch(prev => prev + 1);
     } catch (err) {
-      console.error(`Failed to update packing status for order ${orderId}:`, err);
+      // console.error(`Failed to update packing status for order ${orderId}:`, err);
       setError('Failed to update packing status. Please try again.');
     } finally {
       setLoading(false);
@@ -304,7 +304,7 @@ export default function OrderListPage() {
       setEditingOrderId(null);
       setTriggerFetch(prev => prev + 1);
     } catch (err) {
-      console.error(`Failed to update delivery status for order ${orderId}:`, err);
+      // console.error(`Failed to update delivery status for order ${orderId}:`, err);
       setError('Failed to update delivery status. Please try again.');
     } finally {
       setLoading(false);
@@ -323,7 +323,7 @@ export default function OrderListPage() {
         hour12: true
       });
     } catch (e) {
-      console.error("Invalid date string:", dateString, e);
+      // console.error("Invalid date string:", dateString, e);
       return dateString;
     }
   };
@@ -368,7 +368,7 @@ export default function OrderListPage() {
       alert('Copied to clipboard!');
       setShowCopyDropdown(null);
     }).catch(err => {
-      console.error('Failed to copy: ', err);
+      // console.error('Failed to copy: ', err);
       alert('Failed to copy to clipboard.');
     });
   }, []);

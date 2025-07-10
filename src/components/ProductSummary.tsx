@@ -29,7 +29,7 @@ const ProductSummary: React.FC<ProductSummaryProps> = ({
         throw new Error('Invalid cart data format');
       }
     } catch (e: any) {
-      console.error('ProductSummary: Error validating data:', e);
+      // console.error('ProductSummary: Error validating data:', e);
       setError(`Failed to process cart data: ${e.message || 'Unknown error'}`);
     }
   }, [normalItems, offerSets]);

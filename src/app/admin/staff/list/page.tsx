@@ -54,7 +54,7 @@ export default function StaffListPage() {
         // Recalculate totalPages based on all fetched staff
         setTotalPages(Math.ceil(fetchedStaff.length / pageSize));
       } catch (err) {
-        console.error('Failed to fetch all staff:', err);
+        // console.error('Failed to fetch all staff:', err);
         setError('Failed to load staff list. Please try again.');
         setAllStaff([]);
         setTotalItems(0);
@@ -132,7 +132,7 @@ export default function StaffListPage() {
         );
         setLoading(false); // Hide loading after update
       } catch (err) {
-        console.error('Failed to update staff status:', err);
+        // console.error('Failed to update staff status:', err);
         setError('Failed to update staff status. Please try again.');
         setLoading(false);
       }
@@ -151,7 +151,7 @@ export default function StaffListPage() {
         setAllStaff(prevAllStaff => prevAllStaff.filter(member => member.id !== staffId));
         setLoading(false); // Hide loading after deletion
       } catch (err) {
-        console.error('Failed to delete staff:', err);
+        // console.error('Failed to delete staff:', err);
         setError('Failed to delete staff member. Please try again.');
         setLoading(false);
       }

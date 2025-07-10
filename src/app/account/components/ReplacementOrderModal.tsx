@@ -129,8 +129,8 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
           apiService.getValidOffers()
         ]);
         
-        console.log('Order data response:', orderResponse);
-        console.log('Valid offers response:', offersResponse);
+        // console.log('Order data response:', orderResponse);
+        // console.log('Valid offers response:', offersResponse);
         
         setOrderData(orderResponse);
         setOffers(offersResponse?.data || []);
@@ -150,7 +150,7 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
         
         setLoading(false);
       } catch (error) {
-        console.error('Error fetching data:', error);
+        // console.error('Error fetching data:', error);
         setLoading(false);
       }
     };
@@ -397,11 +397,11 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
         return itemData;
       });
       
-      console.log('Replacement request payload for backend:', {
-        order_id: orderId,
-        request_details: requestDetails,
-        items: items
-      });
+      // console.log('Replacement request payload for backend:', {
+      //   order_id: orderId,
+      //   request_details: requestDetails,
+      //   items: items
+      // });
 
       // Create FormData for file upload
       const formData = new FormData();
@@ -430,7 +430,7 @@ export default function ReplacementOrderModal({ orderId, onClose, onSuccess }: R
       // Call your API to process the replacement
       await apiService.requestReplacement(formData);
 
-      console.log('Replacement request submitted successfully');
+      // console.log('Replacement request submitted successfully');
       onSuccess();
     } catch (error: any) {
       setError(error.message || 'Failed to submit replacement request. Please try again.');

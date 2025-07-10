@@ -47,10 +47,10 @@ export default memo(function OfferMobileSlider({
     useEffect(() => {
         if (isOpen) {
             document.body.style.overflow = 'hidden';
-            console.log("📱 OfferMobileSlider: Body overflow hidden.");
+            // console.log("📱 OfferMobileSlider: Body overflow hidden.");
         } else {
             document.body.style.overflow = 'unset';
-            console.log("📱 OfferMobileSlider: Body overflow unset.");
+            // console.log("📱 OfferMobileSlider: Body overflow unset.");
         }
         return () => {
             document.body.style.overflow = 'unset';
@@ -100,7 +100,7 @@ export default memo(function OfferMobileSlider({
     const handleBuyNow = useCallback(async () => {
         if (!isOfferComplete()) return;
 
-        console.log('📱 OfferMobileSlider: Adding offer to cart, authMode:', authMode, 'isAuthenticated:', isAuthenticated);
+        // console.log('📱 OfferMobileSlider: Adding offer to cart, authMode:', authMode, 'isAuthenticated:', isAuthenticated);
 
         const filledSlots = slots.filter(slot => slot.product);
 
@@ -133,7 +133,7 @@ export default memo(function OfferMobileSlider({
         // FIXED: Only assign paid/free status for GUEST users
         // For authenticated users, let the backend determine paid/free status
         if (authMode === 'guest' && !isAuthenticated) {
-            console.log("📱 OfferMobileSlider: Guest user detected - assigning paid/free status based on price");
+            // console.log("📱 OfferMobileSlider: Guest user detected - assigning paid/free status based on price");
             
             // Create individual product units for sorting
             const individualProducts: (ProductItemDetails & { quantity: number; selectedVariant?: ProductVariant; originalIndex: number })[] = [];
@@ -190,15 +190,15 @@ export default memo(function OfferMobileSlider({
             });
             
             aggregatedOfferItems = Array.from(finalAggregatedMap.values());
-            console.log("📱 OfferMobileSlider: Guest offer items with paid/free status:", 
-                aggregatedOfferItems.map(item => ({
-                    name: item.product_name,
-                    isPaid: item.isPaid,
-                    quantity: item.quantity
-                }))
-            );
+            // console.log("📱 OfferMobileSlider: Guest offer items with paid/free status:", 
+            //     aggregatedOfferItems.map(item => ({
+            //         name: item.product_name,
+            //         isPaid: item.isPaid,
+            //         quantity: item.quantity
+            //     }))
+            // );
         } else {
-            console.log("🔑 OfferMobileSlider: Authenticated user - assigning temporary paid/free status for immediate display");
+            // console.log("🔑 OfferMobileSlider: Authenticated user - assigning temporary paid/free status for immediate display");
             // For authenticated users, assign paid/free status temporarily for immediate display
             // Backend will sync the correct status later
             const individualProducts: (ProductItemDetails & { quantity: number; selectedVariant?: ProductVariant; originalIndex: number })[] = [];
@@ -254,13 +254,13 @@ export default memo(function OfferMobileSlider({
             });
             
             aggregatedOfferItems = Array.from(finalAggregatedMap.values());
-            console.log("🔑 Authenticated user - temporary paid/free assignment for immediate display:", 
-                aggregatedOfferItems.map(item => ({
-                    name: item.product_name,
-                    isPaid: item.isPaid,
-                    quantity: item.quantity
-                }))
-            );
+            // console.log("🔑 Authenticated user - temporary paid/free assignment for immediate display:", 
+            //     aggregatedOfferItems.map(item => ({
+            //         name: item.product_name,
+            //         isPaid: item.isPaid,
+            //         quantity: item.quantity
+            //     }))
+            // );
         }
 
         // FIXED: Let CartContext handle ID management completely
@@ -278,7 +278,7 @@ export default memo(function OfferMobileSlider({
         };
 
         try {
-            console.log("📱 OfferMobileSlider: Dispatching ADD_OFFER_SET with items:", offerSetPayload);
+            // console.log("📱 OfferMobileSlider: Dispatching ADD_OFFER_SET with items:", offerSetPayload);
             
             // FIXED: Just dispatch - no manual delay needed, CartContext handles everything
             dispatchCart({ type: 'ADD_OFFER_SET', payload: offerSetPayload });
@@ -289,7 +289,7 @@ export default memo(function OfferMobileSlider({
             }, 50);
             
         } catch (error) {
-            console.error('❌ OfferMobileSlider: Failed to add to cart:', error);
+            // console.error('❌ OfferMobileSlider: Failed to add to cart:', error);
             alert('Failed to add offer. Please try again.');
         }
     }, [dispatchCart, offerData, isOfferComplete, onOpenCartDrawer, slots, isAuthenticated, authMode]);

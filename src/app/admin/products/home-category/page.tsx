@@ -34,7 +34,7 @@ export default function HomeCategoryListPage() {
       setTotalItems(response.length);
       setTotalPages(Math.ceil(response.length / pageSize));
     } catch (err) {
-      console.error('Failed to fetch home categories:', err);
+      // console.error('Failed to fetch home categories:', err);
       setError('Failed to load home categories. Please try again.');
       setCategories([]);
     } finally {
@@ -62,7 +62,7 @@ export default function HomeCategoryListPage() {
   const handleDeleteCategory = useCallback((categoryId: string) => {
     if (confirm(`Are you sure you want to delete home category "${categoryId}"?`)) {
       // Implement actual API call for deletion here
-      console.log(`Deleting home category with ID: ${categoryId}`);
+      // console.log(`Deleting home category with ID: ${categoryId}`);
       // After successful deletion, you might want to refetch categories to update the list
       // apiService.deleteHomeCategory(categoryId).then(() => fetchCategories());
       alert('Delete functionality not yet implemented in API.');

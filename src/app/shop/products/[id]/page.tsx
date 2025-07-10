@@ -87,7 +87,7 @@ export default function ProductDetailPage() {
           }
         }
       } catch (err) {
-        console.error('Error fetching product:', err);
+        // console.error('Error fetching product:', err);
         setError('Failed to load product details');
       } finally {
         setIsLoading(false);
@@ -188,7 +188,7 @@ export default function ProductDetailPage() {
   };
 
   const handleAddressSelected = (addressId: string): void => {
-    console.log(`Proceeding with address ID: ${addressId}`);
+    // console.log(`Proceeding with address ID: ${addressId}`);
     setIsCheckoutToOpen(false);
   };
 

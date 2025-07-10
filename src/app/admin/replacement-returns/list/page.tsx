@@ -70,7 +70,7 @@ export default function ReplacementOrdersListPage() {
       setTotalItems(response.total || response.replacements_orders?.length || 0);
       setTotalPages(response.total_pages || Math.ceil((response.total || response.replacements_orders?.length || 0) / pageSize));
     } catch (err) {
-      console.error('Failed to fetch replacement orders:', err);
+      // console.error('Failed to fetch replacement orders:', err);
       setError('Failed to load replacement orders. Please try again.');
       setReplacementOrders([]);
     } finally {
@@ -134,7 +134,7 @@ export default function ReplacementOrdersListPage() {
         hour12: true
       });
     } catch (e) {
-      console.error("Invalid date string:", dateString, e);
+      // console.error("Invalid date string:", dateString, e);
       return dateString;
     }
   };

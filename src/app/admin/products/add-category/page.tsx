@@ -38,7 +38,7 @@ export default function AddEditCategoryPage() {
       }
       setFormError(null);
     } catch (err) {
-      console.error('Error fetching category:', err);
+      // console.error('Error fetching category:', err);
       setFormError('Failed to load category details. Please try again.');
     } finally {
       setIsLoading(false);
@@ -135,7 +135,7 @@ export default function AddEditCategoryPage() {
 
       router.push('/admin/products/categories');
     } catch (err) {
-      console.error(`Error ${isEditMode ? 'updating' : 'creating'} category:`, err);
+      // console.error(`Error ${isEditMode ? 'updating' : 'creating'} category:`, err);
       // More user-friendly error messages based on API response if possible
       setFormError(`Failed to ${isEditMode ? 'update' : 'create'} category. Please try again.`);
     } finally {

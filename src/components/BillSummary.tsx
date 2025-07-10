@@ -141,13 +141,13 @@ const BillSummary: React.FC<BillSummaryProps> = ({
       // If checkoutMode is 'cart', items and offer_sets are *omitted* from payload
       // as backend is expected to retrieve them from the user's cart on the server.
 
-      console.log('BillSummary: getProductAmountDetailed payload:', payload);
+      // console.log('BillSummary: getProductAmountDetailed payload:', payload);
 
       const response = await apiService.getProductAmountDetailed(payload);
 
       if (!isMounted.current) return;
 
-      console.log('BillSummary: Bill details response:', response);
+      // console.log('BillSummary: Bill details response:', response);
       if (response) {
         safeSetState(setResponseData, response);
       } else {
@@ -156,7 +156,7 @@ const BillSummary: React.FC<BillSummaryProps> = ({
         onError(errorMsg);
       }
     } catch (error) {
-      console.error('BillSummary: Error fetching bill details:', error);
+      // console.error('BillSummary: Error fetching bill details:', error);
       const errorMsg = 'An error occurred while calculating your order total';
       if (isMounted.current) {
         safeSetState(setError, errorMsg);
@@ -206,11 +206,11 @@ const BillSummary: React.FC<BillSummaryProps> = ({
     }
     // For 'cart' mode, items are omitted and backend retrieves from user's cart
 
-    console.log('BillSummary: Order creation payload:', payload);
+    // console.log('BillSummary: Order creation payload:', payload);
 
     const response = await apiService.createProductsOrder(payload);
 
-    console.log('BillSummary: Order creation response:', response);
+    // console.log('BillSummary: Order creation response:', response);
 
     // Fixed condition to handle both COD and Razorpay orders
     if (response && response.order_details && response.order_details.order_id) {

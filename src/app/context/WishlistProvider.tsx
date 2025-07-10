@@ -35,9 +35,9 @@ export function WishlistProvider({ children }: WishlistProviderProps) {
   const fetchWishlist = useCallback(async () => {
     setIsLoading(true);
     try {
-      console.log('WishlistProvider: Fetching wishlist...');
+      // console.log('WishlistProvider: Fetching wishlist...');
       const items = await wishlistService.getUnifiedWishlist();
-      console.log('WishlistProvider: Raw wishlist items:', items);
+      // console.log('WishlistProvider: Raw wishlist items:', items);
       
       // Remove duplicates and get unique product IDs
       const uniqueProductIds = Array.from(new Set(
@@ -48,10 +48,10 @@ export function WishlistProvider({ children }: WishlistProviderProps) {
         return originalId || cleanId;
       });
       
-      console.log('WishlistProvider: Unique product IDs:', uniqueProductIds);
+      // console.log('WishlistProvider: Unique product IDs:', uniqueProductIds);
       setWishlistItems(uniqueProductIds);
     } catch (error) {
-      console.error('WishlistProvider: Error fetching wishlist:', error);
+      // console.error('WishlistProvider: Error fetching wishlist:', error);
       setWishlistItems([]);
     } finally {
       setIsLoading(false);
@@ -65,7 +65,7 @@ export function WishlistProvider({ children }: WishlistProviderProps) {
   // Listen for auth state changes to refresh wishlist and sync
   useEffect(() => {
     const handleUserLogin = async () => {
-      console.log('WishlistProvider: User logged in, syncing wishlist...');
+      // console.log('WishlistProvider: User logged in, syncing wishlist...');
       try {
         // Sync localStorage wishlist to backend
         await wishlistService.syncLocalWishlistToBackend();
@@ -73,7 +73,7 @@ export function WishlistProvider({ children }: WishlistProviderProps) {
         await fetchWishlist();
         showToast.success('Wishlist synced successfully!');
       } catch (error) {
-        console.error('WishlistProvider: Error syncing wishlist after login:', error);
+        // console.error('WishlistProvider: Error syncing wishlist after login:', error);
         showToast.error('Failed to sync wishlist');
         // Still refresh to get backend wishlist
         await fetchWishlist();
@@ -81,7 +81,7 @@ export function WishlistProvider({ children }: WishlistProviderProps) {
     };
 
     const handleUserLogout = () => {
-      console.log('WishlistProvider: User logged out, refreshing wishlist...');
+      // console.log('WishlistProvider: User logged out, refreshing wishlist...');
       fetchWishlist();
     };
 
@@ -101,10 +101,10 @@ export function WishlistProvider({ children }: WishlistProviderProps) {
 
   const toggleWishlist = useCallback(async (productId: string): Promise<void> => {
     try {
-      console.log('WishlistProvider: Toggling wishlist for product:', productId);
+      // console.log('WishlistProvider: Toggling wishlist for product:', productId);
       
       const result = await wishlistService.toggleWishlistItem(productId);
-      console.log('WishlistProvider: Toggle result:', result);
+      // console.log('WishlistProvider: Toggle result:', result);
       
       // Update local state immediately for responsive UI
       setWishlistItems(prevItems => {
@@ -131,24 +131,24 @@ export function WishlistProvider({ children }: WishlistProviderProps) {
       }
       
     } catch (error) {
-      console.error('WishlistProvider: Error updating wishlist:', error);
+      // console.error('WishlistProvider: Error updating wishlist:', error);
       showToast.error('Failed to update wishlist. Please try again.');
     }
   }, []);
 
   const refreshWishlist = useCallback(async (): Promise<void> => {
-    console.log('WishlistProvider: Manually refreshing wishlist...');
+    // console.log('WishlistProvider: Manually refreshing wishlist...');
     await fetchWishlist();
   }, [fetchWishlist]);
 
   const syncWishlistAfterLogin = useCallback(async (): Promise<void> => {
-    console.log('WishlistProvider: Manual sync after login...');
+    // console.log('WishlistProvider: Manual sync after login...');
     try {
       await wishlistService.syncLocalWishlistToBackend();
       await fetchWishlist();
       showToast.success('Wishlist synced successfully!');
     } catch (error) {
-      console.error('WishlistProvider: Error during manual sync:', error);
+      // console.error('WishlistProvider: Error during manual sync:', error);
       showToast.error('Failed to sync wishlist');
       // Still refresh to get current state
       await fetchWishlist();

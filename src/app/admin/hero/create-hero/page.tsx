@@ -56,7 +56,7 @@ export default function CreateHeroBannerPage() {
         setSmallImagePreview(`${process.env.NEXT_PUBLIC_API_BASE_URL}${bannerData.small_image}`);
       }
     } catch (err) {
-      console.error('Error fetching banner details:', err);
+      // console.error('Error fetching banner details:', err);
       setError('Failed to load banner details. Please try again.');
     }
   };
@@ -129,7 +129,7 @@ export default function CreateHeroBannerPage() {
       alert(isEditMode ? 'Hero banner updated successfully!' : 'Hero banner created successfully!');
       router.push('/admin/hero/list');
     } catch (err) {
-      console.error('Error saving hero banner:', err);
+      // console.error('Error saving hero banner:', err);
       setError('Failed to save hero banner. Please try again.');
     } finally {
       setIsSubmitting(false);

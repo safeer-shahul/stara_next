@@ -122,7 +122,7 @@ function AddCouponPage() {
       }
 
     } catch (err) {
-      console.error('Error fetching coupon data:', err);
+      // console.error('Error fetching coupon data:', err);
       setFormError('Failed to load coupon data. Please try again.');
     } finally {
       setIsFetchingInitialData(false);
@@ -163,7 +163,7 @@ function AddCouponPage() {
       setHasMoreProducts(newFetchedProducts.length > 0); // Check if there's more to load
 
     } catch (err) {
-      console.error('Error loading products:', err);
+      // console.error('Error loading products:', err);
       setFormError('Failed to load products for selection. Please try again.');
     } finally {
       setIsProductsLoading(false);
@@ -340,7 +340,7 @@ function AddCouponPage() {
       alert(`Coupon "${couponName}" ${isEditMode ? 'updated' : 'created'} successfully!`);
       router.push('/admin/coupons/list');
     } catch (err: any) {
-      console.error('Error processing coupon:', err);
+      // console.error('Error processing coupon:', err);
       let errorMessage = `Failed to ${isEditMode ? 'update' : 'create'} coupon. Please try again.`;
       if (err.response?.data?.detail) {
         errorMessage = `Error: ${err.response.data.detail}`;

@@ -31,10 +31,10 @@ export default function WishlistPage() {
       try {
         setLoading(true);
         const response = await wishlistService.getDetailedWishlist();
-        console.log('Wishlist response:', response);
+        // console.log('Wishlist response:', response);
         setWishlistItems(response);
       } catch (error) {
-        console.error('Error fetching wishlist:', error);
+        // console.error('Error fetching wishlist:', error);
         setWishlistItems([]);
         showToast.error('Failed to load wishlist. Please try again.');
       } finally {
@@ -56,7 +56,7 @@ export default function WishlistPage() {
       // Refresh the wishlist context
       await refreshWishlist();
     } catch (error) {
-      console.error('Error removing item from wishlist:', error);
+      // console.error('Error removing item from wishlist:', error);
       showToast.error('Failed to remove item from wishlist.');
     }
   }, [toggleWishlist, refreshWishlist]);

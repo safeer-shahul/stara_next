@@ -12,11 +12,11 @@ export default function ProfileInfo() {
     const fetchUserProfile = async () => {
       try {
         const response = await apiService.getUserProfile();
-        console.log(response, 'getmecustomer');
+        // console.log(response, 'getmecustomer');
         setProfile(response);
         setLoading(false);
       } catch (error) {
-        console.error('Failed to fetch user profile:', error);
+        // console.error('Failed to fetch user profile:', error);
         setLoading(false);
       }
     };

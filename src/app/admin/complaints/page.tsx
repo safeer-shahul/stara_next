@@ -61,35 +61,35 @@ export default function AdminComplaintsPage() {
     const fetchAllComplaintsData = async () => {
   setLoading(true);
   try {
-    console.log('Fetching complaints from:', process.env.NEXT_PUBLIC_API_BASE_URL);
+    // console.log('Fetching complaints from:', process.env.NEXT_PUBLIC_API_BASE_URL);
     const response = await apiService.getAllEnquiries();
     const fetchedComplaints = response?.data || response || [];
     
-    console.log('Fetched complaints:', fetchedComplaints);
+    // console.log('Fetched complaints:', fetchedComplaints);
     setAllComplaints(fetchedComplaints);
     setTotalItems(fetchedComplaints.length);
     setTotalPages(Math.ceil(fetchedComplaints.length / pageSize));
   } catch (err: any) {
-    console.error('Detailed error:', err);
+    // console.error('Detailed error:', err);
     
     // Handle different types of errors
     if (err.response) {
       // Server responded with error status
-      console.error('Response error:', {
-        status: err.response.status,
-        data: err.response.data,
-        headers: err.response.headers
-      });
+      // console.error('Response error:', {
+      //   status: err.response.status,
+      //   data: err.response.data,
+      //   headers: err.response.headers
+      // });
       
       const errorDetails = `Status: ${err.response.status} | Data: ${JSON.stringify(err.response.data)} | Headers: ${JSON.stringify(err.response.headers)}`;
       showToast.error(`API Error - ${errorDetails}`);
     } else if (err.request) {
       // Request was made but no response received
-      console.error('No response received:', err.request);
+      // console.error('No response received:', err.request);
       showToast.error('Network Error - No response from server');
     } else {
       // Something else happened
-      console.error('Error setting up request:', err.message);
+      // console.error('Error setting up request:', err.message);
       showToast.error(`Request Setup Error - ${err.message}`);
     }
     

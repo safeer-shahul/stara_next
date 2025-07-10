@@ -52,7 +52,7 @@ export default function Header() {
         setCategories(formattedCategories);
         setCategoryError(null);
       } catch (err) {
-        console.error('Failed to fetch categories:', err);
+        // console.error('Failed to fetch categories:', err);
         setCategoryError('Failed to load categories');
       } finally {
         setLoadingCategories(false);
@@ -105,7 +105,7 @@ export default function Header() {
       const response = await apiService.getUserProfile();
       setUserProfile(response);
     } catch (error) {
-      console.error('Failed to fetch user profile:', error);
+      // console.error('Failed to fetch user profile:', error);
       setUserProfile(null);
       setIsLoggedIn(false);
     }

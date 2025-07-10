@@ -28,7 +28,7 @@ export default function WishlistButton({ productId, className = '', size = 16 }:
     try {
       await toggleWishlist(productId);
     } catch (error) {
-      console.error('Error toggling wishlist:', error);
+      // console.error('Error toggling wishlist:', error);
     } finally {
       // Reset animation state after a short delay
       setTimeout(() => setIsAnimating(false), 300);

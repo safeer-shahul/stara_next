@@ -118,7 +118,7 @@ function AddOfferPage() {
       await loadProducts(1, selectedProductsFromOffer);
 
     } catch (err) {
-      console.error('Error fetching offer data:', err);
+      // console.error('Error fetching offer data:', err);
       setFormError('Failed to load offer data. Please try again.');
     } finally {
       setIsLoading(false);
@@ -164,7 +164,7 @@ function AddOfferPage() {
         setCurrentPage(page);
       }
     } catch (err) {
-      console.error('Error loading products:', err);
+      // console.error('Error loading products:', err);
       setFormError('Failed to load products. Please try again.');
     } finally {
       setIsLoading(false);
@@ -408,7 +408,7 @@ function AddOfferPage() {
       alert(`Offer "${offerName}" ${isEditMode ? 'updated' : 'created'} successfully!`);
       router.push('/admin/offers/list');
     } catch (err: any) {
-      console.error('Error processing offer:', err);
+      // console.error('Error processing offer:', err);
       let errorMessage = `Failed to ${isEditMode ? 'update' : 'create'} offer. Please try again.`;
       if (err.response?.data?.detail) {
         errorMessage = `Error: ${err.response.data.detail}`;

@@ -104,11 +104,11 @@ export default function ReturnOrderModal({ orderId, orderItems, onClose, onSucce
       
       // For demo purposes, simulate API call
       await new Promise(resolve => setTimeout(resolve, 1500));
-      console.log('Return request submitted:', returnData);
+      // console.log('Return request submitted:', returnData);
       
       onSuccess();
     } catch (err: any) {
-      console.error('Return request failed:', err);
+      // console.error('Return request failed:', err);
       setError(err.message || 'Failed to submit return request. Please try again.');
       setSubmitting(false);
     }

@@ -46,7 +46,7 @@ export default function LowStockListPage() {
         throw new Error(response.message || 'Failed to fetch low stock items');
       }
     } catch (err) {
-      console.error('Failed to fetch low stock items:', err);
+      // console.error('Failed to fetch low stock items:', err);
       setError('Failed to load low stock items. Please try again.');
       setLowStockItems([]);
       setTotalItems(0);

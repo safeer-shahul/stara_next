@@ -27,7 +27,7 @@ export default function CategoryGrid() {
       try {
         setLoading(true);
         const categoryData = await apiService.getAllCategoriesPublic();
-        console.log(categoryData,'categoryData')
+        // console.log(categoryData,'categoryData')
         const formattedCategories:any = categoryData.map(category => ({
           image: `${process.env.NEXT_PUBLIC_API_BASE_URL}${category.category_image}`, 
           title: category.category_name.toUpperCase(),
@@ -38,7 +38,7 @@ export default function CategoryGrid() {
         setCategories(formattedCategories);
         setError(null);
       } catch (err) {
-        console.error('Failed to fetch categories:', err);
+        // console.error('Failed to fetch categories:', err);
         setError('Failed to load categories');
       } finally {
         setLoading(false);

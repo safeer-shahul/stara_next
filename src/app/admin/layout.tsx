@@ -163,7 +163,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
       setAuthChecked(true);
     } catch (error) {
-      console.error('Auth check failed:', error);
+      // console.error('Auth check failed:', error);
       setAdminUser(null);
       setAuthChecked(false);
       router.push('/admin/login');
@@ -298,7 +298,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     });
 
     if (!isCurrentPathAllowed) {
-      console.warn(`Staff user '${adminUser.username}' attempted to access unauthorized path: '${pathname}'. Redirecting to dashboard.`);
+      // console.warn(`Staff user '${adminUser.username}' attempted to access unauthorized path: '${pathname}'. Redirecting to dashboard.`);
       router.push('/admin');
       return null;
     }

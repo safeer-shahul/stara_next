@@ -169,7 +169,7 @@ const AddressForm: React.FC<AddressFormProps> = ({
         setPincodeError('This pincode is not serviceable. Please check and try again.');
       }
     } catch (error) {
-      console.error('Error verifying pincode:', error);
+      // console.error('Error verifying pincode:', error);
       setIsPincodeVerified(false);
       setPincodeError('Failed to verify pincode. Please try again.');
     } finally {
@@ -200,7 +200,7 @@ const AddressForm: React.FC<AddressFormProps> = ({
           }
         }
       } catch (error) {
-        console.error('Error adding address:', error);
+        // console.error('Error adding address:', error);
         setApiError('Failed to save address. Please try again.');
       } finally {
         setLoading(false);

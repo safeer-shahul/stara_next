@@ -152,7 +152,7 @@ class ApiService {
                 this.processQueue(null); // Resolve all pending requests
                 resolve(axios.request(originalRequest)); // Resolve with the retried original request
               } catch (refreshError: any) {
-                console.error('Token refresh failed:', refreshError);
+                // console.error('Token refresh failed:', refreshError);
                 this.logout(true); // Forced logout without Swal, triggered by error
                 this.processQueue(refreshError); // Reject all pending requests
                 reject(refreshError); // Reject the current request
@@ -205,7 +205,7 @@ public async logout(silent: boolean = false, router?: any): Promise<void> {
   if (typeof window !== 'undefined') {
     // 🔄 STEP 1: Save current cart to localStorage before logout
     try {
-      console.log('💾 Preserving cart state before logout...');
+      // console.log('💾 Preserving cart state before logout...');
       
       // Trigger cart context to save current state
       window.dispatchEvent(new CustomEvent('beforeLogout'));
@@ -213,9 +213,9 @@ public async logout(silent: boolean = false, router?: any): Promise<void> {
       // Give time for cart context to respond
       await new Promise(resolve => setTimeout(resolve, 200));
       
-      console.log('✅ Cart state preserved for guest mode');
+      // console.log('✅ Cart state preserved for guest mode');
     } catch (error) {
-      console.error('❌ Error preserving cart state:', error);
+      // console.error('❌ Error preserving cart state:', error);
     }
 
     // 🗑️ STEP 2: Clear authentication tokens and conditionally clear admin data
@@ -227,11 +227,11 @@ public async logout(silent: boolean = false, router?: any): Promise<void> {
       try {
         const userData = JSON.parse(adminUserData);
         if (userData.is_superuser) {
-          console.log('🔧 Clearing admin user data for admin user');
+          // console.log('🔧 Clearing admin user data for admin user');
           localStorage.removeItem('adminUserData');
         }
       } catch (error) {
-        console.error('Error parsing admin user data during logout:', error);
+        // console.error('Error parsing admin user data during logout:', error);
         localStorage.removeItem('adminUserData');
       }
     }
@@ -268,12 +268,12 @@ public async logout(silent: boolean = false, router?: any): Promise<void> {
       const hasUnsavedCart = cartItems && JSON.parse(cartItems).length > 0;
       
       if (hasUnsavedCart) {
-        console.log('🛒 Cart has items that will be preserved during logout');
+        // console.log('🛒 Cart has items that will be preserved during logout');
       }
       
       return true; // Always allow logout, but inform user
     } catch (error) {
-      console.error('❌ Error checking logout safety:', error);
+      // console.error('❌ Error checking logout safety:', error);
       return true; // Default to allowing logout
     }
   }
@@ -281,14 +281,14 @@ public async logout(silent: boolean = false, router?: any): Promise<void> {
   // Optional: Add method to restore cart after login
   public async restoreCartAfterLogin(): Promise<void> {
     try {
-      console.log('🔄 Checking for cart restoration after login...');
+      // console.log('🔄 Checking for cart restoration after login...');
       
       // This is handled automatically by cartContext, but can be called manually
       window.dispatchEvent(new CustomEvent('afterLogin'));
       
-      console.log('✅ Cart restoration event dispatched');
+      // console.log('✅ Cart restoration event dispatched');
     } catch (error) {
-      console.error('❌ Error dispatching cart restoration event:', error);
+      // console.error('❌ Error dispatching cart restoration event:', error);
     }
   }
 
@@ -300,7 +300,7 @@ public async logout(silent: boolean = false, router?: any): Promise<void> {
       const response = await this.publicApiClient.post<TokenResponse>('/api/token/', payload);
       return response.data;
     } catch (error) {
-      console.error('Error in getAuthorizationToken:', error);
+      // console.error('Error in getAuthorizationToken:', error);
       throw error;
     }
   }
@@ -318,7 +318,7 @@ public async logout(silent: boolean = false, router?: any): Promise<void> {
       // console.log('User profile response:', response);
       return response;
     } catch (error) {
-      console.error('Error getting user profile:', error);
+      // console.error('Error getting user profile:', error);
       throw error;
     }
   }
@@ -330,7 +330,7 @@ public async logout(silent: boolean = false, router?: any): Promise<void> {
       });
       return response.data;
     } catch (error) {
-      console.error(`Error in GET request to ${url}:`, error);
+      // console.error(`Error in GET request to ${url}:`, error);
       throw error;
     }
   }
@@ -342,7 +342,7 @@ public async logout(silent: boolean = false, router?: any): Promise<void> {
       });
       return response.data;
     } catch (error) {
-      console.error(`Error in public GET request to ${url}:`, error);
+      // console.error(`Error in public GET request to ${url}:`, error);
       throw error;
     }
   }
@@ -359,7 +359,7 @@ public async logout(silent: boolean = false, router?: any): Promise<void> {
       const response = await this.apiClient.post<T>(url, data, { headers });
       return response.data;
     } catch (error) {
-      console.error('Error in POST request:', error);
+      // console.error('Error in POST request:', error);
       throw error;
     }
   }
@@ -376,7 +376,7 @@ public async logout(silent: boolean = false, router?: any): Promise<void> {
       const response = await this.publicApiClient.post<T>(url, data, { headers });
       return response.data;
     } catch (error) {
-      console.error('Error in public POST request:', error);
+      // console.error('Error in public POST request:', error);
       throw error;
     }
   }
@@ -388,7 +388,7 @@ public async logout(silent: boolean = false, router?: any): Promise<void> {
       });
       return response.data;
     } catch (error) {
-      console.error('Error in PUT request:', error);
+      // console.error('Error in PUT request:', error);
       throw error;
     }
   }
@@ -400,7 +400,7 @@ public async logout(silent: boolean = false, router?: any): Promise<void> {
       });
       return response.data;
     } catch (error) {
-      console.error('Error in DELETE request:', error);
+      // console.error('Error in DELETE request:', error);
       throw error;
     }
   }
@@ -460,7 +460,7 @@ public async logout(silent: boolean = false, router?: any): Promise<void> {
       
       return await this.post<any>('/category/create_category', formData, true);
     } catch (error) {
-      console.error('Error creating category:', error);
+      // console.error('Error creating category:', error);
       throw error;
     }
   }
@@ -477,7 +477,7 @@ public async logout(silent: boolean = false, router?: any): Promise<void> {
       }
       return await this.get<any>(url);
     } catch (error) {
-      console.error('Error fetching paginated categories:', error);
+      // console.error('Error fetching paginated categories:', error);
       throw error;
     }
   }
@@ -493,7 +493,7 @@ public async logout(silent: boolean = false, router?: any): Promise<void> {
       const response = await this.get<any>(`/category/get_paginated_category?page=1&page_size=1000&get_sub_category=true`);
       return response.results;
     } catch (error) {
-      console.error('Error fetching all categories:', error);
+      // console.error('Error fetching all categories:', error);
       throw error;
     }
   }
@@ -509,7 +509,7 @@ public async logout(silent: boolean = false, router?: any): Promise<void> {
       const response = await this.getPublic<any>(`/category/get_paginated_category?page=1&page_size=1000&get_sub_category=true`);
       return response.results;
     } catch (error) {
-      console.error('Error fetching all categories (public):', error);
+      // console.error('Error fetching all categories (public):', error);
       throw error;
     }
   }
@@ -551,7 +551,7 @@ public async logout(silent: boolean = false, router?: any): Promise<void> {
       }
       return await this.getPublic<any>(url);
     } catch (error) {
-      console.error('Error fetching paginated products:', error);
+      // console.error('Error fetching paginated products:', error);
       throw error;
     }
   }
@@ -713,7 +713,7 @@ public async logout(silent: boolean = false, router?: any): Promise<void> {
 
       return await this.get<any>(url);
     } catch (error) {
-      console.error('Error fetching paginated orders:', error);
+      // console.error('Error fetching paginated orders:', error);
       throw error;
     }
   }
@@ -930,7 +930,7 @@ public async getPaginatedReplacementRequests(
     
     return await this.get<any>(url);
   } catch (error) {
-    console.error('Error fetching paginated replacement requests:', error);
+    // console.error('Error fetching paginated replacement requests:', error);
     throw error;
   }
 }
@@ -1074,7 +1074,7 @@ public async getReplacementOrdersPaginated(
           
     return await this.get<any>(url);
   } catch (error) {
-    console.error('Error fetching paginated orders:', error);
+    // console.error('Error fetching paginated orders:', error);
     throw error;
   }
 }

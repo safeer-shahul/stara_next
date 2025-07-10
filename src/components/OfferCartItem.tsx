@@ -46,18 +46,18 @@ export default function OfferCartItem({ offerSet, onRemove, fromProductSummary =
 
   const handleRemove = async () => {
     if (onRemove) {
-      console.log('🗑️ OfferCartItem: Removing offer item with ID:', offerSet);
-      console.log('🗑️ OfferCartItem: Offer details:', {
-        offerId: offerSet.offer,
-        offerName: offerSet.offer_name.offer_name,
-        itemId: offerSet.id
-      });
+      // console.log('🗑️ OfferCartItem: Removing offer item with ID:', offerSet);
+      // console.log('🗑️ OfferCartItem: Offer details:', {
+      //   offerId: offerSet.offer,
+      //   offerName: offerSet.offer_name.offer_name,
+      //   itemId: offerSet.id
+      // });
       await onRemove(offerSet.id);
     }
   };
 
   if (offerSet.offer_items.length === 0) {
-    console.warn('⚠️ OfferCartItem: offer_items is empty for offerSet:', offerSet);
+    // console.warn('⚠️ OfferCartItem: offer_items is empty for offerSet:', offerSet);
     return null;
   }
 
@@ -78,18 +78,18 @@ export default function OfferCartItem({ offerSet, onRemove, fromProductSummary =
     isPaid?: boolean;
   }) => {
     // Fix: Check isPaid flag correctly
-    console.log('💳 OfferCartItem: Product isPaid status:', product.product_name, 'isPaid:', product.isPaid);
+    // console.log('💳 OfferCartItem: Product isPaid status:', product.product_name, 'isPaid:', product.isPaid);
     return {
       isPaid: product.isPaid === true, // Explicitly check for true
       quantity: product.quantity
     };
   };
 
-  console.log('🎁 OfferCartItem: Rendering offer with items:', offerSet.offer_items.map(item => ({
-    name: item.product_name,
-    isPaid: item.isPaid,
-    quantity: item.quantity
-  })));
+  // console.log('🎁 OfferCartItem: Rendering offer with items:', offerSet.offer_items.map(item => ({
+  //   name: item.product_name,
+  //   isPaid: item.isPaid,
+  //   quantity: item.quantity
+  // })));
 
   return (
     <div className={`relative rounded-xl border-2 transition-all duration-300 overflow-hidden ${

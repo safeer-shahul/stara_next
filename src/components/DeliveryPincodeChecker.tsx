@@ -37,7 +37,7 @@ export default function DeliveryPincodeChecker({
         setIsDeliveryAvailable(false);
       }
     } catch (error) {
-      console.error('Error checking pincode:', error);
+      // console.error('Error checking pincode:', error);
       setError("Failed to check pincode. Please try again.");
       setIsDeliveryAvailable(null);
     } finally {

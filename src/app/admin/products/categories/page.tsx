@@ -50,7 +50,7 @@ export default function CategoriesPage() {
       setTotalItems(response.count);
       setTotalPages(Math.ceil(response.count / pageSize));
     } catch (err) {
-      console.error('Failed to fetch categories:', err);
+      // console.error('Failed to fetch categories:', err);
       setError('Failed to load categories. Please try again.');
       setCategories([]);
     } finally {
@@ -79,7 +79,7 @@ export default function CategoriesPage() {
   const handleDeleteCategory = useCallback((categoryId: string) => {
     if (confirm(`Are you sure you want to delete category ${categoryId}?`)) {
       // Implement actual API call for deletion here
-      console.log(`Deleting category with ID: ${categoryId}`);
+      // console.log(`Deleting category with ID: ${categoryId}`);
       // After successful deletion, you might want to refetch categories
       // fetchCategories(); // Uncomment this after implementing delete API
       alert('Delete functionality not yet implemented in API.');

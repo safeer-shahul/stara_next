@@ -30,7 +30,7 @@ export default function HeroBannersListPage() {
       const response: HeroBanner[] = await apiService.getHeroBanners();
       setBanners(response);
     } catch (err) {
-      console.error('Failed to fetch hero banners:', err);
+      // console.error('Failed to fetch hero banners:', err);
       setError('Failed to load hero banners. Please try again.');
       setBanners([]);
     } finally {

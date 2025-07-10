@@ -47,7 +47,7 @@ export default function Home() {
       setHomeCategories(response);
       setError(null);
     } catch (err) {
-      console.error('Failed to fetch home categories:', err);
+      // console.error('Failed to fetch home categories:', err);
       setError('Failed to load home categories. Please try again.');
       setHomeCategories([]);
     } finally {
@@ -58,7 +58,7 @@ export default function Home() {
   const fetchOffers = async () => {
     try {
       const response = await apiService.getValidOffers();
-      console.log('Offers data:', response);
+      // console.log('Offers data:', response);
       // Extract the data array from the API response
       if (response && response.data) {
         setOffers(response.data);
@@ -66,7 +66,7 @@ export default function Home() {
         setOffers([]);
       }
     } catch (err) {
-      console.error('Failed to fetch offers:', err);
+      // console.error('Failed to fetch offers:', err);
       setOffers([]);
     }
   };

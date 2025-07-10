@@ -94,17 +94,17 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
     }
 
     try {
-      console.log('🔍 CartDrawer: Performing silent initial sync...');
+      // console.log('🔍 CartDrawer: Performing silent initial sync...');
       
       // Silent sync - no loading indicators
       await forceRefreshCart();
       
       hasPerformedInitialSync.current = true;
       setLastSyncTime(Date.now());
-      console.log('✅ CartDrawer: Silent sync completed');
+      // console.log('✅ CartDrawer: Silent sync completed');
       
     } catch (error) {
-      console.error('❌ CartDrawer: Error in initial sync:', error);
+      // console.error('❌ CartDrawer: Error in initial sync:', error);
       hasPerformedInitialSync.current = true; // Prevent retry loops
     } finally {
       setIsInitialSyncing(false);
@@ -112,33 +112,33 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
   }, [authMode, forceRefreshCart]);
 
   const handleRemoveItem = useCallback(async (id: string): Promise<void> => {
-    console.log(`🗑️ CartDrawer: Removing item with ID: ${id}`);
+    // console.log(`🗑️ CartDrawer: Removing item with ID: ${id}`);
     
     const itemToRemove = cartItems.find(item => item.id === id);
     if (itemToRemove) {
-      console.log(`🗑️ CartDrawer: Removing ${itemToRemove.type} item:`, {
-        id: itemToRemove.id,
-        type: itemToRemove.type,
-        name: itemToRemove.type === 'normal' 
-          ? (itemToRemove as CartNormalItem).product_name 
-          : (itemToRemove as CartOfferItem).offer_name.offer_name
-      });
+      // console.log(`🗑️ CartDrawer: Removing ${itemToRemove.type} item:`, {
+      //   id: itemToRemove.id,
+      //   type: itemToRemove.type,
+      //   name: itemToRemove.type === 'normal' 
+      //     ? (itemToRemove as CartNormalItem).product_name 
+      //     : (itemToRemove as CartOfferItem).offer_name.offer_name
+      // });
     }
     
     dispatchCart({ type: 'REMOVE_ITEM', payload: id });
   }, [dispatchCart, cartItems]);
 
   const handleQuantityChange = useCallback(async (id: string, change: number): Promise<void> => {
-    console.log('📊 CartDrawer: handleQuantityChange called for item ID:', id, 'change:', change);
+    // console.log('📊 CartDrawer: handleQuantityChange called for item ID:', id, 'change:', change);
     const itemToUpdate = cartItems.find(item => item.id === id);
 
     if (!itemToUpdate || itemToUpdate.type !== 'normal') {
-      console.warn(`❌ CartDrawer: Cannot update quantity - item not found or not normal type`);
+      // console.warn(`❌ CartDrawer: Cannot update quantity - item not found or not normal type`);
       return;
     }
 
     if (!itemToUpdate.productDetails) {
-      console.error(`❌ CartDrawer: Cannot update quantity - missing productDetails`);
+      // console.error(`❌ CartDrawer: Cannot update quantity - missing productDetails`);
       alert('Cannot update quantity: product data incomplete. Please refresh your cart.');
       return;
     }
@@ -154,12 +154,12 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
 
     if (newQuantity > currentEffectiveStock + itemToUpdate.quantity) {
       const maxAllowed = currentEffectiveStock + itemToUpdate.quantity;
-      console.warn(`⚠️ CartDrawer: Cannot increase quantity beyond stock limit`);
+      // console.warn(`⚠️ CartDrawer: Cannot increase quantity beyond stock limit`);
       alert(`Cannot add more: Maximum available stock is ${maxAllowed} units.`);
       return;
     }
 
-    console.log(`📊 CartDrawer: Updating quantity for item ${id} to ${newQuantity}`);
+    // console.log(`📊 CartDrawer: Updating quantity for item ${id} to ${newQuantity}`);
     dispatchCart({ type: 'UPDATE_ITEM_QUANTITY', payload: { id, quantity: newQuantity } });
   }, [cartItems, dispatchCart, getEffectiveProductStock, handleRemoveItem]);
 
@@ -172,18 +172,18 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
   }, []);
 
   const handleAddressSelected = useCallback((addressId: string): void => {
-    console.log(`✅ CartDrawer: Proceeding with address ID: ${addressId}`);
+    // console.log(`✅ CartDrawer: Proceeding with address ID: ${addressId}`);
     setShowCheckoutModal(false);
   }, []);
 
   const handleClearCart = useCallback(async (): Promise<void> => {
     try {
-      console.log('🧹 CartDrawer: Clearing cart');
+      // console.log('🧹 CartDrawer: Clearing cart');
       await clearCart();
       hasPerformedInitialSync.current = false;
       setLastSyncTime(0);
     } catch (error) {
-      console.error('❌ CartDrawer: Error clearing cart:', error);
+      // console.error('❌ CartDrawer: Error clearing cart:', error);
       dispatchCart({ type: 'CLEAR_CART' });
     }
   }, [clearCart, dispatchCart]);
@@ -192,11 +192,11 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
   const handleManualRefresh = useCallback(async (): Promise<void> => {
     const timeSinceLastSync = Date.now() - lastSyncTime;
     if (timeSinceLastSync < 5000) { // 5 second cooldown
-      console.log('🔄 Refresh cooldown active, please wait...');
+      // console.log('🔄 Refresh cooldown active, please wait...');
       return;
     }
 
-    console.log('🔄 Manual cart refresh requested');
+    // console.log('🔄 Manual cart refresh requested');
     setIsManualRefreshing(true);
     hasPerformedInitialSync.current = false;
     
@@ -205,7 +205,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
       hasPerformedInitialSync.current = true;
       setLastSyncTime(Date.now());
     } catch (error) {
-      console.error('❌ Error in manual refresh:', error);
+      // console.error('❌ Error in manual refresh:', error);
     } finally {
       setIsManualRefreshing(false);
     }
@@ -226,7 +226,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
     try {
       return cartUtils.calculateDetailedTotals(cartItems);
     } catch (error) {
-      console.error('❌ Error calculating totals:', error);
+      // console.error('❌ Error calculating totals:', error);
       return {
         normalSubtotal: 0,
         offerSubtotal: 0,
@@ -260,17 +260,17 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
   const isBlocking = isInitialSyncing || isManualRefreshing;
   const showLoadingOverlay = isInitialSyncing && cartItems.length === 0;
 
-  console.log('🎨 CartDrawer: Rendering with items:', {
-    total: cartItems.length,
-    normal: normalItems.length,
-    offers: offerItems.length,
-    totals,
-    authMode,
-    isBlocking,
-    showLoadingOverlay,
-    hasPerformedSync: hasPerformedInitialSync.current,
-    lastSyncTime
-  });
+  // console.log('🎨 CartDrawer: Rendering with items:', {
+  //   total: cartItems.length,
+  //   normal: normalItems.length,
+  //   offers: offerItems.length,
+  //   totals,
+  //   authMode,
+  //   isBlocking,
+  //   showLoadingOverlay,
+  //   hasPerformedSync: hasPerformedInitialSync.current,
+  //   lastSyncTime
+  // });
 
   return (
     <>

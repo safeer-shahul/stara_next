@@ -127,9 +127,9 @@ const saveToLocalStorage = (items: CartItemType[]) => {
   if (typeof window !== 'undefined') {
     try {
       localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
-      console.log('💾 Cart saved to localStorage:', items.length, 'items');
+      // console.log('💾 Cart saved to localStorage:', items.length, 'items');
     } catch (error) {
-      console.error('❌ Error saving to localStorage:', error);
+      // console.error('❌ Error saving to localStorage:', error);
     }
   }
 };
@@ -141,7 +141,7 @@ const loadFromLocalStorage = (): CartItemType[] => {
     const stored = localStorage.getItem(CART_STORAGE_KEY);
     if (stored) {
       const parsed = JSON.parse(stored);
-      console.log('📂 Cart loaded from localStorage:', parsed.length, 'items');
+      // console.log('📂 Cart loaded from localStorage:', parsed.length, 'items');
       return parsed.map((item: any) => ({
         ...item,
         id: item.id || uuidv4(),
@@ -149,7 +149,7 @@ const loadFromLocalStorage = (): CartItemType[] => {
       }));
     }
   } catch (error) {
-    console.error('❌ Error loading from localStorage:', error);
+    // console.error('❌ Error loading from localStorage:', error);
     localStorage.removeItem(CART_STORAGE_KEY);
   }
   return [];
@@ -158,7 +158,7 @@ const loadFromLocalStorage = (): CartItemType[] => {
 const clearLocalStorage = () => {
   if (typeof window !== 'undefined') {
     localStorage.removeItem(CART_STORAGE_KEY);
-    console.log('🗑️ Cart localStorage cleared');
+    // console.log('🗑️ Cart localStorage cleared');
   }
 };
 
@@ -168,11 +168,11 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
 
   switch (action.type) {
     case 'SET_CART_ITEMS':
-      console.log('🔄 Reducer: SET_CART_ITEMS', action.payload.length, 'items');
+      // console.log('🔄 Reducer: SET_CART_ITEMS', action.payload.length, 'items');
       return { ...state, cartItems: action.payload };
 
     case 'ADD_NORMAL_ITEM':
-      console.log('➕ Reducer: ADD_NORMAL_ITEM', action.payload.product_name);
+      // console.log('➕ Reducer: ADD_NORMAL_ITEM', action.payload.product_name);
 
       const incomingHasVariant = !!action.payload.selectedVariant;
       const incomingVariantId = action.payload.selectedVariant?.id;
@@ -209,7 +209,7 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
       return { ...state, cartItems: newItems };
 
     case 'ADD_OFFER_SET':
-      console.log('🎁 Reducer: ADD_OFFER_SET', action.payload.offer_name.offer_name);
+      // console.log('🎁 Reducer: ADD_OFFER_SET', action.payload.offer_name.offer_name);
 
       const newOfferSet: CartOfferItem = {
         ...action.payload,
@@ -222,7 +222,7 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
       return { ...state, cartItems: newItems };
 
     case 'UPDATE_OFFER_ID':
-      console.log('🔄 Reducer: UPDATE_OFFER_ID', `${action.payload.tempId} → ${action.payload.actualId}`);
+      // console.log('🔄 Reducer: UPDATE_OFFER_ID', `${action.payload.tempId} → ${action.payload.actualId}`);
       newItems = state.cartItems.map((item) => {
         if (item.type === 'offer' && item.id === action.payload.tempId) {
           return {
@@ -237,7 +237,7 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
       return { ...state, cartItems: newItems };
 
     case 'UPDATE_NORMAL_ID':
-      console.log('🔄 Reducer: UPDATE_NORMAL_ID', `${action.payload.tempId} → ${action.payload.actualId}`);
+      // console.log('🔄 Reducer: UPDATE_NORMAL_ID', `${action.payload.tempId} → ${action.payload.actualId}`);
       newItems = state.cartItems.map((item) => {
         if (item.type === 'normal' && item.id === action.payload.tempId) {
           return {
@@ -253,12 +253,12 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
       return { ...state, cartItems: newItems };
 
     case 'REMOVE_ITEM':
-      console.log('🗑️ Reducer: REMOVE_ITEM', action.payload);
+      // console.log('🗑️ Reducer: REMOVE_ITEM', action.payload);
       newItems = state.cartItems.filter((item) => item.id !== action.payload);
       return { ...state, cartItems: newItems };
 
     case 'UPDATE_ITEM_QUANTITY':
-      console.log('📊 Reducer: UPDATE_ITEM_QUANTITY', action.payload);
+      // console.log('📊 Reducer: UPDATE_ITEM_QUANTITY', action.payload);
       newItems = state.cartItems.map((item) => {
         if (item.type === 'normal' && item.id === action.payload.id) {
           return {
@@ -273,7 +273,7 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
       return { ...state, cartItems: newItems };
 
     case 'CLEAR_CART':
-      console.log('🧹 Reducer: CLEAR_CART');
+      // console.log('🧹 Reducer: CLEAR_CART');
       return { ...state, cartItems: [] };
 
     case 'SET_LOADING':
@@ -287,7 +287,7 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
       return state; // Ignore other loading requests
 
     default:
-      console.warn(`❓ Unhandled action type: ${(action as { type: string }).type}`);
+      // console.warn(`❓ Unhandled action type: ${(action as { type: string }).type}`);
       return state;
   }
 };
@@ -310,7 +310,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   // Listen for beforeLogout event to save cart
   useEffect(() => {
     const handleBeforeLogout = () => {
-      console.log('💾 Saving cart before logout...');
+      // console.log('💾 Saving cart before logout...');
       saveToLocalStorage(state.cartItems);
     };
 
@@ -325,13 +325,13 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
         dispatch({ type: 'SET_LOADING', payload: true });
       }
       
-      console.log('🔄 Loading cart from API...');
+      // console.log('🔄 Loading cart from API...');
       const cartItems = await cartService.fetchCartFromBackend();
       dispatch({ type: 'SET_CART_ITEMS', payload: cartItems });
       
-      console.log(`✅ Cart loaded from API: ${cartItems.length} items`);
+      // console.log(`✅ Cart loaded from API: ${cartItems.length} items`);
     } catch (error) {
-      console.error('❌ Error loading cart from API:', error);
+      // console.error('❌ Error loading cart from API:', error);
       const fallbackItems = loadFromLocalStorage();
       dispatch({ type: 'SET_CART_ITEMS', payload: fallbackItems });
     } finally {
@@ -345,20 +345,20 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     if (!isInitialized.current) {
       const initializeCart = async () => {
-        console.log('🚀 Initializing cart...');
+        // console.log('🚀 Initializing cart...');
         
         const currentAccessToken = localStorage.getItem('accessToken');
-        console.log('🔍 AccessToken check:', currentAccessToken ? 'Found' : 'Not found');
+        // console.log('🔍 AccessToken check:', currentAccessToken ? 'Found' : 'Not found');
         
         if (currentAccessToken) {
-          console.log('🔑 Authenticated user detected');
+          // console.log('🔑 Authenticated user detected');
           setAuthMode('authenticated');
           
           // Load from API without loading state - let cart drawer handle it
           await loadCartFromAPI(false);
           
         } else {
-          console.log('👤 Guest user detected');
+          // console.log('👤 Guest user detected');
           setAuthMode('guest');
           
           const storedItems = loadFromLocalStorage();
@@ -368,7 +368,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
               const processedItems = await cartService.processGuestOffers(storedItems);
               dispatch({ type: 'SET_CART_ITEMS', payload: processedItems });
             } catch (error) {
-              console.error('❌ Error processing guest offers:', error);
+              // console.error('❌ Error processing guest offers:', error);
               dispatch({ type: 'SET_CART_ITEMS', payload: storedItems });
             }
           } else {
@@ -394,11 +394,11 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       const previousToken = prevAccessTokenRef.current;
 
       if (!previousToken && currentAccessToken) {
-        console.log('🔑 Login detected - switching to API-first mode');
+        // console.log('🔑 Login detected - switching to API-first mode');
         setAuthMode('authenticated');
         handleLoginTransition();
       } else if (previousToken && !currentAccessToken) {
-        console.log('🚪 Logout detected - switching to localStorage mode');
+        // console.log('🚪 Logout detected - switching to localStorage mode');
         setAuthMode('guest');
         handleLogoutTransition();
       }
@@ -414,22 +414,22 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   // Handle login transition: localStorage → API
   const handleLoginTransition = useCallback(async () => {
     try {
-      console.log('📤 Transferring localStorage cart to backend...');
+      // console.log('📤 Transferring localStorage cart to backend...');
       
       const localItems = loadFromLocalStorage();
       
       if (localItems.length > 0) {
         await cartService.pushLocalCartToBackend(localItems);
-        console.log('✅ Local cart transferred to backend');
+        // console.log('✅ Local cart transferred to backend');
       }
       
       clearLocalStorage();
-      console.log('🗑️ localStorage cleared');
+      // console.log('🗑️ localStorage cleared');
       
       await loadCartFromAPI(false);
       
     } catch (error) {
-      console.error('❌ Error during login transition:', error);
+      // console.error('❌ Error during login transition:', error);
       const fallbackItems = loadFromLocalStorage();
       dispatch({ type: 'SET_CART_ITEMS', payload: fallbackItems });
     }
@@ -438,14 +438,14 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   // Handle logout transition: API → localStorage
   const handleLogoutTransition = useCallback(async () => {
     try {
-      console.log('💾 Cart preserved for guest mode');
+      // console.log('💾 Cart preserved for guest mode');
       
       const storedItems = loadFromLocalStorage();
       const processedItems = await cartService.processGuestOffers(storedItems);
       dispatch({ type: 'SET_CART_ITEMS', payload: processedItems });
       
     } catch (error) {
-      console.error('❌ Error during logout transition:', error);
+      // console.error('❌ Error during logout transition:', error);
       const fallbackItems = loadFromLocalStorage();
       dispatch({ type: 'SET_CART_ITEMS', payload: fallbackItems });
     }
@@ -456,18 +456,18 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     if (authMode !== 'authenticated') return false;
     
     try {
-      console.log('🔍 Performing lightweight backend cart check...');
+      // console.log('🔍 Performing lightweight backend cart check...');
       
       const backendCartResponse = await apiService.getUserCart();
       const normalItems = backendCartResponse?.shopping_cart?.items || [];
       const offerItems = backendCartResponse?.offer_cart?.items || [];
       const isEmpty = normalItems.length === 0 && offerItems.length === 0;
       
-      console.log(`📊 Backend cart check: ${isEmpty ? 'empty' : 'has items'} (${normalItems.length + offerItems.length} total)`);
+      // console.log(`📊 Backend cart check: ${isEmpty ? 'empty' : 'has items'} (${normalItems.length + offerItems.length} total)`);
       return isEmpty;
       
     } catch (error) {
-      console.error('❌ Error checking backend cart:', error);
+      // console.error('❌ Error checking backend cart:', error);
       return false;
     }
   }, [authMode]);
@@ -492,14 +492,14 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
           if (action.type === 'ADD_NORMAL_ITEM') {
             const operationKey = `add-${action.payload.product_id}-${action.payload.selectedVariant?.id || 'no-variant'}`;
             if (pendingOperations.current.has(operationKey)) {
-              console.log('⏳ Add operation already pending for:', action.payload.product_id);
+              // console.log('⏳ Add operation already pending for:', action.payload.product_id);
               return;
             }
             
             pendingOperations.current.add(operationKey);
 
             try {
-              console.log('➕ Adding item to backend:', action.payload.product_id);
+              // console.log('➕ Adding item to backend:', action.payload.product_id);
               
               // OPTIMISTIC UPDATE: Add to UI immediately
               const itemId = action.payload.id;
@@ -544,10 +544,10 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
                 }
               }
               
-              console.log('✅ Item added successfully');
+              // console.log('✅ Item added successfully');
               
             } catch (error) {
-              console.error('❌ Error adding item:', error);
+              // console.error('❌ Error adding item:', error);
               // Rollback on error
               dispatch({ type: 'REMOVE_ITEM', payload: action.payload.id });
             } finally {
@@ -577,10 +577,10 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
                 await cartService.removeNormalItem(action.payload);
               }
               
-              console.log('✅ Item removed successfully');
+              // console.log('✅ Item removed successfully');
               
             } catch (error) {
-              console.error('❌ Error removing item:', error);
+              // console.error('❌ Error removing item:', error);
               // Rollback on error - re-add the item
               if (itemToRemove) {
                 if (itemToRemove.type === 'normal') {
@@ -633,11 +633,11 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
                   });
                 }
                 
-                console.log('✅ Quantity updated successfully');
+                // console.log('✅ Quantity updated successfully');
               }
               
             } catch (error) {
-              console.error('❌ Error updating quantity:', error);
+              // console.error('❌ Error updating quantity:', error);
               // Rollback on error - restore old quantity
               dispatch({ 
                 type: 'UPDATE_ITEM_QUANTITY', 
@@ -695,10 +695,10 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
                 });
               }
               
-              console.log('✅ Offer added successfully');
+              // console.log('✅ Offer added successfully');
               
             } catch (error) {
-              console.error('❌ Error adding offer:', error);
+              // console.error('❌ Error adding offer:', error);
               // Rollback on error
               dispatch({ type: 'REMOVE_ITEM', payload: action.payload.id });
             } finally {
@@ -714,10 +714,10 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
               // Background API call - NO loading states
               await apiService.addToCart({ mode: 'delete_cart' });
               
-              console.log('✅ Cart cleared successfully');
+              // console.log('✅ Cart cleared successfully');
               
             } catch (error) {
-              console.error('❌ Error clearing cart:', error);
+              // console.error('❌ Error clearing cart:', error);
               // Note: We don't rollback cart clear as it's usually intentional
             }
           }
@@ -734,7 +734,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
           }
           
         } catch (error) {
-          console.error(`❌ Error in ${action.type}:`, error);
+          // console.error(`❌ Error in ${action.type}:`, error);
           // For critical errors, still update the UI
           dispatch(action);
         }
@@ -757,7 +757,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
         const processedItems = await cartService.processGuestOffers(storedItems);
         dispatch({ type: 'SET_CART_ITEMS', payload: processedItems });
       } catch (error) {
-        console.error('❌ Error in force refresh:', error);
+        // console.error('❌ Error in force refresh:', error);
         const fallbackItems = loadFromLocalStorage();
         dispatch({ type: 'SET_CART_ITEMS', payload: fallbackItems });
       } finally {
@@ -778,7 +778,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
         // Background API call
         await apiService.addToCart({ mode: 'delete_cart' });
       } catch (error) {
-        console.error('❌ Error clearing cart on backend:', error);
+        // console.error('❌ Error clearing cart on backend:', error);
         // UI is already cleared, so no rollback needed
       }
     } else {

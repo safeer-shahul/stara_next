@@ -37,7 +37,7 @@ const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
         razorpayInstanceRef.current.close();
         razorpayInstanceRef.current = null;
       } catch (e) {
-        console.log('Error closing Razorpay', e);
+        // console.log('Error closing Razorpay', e);
       }
     }
   };
@@ -49,7 +49,7 @@ const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
       if (paymentHandledRef.current) return;
       paymentHandledRef.current = true;
       
-      console.log('Payment response received:', paymentResponse);
+      // console.log('Payment response received:', paymentResponse);
       
       // Make sure to close the Razorpay modal first
       closeRazorpay();
@@ -58,7 +58,7 @@ const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
       await new Promise(resolve => setTimeout(resolve, 300));
       
       const response = await apiService.verifyPayment(paymentResponse);
-      console.log('Payment verification response:', response);
+      // console.log('Payment verification response:', response);
       
       if (response) {
         // Use a timeout to ensure state updates complete before navigating
@@ -71,7 +71,7 @@ const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
         onError(errorMessage);
       }
     } catch (error) {
-      console.error('Error verifying payment:', error);
+      // console.error('Error verifying payment:', error);
       const errorMessage = 'Error verifying payment. Please contact support.';
       setError(errorMessage);
       onError(errorMessage);
@@ -165,7 +165,7 @@ const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
         }, 300);
         
       } catch (error) {
-        console.error('Error initializing payment:', error);
+        // console.error('Error initializing payment:', error);
         const errorMessage = 'Failed to initialize payment. Please try again.';
         setError(errorMessage);
         onError(errorMessage);

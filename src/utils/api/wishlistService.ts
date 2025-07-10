@@ -18,13 +18,13 @@ export interface WishlistItemFromBackend {
 export const wishlistService = {
   // Fetch wishlist for authenticated users
   fetchWishlistFromBackend: async (): Promise<string[]> => {
-    console.log("wishlistService: Fetching wishlist from backend");
+    // console.log("wishlistService: Fetching wishlist from backend");
     try {
       const response = await apiService.getWishlist();
-      console.log("wishlistService: Raw backend wishlist response:", response);
+      // console.log("wishlistService: Raw backend wishlist response:", response);
       
       if (!response || !Array.isArray(response)) {
-        console.log("wishlistService: Invalid response format, returning empty array");
+        // console.log("wishlistService: Invalid response format, returning empty array");
         return [];
       }
       
@@ -33,8 +33,8 @@ export const wishlistService = {
         response.map((id: string) => id.replace(/-/g, ''))
       ));
       
-      console.log("wishlistService: Unique product IDs after deduplication:", uniqueProductIds);
-      console.log("wishlistService: Original count:", response.length, "-> Deduplicated count:", uniqueProductIds.length);
+      // console.log("wishlistService: Unique product IDs after deduplication:", uniqueProductIds);
+      // console.log("wishlistService: Original count:", response.length, "-> Deduplicated count:", uniqueProductIds.length);
       
       // Return with original format (add hyphens back if needed)
       const result = uniqueProductIds.map(cleanId => {
@@ -43,36 +43,36 @@ export const wishlistService = {
         return originalId || cleanId;
       });
       
-      console.log("wishlistService: Final result:", result);
+      // console.log("wishlistService: Final result:", result);
       return result;
     } catch (error) {
-      console.error('wishlistService: Error fetching wishlist from backend:', error);
+      // console.error('wishlistService: Error fetching wishlist from backend:', error);
       return [];
     }
   },
 
   // Fetch detailed wishlist with product details for authenticated users
   fetchDetailedWishlistFromBackend: async (): Promise<WishlistItemFromBackend[]> => {
-    console.log("wishlistService: Fetching detailed wishlist from backend");
+    // console.log("wishlistService: Fetching detailed wishlist from backend");
     try {
       const response = await apiService.getMyWishlist();
-      console.log("wishlistService: Backend detailed wishlist response:", response);
-      console.log("wishlistService: Number of items returned:", response?.length || 0);
+      // console.log("wishlistService: Backend detailed wishlist response:", response);
+      // console.log("wishlistService: Number of items returned:", response?.length || 0);
       
       if (!response || !Array.isArray(response)) {
-        console.log("wishlistService: Invalid detailed response format, returning empty array");
+        // console.log("wishlistService: Invalid detailed response format, returning empty array");
         return [];
       }
       
       // Add isInStock property to each product
       const processedItems = response.map((item: WishlistItemFromBackend, index: number) => {
-        console.log(`wishlistService: Processing item ${index + 1}:`, {
-          id: item.id,
-          productId: item.products?.id,
-          productName: item.products?.product_name,
-          hasVariants: item.products?.have_variants,
-          variants: item.products?.product_variant?.length || 0
-        });
+        // console.log(`wishlistService: Processing item ${index + 1}:`, {
+        //   id: item.id,
+        //   productId: item.products?.id,
+        //   productName: item.products?.product_name,
+        //   hasVariants: item.products?.have_variants,
+        //   variants: item.products?.product_variant?.length || 0
+        // });
         
         return {
           ...item,
@@ -85,27 +85,27 @@ export const wishlistService = {
         };
       });
       
-      console.log("wishlistService: Processed items count:", processedItems.length);
+      // console.log("wishlistService: Processed items count:", processedItems.length);
       return processedItems;
     } catch (error) {
-      console.error('wishlistService: Error fetching detailed wishlist from backend:', error);
+      // console.error('wishlistService: Error fetching detailed wishlist from backend:', error);
       return [];
     }
   },
 
   // Fetch wishlist from localStorage
   fetchWishlistFromLocalStorage: (): string[] => {
-    console.log("wishlistService: Fetching wishlist from localStorage");
+    // console.log("wishlistService: Fetching wishlist from localStorage");
     try {
       const localWishlist = localStorage.getItem('wishlist');
       if (localWishlist) {
         const parsed = JSON.parse(localWishlist);
-        console.log("wishlistService: LocalStorage wishlist:", parsed);
+        // console.log("wishlistService: LocalStorage wishlist:", parsed);
         return Array.isArray(parsed) ? parsed : [];
       }
       return [];
     } catch (error) {
-      console.error('wishlistService: Error parsing localStorage wishlist:', error);
+      // console.error('wishlistService: Error parsing localStorage wishlist:', error);
       localStorage.removeItem('wishlist');
       return [];
     }
@@ -113,7 +113,7 @@ export const wishlistService = {
 
   // Fetch product details for localStorage wishlist IDs
   fetchProductDetailsForLocalWishlist: async (productIds: string[]): Promise<WishlistItemFromBackend[]> => {
-    console.log("wishlistService: Fetching product details for", productIds.length, "products");
+    // console.log("wishlistService: Fetching product details for", productIds.length, "products");
     
     if (productIds.length === 0) {
       return [];
@@ -131,7 +131,7 @@ export const wishlistService = {
         cleanProductIds
       );
       
-      console.log("wishlistService: Products fetched:", productsResponse.products?.length || 0);
+      // console.log("wishlistService: Products fetched:", productsResponse.products?.length || 0);
       
       // Transform to wishlist item format
       const wishlistItems: WishlistItemFromBackend[] = productsResponse.products?.map((product: any) => {
@@ -170,39 +170,39 @@ export const wishlistService = {
         };
       }) || [];
 
-      console.log("wishlistService: Transformed wishlist items:", wishlistItems.length);
+      // console.log("wishlistService: Transformed wishlist items:", wishlistItems.length);
       return wishlistItems;
     } catch (error) {
-      console.error('wishlistService: Error fetching product details:', error);
+      // console.error('wishlistService: Error fetching product details:', error);
       return [];
     }
   },
 
   // Save wishlist to localStorage
   saveWishlistToLocalStorage: (productIds: string[]): void => {
-    console.log("wishlistService: Saving wishlist to localStorage:", productIds);
+    // console.log("wishlistService: Saving wishlist to localStorage:", productIds);
     try {
       localStorage.setItem('wishlist', JSON.stringify(productIds));
     } catch (error) {
-      console.error('wishlistService: Error saving wishlist to localStorage:', error);
+      // console.error('wishlistService: Error saving wishlist to localStorage:', error);
     }
   },
 
   // Add/remove item from wishlist
   toggleWishlistItem: async (productId: string): Promise<{ isInWishlist: boolean; action: 'added' | 'removed' }> => {
-    console.log("wishlistService: Toggling wishlist item:", productId);
+    // console.log("wishlistService: Toggling wishlist item:", productId);
     const accessToken = localStorage.getItem('accessToken');
     const cleanProductId = productId.replace(/-/g, '');
 
     try {
       if (accessToken) {
         // User is logged in, use API
-        console.log("wishlistService: User logged in, using API");
+        // console.log("wishlistService: User logged in, using API");
         const response = await apiService.addToWishlist({
           product: cleanProductId,
         });
         
-        console.log("wishlistService: API response:", response);
+        // console.log("wishlistService: API response:", response);
         
         // Determine action based on response
         const action = response?.status === 'removed' ? 'removed' : 'added';
@@ -211,7 +211,7 @@ export const wishlistService = {
         return { isInWishlist, action };
       } else {
         // User not logged in, use localStorage
-        console.log("wishlistService: User not logged in, using localStorage");
+        // console.log("wishlistService: User not logged in, using localStorage");
         const currentWishlist = wishlistService.fetchWishlistFromLocalStorage();
         const isCurrentlyInWishlist = currentWishlist.includes(productId);
         
@@ -233,33 +233,33 @@ export const wishlistService = {
         return { isInWishlist: action === 'added', action };
       }
     } catch (error) {
-      console.error('wishlistService: Error toggling wishlist item:', error);
+      // console.error('wishlistService: Error toggling wishlist item:', error);
       throw error;
     }
   },
 
   // Sync localStorage wishlist to backend after login
   syncLocalWishlistToBackend: async (): Promise<void> => {
-    console.log("wishlistService: Syncing localStorage wishlist to backend");
+    // console.log("wishlistService: Syncing localStorage wishlist to backend");
     const accessToken = localStorage.getItem('accessToken');
     
     if (!accessToken) {
-      console.log("wishlistService: No access token, skipping sync");
+      // console.log("wishlistService: No access token, skipping sync");
       return;
     }
 
     try {
       const localWishlist = wishlistService.fetchWishlistFromLocalStorage();
-      console.log("wishlistService: Local wishlist to sync:", localWishlist);
+      // console.log("wishlistService: Local wishlist to sync:", localWishlist);
       
       if (localWishlist.length === 0) {
-        console.log("wishlistService: No local wishlist items to sync");
+        // console.log("wishlistService: No local wishlist items to sync");
         return;
       }
 
       // Get current backend wishlist
       const backendWishlist = await wishlistService.fetchWishlistFromBackend();
-      console.log("wishlistService: Current backend wishlist:", backendWishlist);
+      // console.log("wishlistService: Current backend wishlist:", backendWishlist);
 
       // Find items that are in localStorage but not in backend
       const itemsToSync = localWishlist.filter(localId => {
@@ -267,27 +267,27 @@ export const wishlistService = {
         return !backendWishlist.some(backendId => backendId.replace(/-/g, '') === cleanLocalId);
       });
 
-      console.log("wishlistService: Items to sync to backend:", itemsToSync);
+      // console.log("wishlistService: Items to sync to backend:", itemsToSync);
 
       // Sync each item to backend
       for (const productId of itemsToSync) {
         try {
-          console.log("wishlistService: Syncing product to backend:", productId);
+          // console.log("wishlistService: Syncing product to backend:", productId);
           await apiService.addToWishlist({
             product: productId.replace(/-/g, ''),
           });
-          console.log("wishlistService: Successfully synced product:", productId);
+          // console.log("wishlistService: Successfully synced product:", productId);
         } catch (error) {
-          console.error('wishlistService: Error syncing product to backend:', productId, error);
+          // console.error('wishlistService: Error syncing product to backend:', productId, error);
         }
       }
 
       // Clear localStorage after successful sync
       localStorage.removeItem('wishlist');
-      console.log("wishlistService: Cleared localStorage wishlist after sync");
+      // console.log("wishlistService: Cleared localStorage wishlist after sync");
 
     } catch (error) {
-      console.error('wishlistService: Error during sync:', error);
+      // console.error('wishlistService: Error during sync:', error);
       throw error;
     }
   },

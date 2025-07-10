@@ -64,7 +64,7 @@ export default function ProductSlider({ title, categoryId, products }: ProductSl
       setIsNavigating(productId);
       await router.push(`/shop/products/${productId}`);
     } catch (error) {
-      console.error('Navigation error:', error);
+      // console.error('Navigation error:', error);
     } finally {
       setTimeout(() => setIsNavigating(null), 100);
     }
