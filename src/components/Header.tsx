@@ -150,7 +150,7 @@ export default function Header() {
             <Image src="/starablack.webp" alt="Stara Logo" width={150} height={44} priority />
           </Link>
 
-          <div className="hidden md:block w-1/3">
+          {/* <div className="hidden md:block w-1/3">
             <div className="relative">
               <input
                 type="text"
@@ -163,7 +163,7 @@ export default function Header() {
                 <Search size={18} className='text-[var(--color-primary-950)]'/>
               </button>
             </div>
-          </div>
+          </div> */}
 
           <div className="flex space-x-4">
             <button className="md:hidden" onClick={() => setIsMenuOpen(!isMenuOpen)} aria-label="Toggle menu">
@@ -228,13 +228,13 @@ export default function Header() {
         {isMenuOpen && (
           <div className="md:hidden bg-white absolute w-full z-50 border-t border-gray-200 shadow-lg">
             <div className="p-4">
-              <input
+              {/* <input
                 type="text"
                 placeholder="Search for jewelry..."
                 className="w-full py-2 px-4 mb-4 rounded-full bg-gray-100 focus:outline-none"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-              />
+              /> */}
               
               {isLoggedIn ? (
                 <div className="flex items-center py-2 border-b border-gray-100 mb-2">
