@@ -139,8 +139,7 @@ export default function Header() {
     <>
       <div className="bg-[var(--color-primary-950)] text-white py-2 text-center text-[14px]">
         <p>
-          BUY 1 GET 1 FREE &nbsp;&nbsp;| &nbsp;&nbsp;Use Code&nbsp;&nbsp;
-          <span className="bg-red-500 text-white px-2 py-1 rounded-full text-xs font-bold">TANK</span>
+          Welcome to Stara! Enjoy free shipping on all orders. 
         </p>
       </div>
 
